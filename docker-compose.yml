@@ -4,10 +4,10 @@ services:
   # ------------------------------------
   client:
     build: ./client
-    container_name: apm-client # ชื่อนี้ต้องตรงกับ proxy_pass ใน nginx ตัวแม่
+    container_name: udp-client  # ชื่อนี้ต้องตรงกับ proxy_pass ใน nginx ตัวแม่
     restart: always
     ports:
-      - "3001:80"
+      - "3009:80"
     networks:
       - shared-network
 
@@ -16,13 +16,13 @@ services:
   # ------------------------------------
   server:
     build: ./server
-    container_name: apm-server # ชื่อนี้ต้องตรงกับ proxy_pass ใน nginx ตัวแม่
+    container_name: udp-server  # ชื่อนี้ต้องตรงกับ proxy_pass ใน nginx ตัวแม่
     restart: always
     ports:
-      - "3002:3002"
+      - "3010:3010"
     # ตั้งค่า Environment Variable (Overrides ไฟล์ .env)
     environment:
-      - PORT=3002
+      - PORT=3010
       # **สำคัญมาก**: การเชื่อมต่อ DB ใน Docker Network เดียวกัน
       # ให้ใช้ชื่อ Service "db-mysql" และ Port ภายใน "3306" (ไม่ใช่ 12306)
       - DB_HOST=db-mysql
