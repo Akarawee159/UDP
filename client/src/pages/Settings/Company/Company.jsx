@@ -4,7 +4,7 @@ import {
     PlusOutlined,
     DeleteOutlined,
     EditOutlined,
-    DatabaseTwoTone,
+    SettingFilled,
     SearchOutlined
 } from '@ant-design/icons';
 import api from "../../../api";
@@ -184,7 +184,6 @@ function Company() {
             cellRenderer: ActionRenderer,
             sortable: false,
             filter: false,
-            pinned: 'right',
             lockVisible: true,
             cellClass: "flex items-center justify-center",
             suppressMovable: true,
@@ -223,10 +222,9 @@ function Company() {
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                            <DatabaseTwoTone className="text-blue-600" />
                             ข้อมูลบริษัท
                         </h1>
-                        <p className="text-slate-700 text-sm mt-1 pl-9">
+                        <p className="text-slate-700 text-sm mt-1 pl-1">
                             จัดการโครงสร้างบริษัท
                         </p>
                     </div>

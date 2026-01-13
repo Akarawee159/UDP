@@ -127,10 +127,10 @@ async function getOptions() {
   ] = await Promise.all([
     safeQuery(`SELECT G_NAME AS name_th, G_NAME_EN AS name_en FROM tb_titlename ORDER BY G_ID`, [], 'tb_titlename'),
     safeQuery(`SELECT company_code, company_name_th FROM tb_company ORDER BY company_name_th`, [], 'tb_company'),
-    safeQuery(`SELECT G_CODE AS branch_code, G_NAME AS branch FROM tb_branch ORDER BY G_CODE`, [], 'tb_branch'),
-    safeQuery(`SELECT G_CODE AS dep_code, G_NAME AS department FROM tb_department WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_department'),
+    safeQuery(`SELECT G_CODE AS branch_code, G_NAME AS branch, company_code FROM tb_branch ORDER BY G_CODE`, [], 'tb_branch'),
+    safeQuery(`SELECT G_CODE AS dep_code, G_NAME AS department, branch_code FROM tb_department WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_department'),
     safeQuery(`SELECT G_NAME AS worksites FROM tb_worksites ORDER BY G_CODE`, [], 'tb_worksites'),
-    safeQuery(`SELECT G_NAME AS position FROM tb_position WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_position'),
+    safeQuery(`SELECT G_NAME AS position, department_code FROM tb_position WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_position'),
     safeQuery(`SELECT G_NAME AS employee_type FROM tb_employee_type ORDER BY G_CODE`, [], 'tb_employee_type'),
     safeQuery(`SELECT G_NAME AS working_status FROM tb_working_status ORDER BY G_CODE`, [], 'tb_working_status'),
     safeQuery(`SELECT G_NAME AS resign_reason FROM tb_resign_reason ORDER BY G_CODE`, [], 'tb_resign_reason'),

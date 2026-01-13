@@ -36,7 +36,7 @@ export const menuItems = [
     type: "dropdown",
     children: [
       { id: "201", label: "กำหนดสิทธิผู้ใช้งาน", path: "/management" },
-      { id: "202", label: "กำหนดสิทธิการใช้งาน", path: "/permission" }
+      { id: "202", label: "กำหนดสิทธิการใช้งาน", path: "/permission" },
     ]
   },
   {
@@ -50,11 +50,10 @@ export const menuItems = [
       { id: "301", label: "สาขา", path: "/settings/branch" },
       { id: "302", label: "แผนก", path: "/settings/department" },
       { id: "303", label: "ตำแหน่งงาน", path: "/settings/position" },
-      { id: "304", label: "โซน (Zone)", path: "/settings/position" },
-      { id: "305", label: "โลเคชั่น (Location) ", path: "/settings/position" },
-      { id: "306", label: "หน่วย (Unit)", path: "/settings/position" },
-      { id: "307", label: "ขนาดบรรจุภัณฑ์", path: "/settings/position" },
-      { id: "319", label: "สถานที่อบรม", path: "/settings/training-location" },
+      { id: "304", label: "โซน (Zone)", path: "/settings/zone" },
+      { id: "305", label: "โลเคชั่น (Location) ", path: "/settings/location" },
+      { id: "306", label: "หน่วย (Unit)", path: "/settings/counting-unit" },
+      { id: "307", label: "ขนาดบรรจุภัณฑ์", path: "/settings/packaging-size" },
     ]
   },
   {
@@ -63,21 +62,8 @@ export const menuItems = [
     icon: <DatabaseOutlined />,
     type: "dropdown",
     children: [
-      {
-        id: "401",
-        label: "สร้างข้อมูลพนักงาน",
-        path: "/employees"
-      },
-      {
-        id: "402",
-        label: "สร้างข้อมูลกล่อง",
-        path: "/trainings"
-      },
-      {
-        id: "403",
-        label: "ตารางแผนอบรม",
-        path: "/training-calendar"
-      }
+      { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
+      { id: "402", label: "สร้างข้อมูลกล่อง", path: "/create-box" },
     ]
   },
   {
@@ -86,16 +72,8 @@ export const menuItems = [
     icon: <DropboxOutlined />,
     type: "dropdown",
     children: [
-      {
-        id: "501",
-        label: "ขึ้นทะเบียนกล่อง",
-        path: "/reports/employee-report"
-      },
-      {
-        id: "502",
-        label: "สร้างข้อมูลรายการกล่อง",
-        path: "/reports/training-report"
-      }]
+      { id: "501", label: "ขึ้นทะเบียนกล่อง", path: "/registration/register-box" },
+    ]
   },
   {
     id: "60",
@@ -103,16 +81,9 @@ export const menuItems = [
     icon: <FileTextOutlined />,
     type: "dropdown",
     children: [
-      {
-        id: "601",
-        label: "รายงานพิเศษ (Non-Move)",
-        path: "/reports/employee-report"
-      },
-      {
-        id: "602",
-        label: "รายงานตามสถานะกล่อง",
-        path: "/reports/training-report"
-      }]
+      { id: "601", label: "รายงานพิเศษ (Non-Move)", path: "/reports/employee-report" },
+      { id: "602", label: "รายงานตามสถานะกล่อง", path: "/reports/training-report" },
+    ]
   },
 ];
 

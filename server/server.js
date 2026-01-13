@@ -31,7 +31,6 @@ const branchRoutes = require("./src/modules/settings/branch/branchRoutes");
 const companyRoutes = require("./src/modules/settings/company/companyRoutes");
 const departmentRoutes = require("./src/modules/settings/department/departmentRoutes");
 const positionRoutes = require("./src/modules/settings/position/positionRoutes");
-const trainingLocationRoutes = require("./src/modules/settings/trainingLocation/trainingLocationRoutes");
 
 const reportEmployeeRoutes = require("./src/modules/reports/reportEmployee/reportEmployeeRoutes");
 const reportTrainingRoutes = require("./src/modules/reports/reportTraining/reportTrainingRoutes");
@@ -73,36 +72,39 @@ app.use("/api/management", managementRoutes);
 
 /**
  * =========================
+ * Settings (main=30)
+ * =========================
+ */
+app.use("/api/branch", auth, permit({ mainId: "30", subId: "301" }), branchRoutes);
+app.use("/api/company", auth, permit({ mainId: "30", subId: "302" }), companyRoutes);
+app.use("/api/department", auth, permit({ mainId: "30", subId: "302" }), departmentRoutes);
+app.use("/api/position", auth, permit({ mainId: "30", subId: "303" }), positionRoutes);
+
+/**
+ * =========================
  * Masterdata (main=40)
- * - 401 ข้อมูลพนักงาน
- * - 402 ข้อมูลการอบรม
  * =========================
  */
 app.use("/api/employee", auth, permit({ mainId: "40", subId: "401" }), employeeRoutes);
 app.use("/api/workhistory", auth, permit({ mainId: "40", subId: "401" }), workhistoryRoutes);
 app.use("/api/relatives", auth, permit({ mainId: "40", subId: "401" }), relativesRoutes);
 app.use("/api/location", auth, permit({ mainId: "40", subId: "401" }), locationRoutes);
-
 app.use("/api/trainings", auth, permit({ mainId: "40", subId: "402" }), trainingsRoutes);
 
 /**
  * =========================
- * Settings (main=30)
+ * Registration (main=50)
  * =========================
  */
-app.use("/api/company", auth, permit({ mainId: "30", subId: "300" }), companyRoutes);
-app.use("/api/branch", auth, permit({ mainId: "30", subId: "301" }), branchRoutes);
-app.use("/api/department", auth, permit({ mainId: "30", subId: "302" }), departmentRoutes);
-app.use("/api/position", auth, permit({ mainId: "30", subId: "303" }), positionRoutes);
-app.use("/api/training-location", auth, permit({ mainId: "30", subId: "319" }), trainingLocationRoutes);
+
 
 /**
  * =========================
- * Reports (main=50)
+ * Reports (main=60)
  * =========================
  */
-app.use("/api/report/employee", auth, permit({ mainId: "50", subId: "501" }), reportEmployeeRoutes);
-app.use("/api/report/training", auth, permit({ mainId: "50", subId: "502" }), reportTrainingRoutes);
+app.use("/api/report/employee", auth, permit({ mainId: "60", subId: "601" }), reportEmployeeRoutes);
+app.use("/api/report/training", auth, permit({ mainId: "60", subId: "602" }), reportTrainingRoutes);
 
 /* --------------------- Static File Serving ------------------- */
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));
@@ -110,36 +112,25 @@ app.use("/img/signature", express.static(path.join(__dirname, "src/img/signature
 app.use("/img/employee", express.static(path.join(__dirname, "src/img/employee")));
 
 // Health & root
-app.get("/", (_req, res) => res.send("HRMS API is running"));
+app.get("/", (_req, res) => res.send("UDP API is running"));
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
-
 app.get("/db", async (_req, res) => {
   try {
     // ใช้คำสั่ง SQL ง่ายๆ เพื่อทดสอบ (SELECT 1)
+    // หมายเหตุ: ถ้าใช้ mysql2 ให้ใช้ db.execute หรือ db.query
     await db.execute("SELECT 1");
 
     res.status(200).json({
       status: "ok",
       message: "Database connection is healthy",
-      timestamp: new Date(),
-      // ✅ เพิ่มส่วนแสดงข้อมูล Connection
-      connection: {
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT,
-        database: process.env.DB_NAME || process.env.DB_DATABASE // เผื่อบางคนตั้งชื่อตัวแปรไม่เหมือนกัน
-      }
+      timestamp: new Date()
     });
   } catch (error) {
     console.error("Database Connection Error:", error);
     res.status(500).json({
       status: "error",
       message: "Cannot connect to database",
-      error: error.message,
-      // กรณี Error ก็อาจจะอยากเห็นว่าพยายามต่อที่ไหน (Optional)
-      target: {
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT
-      }
+      error: error.message
     });
   }
 });

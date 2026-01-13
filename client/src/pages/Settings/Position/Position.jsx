@@ -1,36 +1,33 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-// ✅ 1. เพิ่ม Grid ใน import
-import { Table, App, Button, Input, ConfigProvider, Tooltip, Tag, Grid } from 'antd';
+import { App, Button, Input, ConfigProvider, Tooltip, Grid, Space } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
   SearchOutlined,
-  ApartmentOutlined,
-  GlobalOutlined,
   MoreOutlined
 } from '@ant-design/icons';
 import api from "../../../api";
-
 import ModalForm from "./Modal/ModalForm";
 import ModalDelete from "./Modal/ModalDelete";
-
 import { getSocket } from '../../../socketClient';
+// ✅ Import DataTable เข้ามา
+import DataTable from '../../../components/aggrid/DataTable';
 
 function Position() {
   const screens = Grid.useBreakpoint();
   const isMd = !!screens.md;
 
-  // ✅ Logic Style เดิม
+  const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
+
+  // ✅ Style สำหรับ Container ให้รองรับ AG Grid (height fixed)
   const containerStyle = useMemo(() => ({
     margin: isMd ? '-8px' : '0',
     padding: isMd ? '16px' : '12px',
-    minHeight: '100vh',
+    height: '100vh', // Fix height เพื่อให้ Grid scroll ได้ภายใน
     display: 'flex',
     flexDirection: 'column',
   }), [isMd]);
-
-  const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
 
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
@@ -39,8 +36,6 @@ function Position() {
   const [modalFormOpen, setModalFormOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
   const [openDelete, setOpenDelete] = useState(false);
-
-  const [tablePagination, setTablePagination] = useState({ current: 1, pageSize: 20 });
 
   const fetchData = useCallback(async () => {
     try {
@@ -88,18 +83,6 @@ function Position() {
     };
   }, []);
 
-  useEffect(() => {
-    // ค้นหาแล้วให้กลับไปหน้า 1 กันหลุดหน้า
-    setTablePagination((p) => ({ ...p, current: 1 }));
-  }, [searchTerm]);
-
-  const handleTableChange = (pagination) => {
-    setTablePagination({
-      current: pagination?.current || 1,
-      pageSize: pagination?.pageSize || 20,
-    });
-  };
-
   // ====== Actions ======
 
   const handleCreate = () => {
@@ -119,91 +102,112 @@ function Position() {
 
   const refreshAfterSuccess = () => fetchData();
 
-  const columns = [
-    {
-      title: 'ลำดับ',
-      key: 'index',
-      width: 70,
-      align: 'center',
-      render: (_val, _row, index) => {
-        const start = (tablePagination.current - 1) * tablePagination.pageSize;
-        return <span className="text-gray-500 font-medium">{start + index + 1}</span>;
-      },
-    },
-    {
-      title: 'รหัสตำแหน่ง',
-      dataIndex: 'G_CODE',
-      key: 'G_CODE',
-      width: 150,
-      render: (text) => (
-        <span className="font-mono font-semibold text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-          {text}
-        </span>
-      ),
-    },
-    {
-      title: 'ชื่อตำแหน่งงาน (ไทย)',
-      dataIndex: 'G_NAME',
-      key: 'G_NAME',
-      render: (text) => <span className="text-gray-700 font-medium">{text}</span>,
-    },
-    {
-      title: 'อยู่ภายใต้แผนก',
-      key: 'dept_info',
-      render: (_, record) => (
-        <div className="flex flex-col">
-          {record.dept_name ? (
-            <>
-              <span className="text-gray-700 font-medium">{record.dept_name}</span>
-              {/* แสดงรหัสแผนกตัวเล็กๆ */}
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <ApartmentOutlined /> {record.dept_code_ref}
-              </span>
-            </>
-          ) : (
-            <span className="text-gray-400">-</span>
-          )}
-        </div>
-      )
-    },
-    {
-      title: 'การจัดการ',
-      key: 'actions',
-      align: 'center',
-      width: 150,
-      render: (_val, record) => (
-        <div className="flex justify-center gap-2">
-          <Tooltip title="แก้ไขข้อมูล">
-            <Button
-              type="text"
-              shape="circle"
-              icon={<EditOutlined />}
-              className="text-amber-500 hover:bg-amber-50 hover:text-amber-600"
-              onClick={() => handleUpdate(record)}
-            />
-          </Tooltip>
-          <Tooltip title="ลบข้อมูล">
-            <Button
-              type="text"
-              shape="circle"
-              danger
-              icon={<DeleteOutlined />}
-              className="hover:bg-red-50"
-              onClick={() => openDeleteModal(record)}
-            />
-          </Tooltip>
-        </div>
-      ),
-    },
-  ];
+  // ====== AG Grid Definitions ======
 
+  // 1. Renderer สำหรับปุ่มจัดการ
+  const ActionRenderer = (params) => {
+    const record = params.data;
+    if (!record) return null;
+
+    return (
+      <Space size="small" className='h-full flex items-center justify-center w-full'>
+        <Tooltip title="แก้ไขข้อมูล">
+          <Button
+            type="text"
+            shape="circle"
+            size='small'
+            icon={<EditOutlined className="text-blue-700" />}
+            className="hover:bg-blue-50 flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); handleUpdate(record); }}
+          />
+        </Tooltip>
+        <Tooltip title="ลบข้อมูล">
+          <Button
+            type="text"
+            shape="circle"
+            size='small'
+            danger
+            icon={<DeleteOutlined />}
+            className="hover:bg-red-50 flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); openDeleteModal(record); }}
+          />
+        </Tooltip>
+      </Space>
+    );
+  };
+
+  // 2. กำหนด Columns
+  const columnDefs = useMemo(() => [
+    {
+      headerName: 'ลำดับ',
+      width: 80,
+      maxWidth: 80,
+      valueGetter: "node.rowIndex + 1",
+      cellClass: "text-center flex items-center justify-center",
+      sortable: false,
+      filter: false,
+      pinned: 'left',
+      lockVisible: true,
+      suppressMovable: true,
+      headerComponent: undefined
+    },
+    {
+      headerName: 'รหัสตำแหน่ง',
+      field: 'G_CODE',
+      width: 150,
+      filter: true,
+      // ✅ ไม่ต้องมี span สีฟ้าแล้ว แสดงเป็น text ธรรมดา (เหมือน Branch)
+      cellClass: "font-mono font-semibold text-blue-700",
+      filterParams: { buttons: ['reset'] }
+    },
+    {
+      headerName: 'ชื่อตำแหน่งงาน (ไทย)',
+      field: 'G_NAME',
+      minWidth: 150,
+      flex: 1,
+      filter: true,
+      filterParams: { buttons: ['reset'] }
+    },
+    {
+      // ✅ แยก column: อยู่ภายใต้แผนก
+      headerName: 'อยู่ภายใต้แผนก',
+      field: 'dept_name',
+      minWidth: 200,
+      valueFormatter: (p) => p.value || '-',
+      filter: true,
+      filterParams: { buttons: ['reset'] }
+    },
+    {
+      // ✅ แยก column: รหัสแผนก
+      headerName: 'รหัสแผนก',
+      field: 'dept_code_ref',
+      width: 120,
+      valueFormatter: (p) => p.value || '-',
+      filter: true,
+      filterParams: { buttons: ['reset'] }
+    },
+    {
+      headerName: 'จัดการ',
+      width: 100,
+      cellRenderer: ActionRenderer,
+      sortable: false,
+      filter: false,
+      lockVisible: true,
+      cellClass: "flex items-center justify-center",
+      suppressMovable: true,
+      headerComponent: undefined
+    }
+  ], []);
+
+  // Logic กรองข้อมูล (Client-side search)
   const filteredRows = useMemo(() => {
     if (!searchTerm) return rows;
     const term = searchTerm.toLowerCase();
     return rows.filter(
       (row) =>
-        row.G_CODE?.toLowerCase().includes(term) ||
-        row.G_NAME?.toLowerCase().includes(term)
+        String(row.G_CODE || '').toLowerCase().includes(term) ||
+        String(row.G_NAME || '').toLowerCase().includes(term) ||
+        String(row.dept_name || '').toLowerCase().includes(term)
     );
   }, [rows, searchTerm]);
 
@@ -216,30 +220,21 @@ function Position() {
           fontFamily: 'Inter, "Sarabun", sans-serif',
         },
         components: {
-          Table: {
-            headerBg: '#eff6ff', // Blue 50
-            headerColor: '#1e40af', // Blue 800
-            rowHoverBg: '#eff6ff',
-            borderColor: '#eff6ff',
-          },
           Button: {
             primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)',
           }
         }
       }}
     >
-      {/* ✅ 2. ใช้ containerStyle และลบ class ที่ซ้ำซ้อน */}
       <div style={containerStyle} className="bg-gray-50">
 
         {/* Header Section */}
-        {/* ✅ 3. เปลี่ยน max-w-screen-2xl เป็น w-full */}
-        <div className="w-full mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
           <div>
-            <h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2">
-              <MoreOutlined className="text-blue-600" />
+            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
               ข้อมูลตำแหน่งงาน
             </h1>
-            <p className="text-blue-600/80 text-sm mt-1 pl-9">
+            <p className="text-slate-700 text-sm mt-1 pl-1">
               จัดการตำแหน่งงานและโครงสร้างบุคลากร
             </p>
           </div>
@@ -265,27 +260,12 @@ function Position() {
         </div>
 
         {/* Table Content */}
-        {/* ✅ 4. เพิ่ม flex-1 และเปลี่ยนเป็น w-full */}
-        <div className="w-full flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <Table
-            size="middle"
-            rowKey="G_ID"
+        {/* ✅ ใช้ DataTable แทน Table ของ Ant Design */}
+        <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+          <DataTable
+            rowData={filteredRows}
+            columnDefs={columnDefs}
             loading={loading}
-            columns={columns}
-            dataSource={filteredRows}
-            scroll={{ x: 'max-content', y: 600 }}
-            onChange={handleTableChange}
-            pagination={{
-              ...tablePagination,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
-              className: 'p-4',
-              showTotal: (total, range) => (
-                <span className="text-gray-400 text-sm">
-                  แสดง {range[0]}-{range[1]} จาก {total} รายการ
-                </span>
-              ),
-            }}
           />
         </div>
 

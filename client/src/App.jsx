@@ -13,22 +13,30 @@ import AdminLayout from "./layouts/AdminLayout";
 
 import Dashboard from "./pages/DashBoard/Dashboard";
 
+// การจัดการผู้ใช้งาน
 import PermissionRole from "./pages/Management/PermissionRole/PermissionRole";
 import UserManagement from "./pages/Management/UserManagement/UserManagement";
 
+// ข้อมูลหลัก
 import Employees from "./pages/Masterdata/Employees/Employees";
-import PdfViewer from "./pages/PdfViewer";
-import Trainings from "./pages/Masterdata/Trainings/Trainings";
-import TrainingCalendar from "./pages/Masterdata/TrainingCalendar/TrainingCalendar";
+import CreateBox from "./pages/Masterdata/CreateBox/CreateBox";
 
-import EmployeeReport from "./pages/Reports/EmployeeReport/EmployeeReport";
-import TrainingReport from "./pages/Reports/TrainingReport/TrainingReport";
+// ระบบขึ้นทะเบียนกล่อง
+import RegisterBox from "./pages/Registration/RegisterBox/RegisterBox";
 
+// ตั้งค่าเริ่มต้น
 import Branch from "./pages/Settings/Branch/Branch";
 import Company from "./pages/Settings/Company/Company";
 import Department from "./pages/Settings/Department/Department";
 import Position from "./pages/Settings/Position/Position";
-import TrainingLocation from "./pages/Settings/TrainingLocation/TrainingLocation";
+import Zone from "./pages/Settings/Zone/Zone";
+import Location from "./pages/Settings/Location/Location";
+import CountingUnit from "./pages/Settings/CountingUnit/CountingUnit";
+import PackagingSize from "./pages/Settings/PackagingSize/PackagingSize";
+
+// รายงาน
+import EmployeeReport from "./pages/Reports/EmployeeReport/EmployeeReport";
+import TrainingReport from "./pages/Reports/TrainingReport/TrainingReport";
 
 /** 404 สำหรับ route ที่ไม่มีจริง (คนพิมพ์ผิด/ไม่มีเส้นทาง) */
 function NotFoundPage() {
@@ -164,7 +172,10 @@ export default function App() {
           <Route path="/settings/branch" element={<ProtectedRoute mainId="30" subId="301"><AdminLayout><Branch /></AdminLayout></ProtectedRoute>} />
           <Route path="/settings/department" element={<ProtectedRoute mainId="30" subId="302"><AdminLayout><Department /></AdminLayout></ProtectedRoute>} />
           <Route path="/settings/position" element={<ProtectedRoute mainId="30" subId="303"><AdminLayout><Position /></AdminLayout></ProtectedRoute>} />
-          <Route path="/settings/training-location" element={<ProtectedRoute mainId="30" subId="319"><AdminLayout><TrainingLocation /></AdminLayout></ProtectedRoute>} />
+          <Route path="/settings/zone" element={<ProtectedRoute mainId="30" subId="304"><AdminLayout><Zone /></AdminLayout></ProtectedRoute>} />
+          <Route path="/settings/location" element={<ProtectedRoute mainId="30" subId="305"><AdminLayout><Location /></AdminLayout></ProtectedRoute>} />
+          <Route path="/settings/counting-unit" element={<ProtectedRoute mainId="30" subId="306"><AdminLayout><CountingUnit /></AdminLayout></ProtectedRoute>} />
+          <Route path="/settings/packaging-size" element={<ProtectedRoute mainId="30" subId="307"><AdminLayout><PackagingSize /></AdminLayout></ProtectedRoute>} />
 
           {/* ข้อมูลหลัก main=40 */}
           <Route
@@ -178,36 +189,12 @@ export default function App() {
             }
           />
 
-          {/* PDF ถ้าต้องการ “กันด้วยสิทธิพนักงาน” ก็ห่อด้วย 40/401 เช่นกัน */}
           <Route
-            path="/pdf/:employee_code"
-            element={
-              <ProtectedRoute mainId="40" subId="401">
-                <AdminLayout>
-                  <PdfViewer />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/trainings"
+            path="/create-box"
             element={
               <ProtectedRoute mainId="40" subId="402">
                 <AdminLayout>
-                  <Trainings />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          {/* ✅ กรณีที่คุณถาม: พิมพ์ /training-calendar แล้วไม่มีสิทธิ → จะเห็น 404 */}
-          <Route
-            path="/training-calendar"
-            element={
-              <ProtectedRoute mainId="40" subId="403">
-                <AdminLayout>
-                  <TrainingCalendar />
+                  <CreateBox />
                 </AdminLayout>
               </ProtectedRoute>
             }
@@ -215,9 +202,21 @@ export default function App() {
 
           {/* รายงาน main=50 */}
           <Route
-            path="/reports/employee-report"
+            path="/registration/register-box"
             element={
               <ProtectedRoute mainId="50" subId="501">
+                <AdminLayout>
+                  <RegisterBox />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* รายงาน main=60 */}
+          <Route
+            path="/registration/register-box"
+            element={
+              <ProtectedRoute mainId="60" subId="601">
                 <AdminLayout>
                   <EmployeeReport />
                 </AdminLayout>
@@ -228,7 +227,7 @@ export default function App() {
           <Route
             path="/reports/training-report"
             element={
-              <ProtectedRoute mainId="50" subId="502">
+              <ProtectedRoute mainId="60" subId="602">
                 <AdminLayout>
                   <TrainingReport />
                 </AdminLayout>

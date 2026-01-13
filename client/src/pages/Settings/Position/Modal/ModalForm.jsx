@@ -139,8 +139,8 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                 styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
             >
                 {/* Header ... */}
-                <div className="bg-blue-50 px-6 py-4 border-b border-blue-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-blue-800">
+                <div className="bg-slate-200 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-slate-800">
                         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 text-xl">
                             {isEditMode ? <EditOutlined /> : <PlusCircleOutlined />}
                         </div>
@@ -148,12 +148,12 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                             <h3 className="text-lg font-bold m-0 leading-tight">
                                 {isEditMode ? 'แก้ไขตำแหน่งงาน' : 'เพิ่มตำแหน่งงาน'}
                             </h3>
-                            <span className="text-xs text-blue-600/70">
+                            <span className="text-xs text-slate-700">
                                 {isEditMode ? 'ปรับปรุงรายละเอียดตำแหน่งเดิม' : 'สร้างตำแหน่งงานใหม่ในระบบ'}
                             </span>
                         </div>
                     </div>
-                    <button onClick={handleCancel} disabled={loading} className="text-blue-400 hover:text-blue-700 transition-colors text-3xl">&times;</button>
+                    <button onClick={handleCancel} disabled={loading} className="text-slate-400 hover:text-slate-700 transition-colors text-3xl">&times;</button>
                 </div>
 
                 <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
