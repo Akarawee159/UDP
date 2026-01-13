@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media screen and (max-width: 768px) {
+  .ant-table-container {
+    overflow-x: auto;
+  }
+}
+
+.ant-table-thead > tr > th {
+  @apply bg-blue-50 text-gray-800 font-semibold text-sm;
+}
+
+.ant-table-cell {
+  @apply text-sm text-gray-700;
+}
