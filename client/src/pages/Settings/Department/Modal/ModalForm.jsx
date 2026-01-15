@@ -30,7 +30,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     useEffect(() => {
         const fetchBranches = async () => {
             try {
-                const res = await api.get('/department/branch-codes');
+                const res = await api.get('/settings/department/branch-codes');
                 setBranchList(res?.data?.data || []);
             } catch (err) {
                 console.error("Fetch branches error:", err);
@@ -50,7 +50,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     const fetchDetail = useCallback(async (id) => {
         try {
             setFetching(true);
-            const res = await api.get(`/department/${id}`);
+            const res = await api.get(`/settings/department/${id}`);
             const data = res?.data?.data;
             if (data) {
                 form.setFieldsValue({
@@ -93,7 +93,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         timerRef.current = setTimeout(async () => {
             try {
                 setCheckingCode(true);
-                let url = `/department/check-code?code=${encodeURIComponent(value)}`;
+                let url = `/settings/department/check-code?code=${encodeURIComponent(value)}`;
                 if (isEditMode) url += `&excludeId=${record.G_ID}`;
                 const res = await api.get(url);
                 if (res?.data?.exists) reject('รหัสนี้มีแล้วในระบบ'); else resolve();
@@ -113,11 +113,11 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             setLoading(true);
             let resData;
             if (isEditMode) {
-                const res = await api.put(`/department/${record.G_ID}`, payload);
+                const res = await api.put(`/settings/department/${record.G_ID}`, payload);
                 message.success('อัปเดตข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             } else {
-                const res = await api.post('/department', payload);
+                const res = await api.post('/settings/department', payload);
                 message.success('เพิ่มข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             }

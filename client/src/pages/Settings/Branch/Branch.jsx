@@ -40,7 +40,7 @@ function Branch() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/branch');
+      const res = await api.get('/settings/branch');
       setRows(res?.data?.data || []);
     } catch (err) {
       console.error(err);
@@ -169,8 +169,16 @@ function Branch() {
       filterParams: { buttons: ['reset'] }
     },
     {
-      // ✅ แยก column: อยู่ภายใต้สาขา (ชื่อบริษัทแม่)
-      headerName: 'อยู่ภายใต้สาขา',
+      headerName: 'ที่อยู่สาขา',
+      field: 'G_ADDRESS',
+      minWidth: 200,
+      valueFormatter: (p) => p.value || '-',
+      filter: true,
+      filterParams: { buttons: ['reset'] }
+    },
+    {
+      // ✅ แยก column: อยู่ภายใต้บริษัท (ชื่อบริษัทแม่)
+      headerName: 'อยู่ภายใต้บริษัท',
       field: 'company_name_th',
       minWidth: 200,
       valueFormatter: (p) => p.value || '-',

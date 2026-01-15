@@ -11,13 +11,13 @@ import { LOCALE_TEXT_TH } from './constants';
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const DataTable = ({
-    rowData,
-    columnDefs,
-    loading,
-    ...props
+  rowData,
+  columnDefs,
+  loading,
+  ...props
 }) => {
 
-    const gridStyle = `
+  const gridStyle = `
     /* 1. Header Setting */
     .ag-theme-alpine .ag-header {
       background-color: #e2e8f0; 
@@ -70,60 +70,60 @@ const DataTable = ({
     }
   `;
 
-    const defaultColDef = useMemo(() => ({
-        sortable: true,
-        resizable: true,
-        suppressMovable: false,
-        filter: true,
-        floatingFilter: false, // ปิดช่องค้นหาใต้ Header (ใช้ปุ่ม Filter ที่หัวตารางแทน)
-        lockVisible: true,
-        headerComponent: CustomHeader, // ใช้ Custom Header
-        // ❌ ลบ menuTabs ออก (แก้ Error #200 เพราะเป็น Enterprise Feature)
-        // ❌ ลบ suppressMenu ออก (แก้ Warning เพราะเลิกใช้แล้ว)
-    }), []);
+  const defaultColDef = useMemo(() => ({
+    sortable: true,
+    resizable: true,
+    suppressMovable: false,
+    filter: true,
+    floatingFilter: false, // ปิดช่องค้นหาใต้ Header (ใช้ปุ่ม Filter ที่หัวตารางแทน)
+    lockVisible: true,
+    headerComponent: CustomHeader, // ใช้ Custom Header
+    // ❌ ลบ menuTabs ออก (แก้ Error #200 เพราะเป็น Enterprise Feature)
+    // ❌ ลบ suppressMenu ออก (แก้ Warning เพราะเลิกใช้แล้ว)
+  }), []);
 
-    return (
-        <div className="ag-theme-alpine w-full h-full relative">
-            {/* Inject CSS */}
-            <style>{gridStyle}</style>
+  return (
+    <div className="ag-theme-alpine w-full h-full relative">
+      {/* Inject CSS */}
+      <style>{gridStyle}</style>
 
-            <AgGridReact
-                // ✅ ใส่ theme="legacy" เพื่อแก้ Error #239 (ให้ใช้ CSS แบบเดิมได้)
-                theme="legacy"
+      <AgGridReact
+        // ✅ ใส่ theme="legacy" เพื่อแก้ Error #239 (ให้ใช้ CSS แบบเดิมได้)
+        theme="legacy"
 
-                rowData={rowData}
-                columnDefs={columnDefs}
-                defaultColDef={defaultColDef}
+        rowData={rowData}
+        columnDefs={columnDefs}
+        defaultColDef={defaultColDef}
 
-                // Pagination
-                pagination={true}
-                paginationPageSize={20}
-                paginationPageSizeSelector={[20, 50, 100]}
-                localeText={LOCALE_TEXT_TH}
+        // Pagination
+        pagination={true}
+        paginationPageSize={30}
+        paginationPageSizeSelector={[30, 50, 100]}
+        localeText={LOCALE_TEXT_TH}
 
-                // Selection (แก้ Warning deprecated string)
-                rowSelection={{
-                    mode: 'singleRow',
-                    checkboxes: false,
-                    headerCheckbox: false
-                }}
+        // Selection (แก้ Warning deprecated string)
+        rowSelection={{
+          mode: 'singleRow',
+          checkboxes: false,
+          headerCheckbox: false
+        }}
 
-                animateRows={true}
-                rowHeight={24}
-                headerHeight={40}
+        animateRows={true}
+        rowHeight={24}
+        headerHeight={40}
 
-                // Responsive Logic (มือถือเลื่อนซ้ายขวาได้ Desktop บีบเต็มจอ)
-                onGridReady={(params) => {
-                    if (window.innerWidth > 768) {
-                        params.api.sizeColumnsToFit();
-                    }
-                    if (props.onGridReady) props.onGridReady(params);
-                }}
+        // Responsive Logic (มือถือเลื่อนซ้ายขวาได้ Desktop บีบเต็มจอ)
+        onGridReady={(params) => {
+          if (window.innerWidth > 768) {
+            params.api.sizeColumnsToFit();
+          }
+          if (props.onGridReady) props.onGridReady(params);
+        }}
 
-                {...props}
-            />
-        </div>
-    );
+        {...props}
+      />
+    </div>
+  );
 };
 
 export default DataTable;

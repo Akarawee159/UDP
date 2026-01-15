@@ -53,7 +53,11 @@ export function connectWithStoredToken() {
             'position',
             'company',
             'permission',
-            'training-location'
+            'training-location',
+            'zone',
+            'countingunit',
+            'area',
+            'packaging',
         ];
 
         standardEntities.forEach(entity => {

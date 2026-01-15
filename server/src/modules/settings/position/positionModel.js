@@ -23,11 +23,17 @@ async function getAll() {
 
 /** ดึงข้อมูลตาม G_ID */
 async function getById(G_ID) {
-  // ✅ 2. เพิ่ม department_code
   const sql = `
-    SELECT G_ID, G_CODE, G_NAME, department_code
-    FROM tb_position
-    WHERE G_ID = ?
+    SELECT 
+      p.G_ID, 
+      p.G_CODE, 
+      p.G_NAME, 
+      p.department_code,
+      d.G_NAME AS dept_name,      
+      d.G_CODE AS dept_code_ref 
+    FROM tb_position p
+    LEFT JOIN tb_department d ON p.department_code = d.G_CODE 
+    WHERE p.G_ID = ?
     LIMIT 1
   `;
   const [rows] = await db.query(sql, [G_ID]);

@@ -37,7 +37,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     const fetchCompanyCodes = async () => {
         try {
             setCodesLoading(true);
-            const res = await api.get('/branch/company-codes');
+            const res = await api.get('/settings/branch/company-codes');
             setCompanyCodes(res?.data?.data || []);
         } catch (err) {
             console.error(err);
@@ -49,12 +49,13 @@ function ModalForm({ open, record, onClose, onSuccess }) {
 
     const fetchById = async (G_ID) => {
         try {
-            const res = await api.get(`/branch/${G_ID}`);
+            const res = await api.get(`/settings/branch/${G_ID}`);
             const row = res?.data?.data;
             if (row) {
                 form.setFieldsValue({
                     G_CODE: row.G_CODE || '',
                     G_NAME: row.G_NAME || '',
+                    G_ADDRESS: row.G_ADDRESS || '',
                     company_code: row.company_code || '',
                 });
                 setOriginalCode(row.G_CODE || null);
@@ -83,6 +84,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             const payload = {
                 G_CODE: (raw.G_CODE || '').trim(),
                 G_NAME: (raw.G_NAME || '').trim(),
+                G_ADDRESS: (raw.G_ADDRESS || '').trim(),
                 company_code: (raw.company_code || '').trim(),
             };
 
@@ -90,11 +92,11 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             let resData;
 
             if (isEditMode) {
-                const { data } = await api.put(`/branch/${record.G_ID}`, payload);
+                const { data } = await api.put(`/settings/branch/${record.G_ID}`, payload);
                 message.success('อัปเดตข้อมูลสำเร็จ');
                 resData = data?.data;
             } else {
-                const { data } = await api.post('/branch', payload);
+                const { data } = await api.post('/settings/branch', payload);
                 message.success('เพิ่มข้อมูลสำเร็จ');
                 resData = data?.data;
             }
@@ -136,7 +138,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
 
             try {
                 setCheckingCode(true);
-                let url = `/branch/check-code?code=${encodeURIComponent(code)}`;
+                let url = `/settings/branch/check-code?code=${encodeURIComponent(code)}`;
                 if (isEditMode) {
                     url += `&excludeId=${record.G_ID}`;
                 }
@@ -242,9 +244,21 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                                 />
                             </Form.Item>
                             <Form.Item
-                                label={<span className="font-semibold text-gray-700">ชื่อสาขา (ไทย)</span>}
+                                label={<span className="font-semibold text-gray-700">ชื่อสาขา</span>}
                                 name="G_NAME"
-                                rules={[{ required: true, message: 'กรุณาระบุชื่อสาขา (ไทย)' }]}
+                                rules={[{ required: true, message: 'กรุณาระบุชื่อสาขา' }]}
+                            >
+                                <Input
+                                    prefix={<TagOutlined className="text-gray-400" />}
+                                    placeholder="เช่น สำนักงานใหญ่"
+                                    className="h-11 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400 bg-gray-50 focus:bg-white transition-all"
+                                    allowClear
+                                />
+                            </Form.Item>
+                            <Form.Item
+                                label={<span className="font-semibold text-gray-700">ที่อยู่สาขา</span>}
+                                name="G_ADDRESS"
+                                rules={[{ required: true, message: 'กรุณาระบุที่อยู่สาขา' }]}
                             >
                                 <Input
                                     prefix={<TagOutlined className="text-gray-400" />}

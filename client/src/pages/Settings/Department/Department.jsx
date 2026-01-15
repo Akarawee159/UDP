@@ -40,7 +40,7 @@ function Department() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/department');
+      const res = await api.get('/settings/department');
       setRows(res?.data?.data || []);
     } catch (err) {
       console.error(err);

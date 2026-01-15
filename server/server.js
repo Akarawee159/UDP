@@ -29,8 +29,12 @@ const locationRoutes = require("./src/modules/masterdata/location/locationRoutes
 
 const branchRoutes = require("./src/modules/settings/branch/branchRoutes");
 const companyRoutes = require("./src/modules/settings/company/companyRoutes");
+const countingunitRoutes = require("./src/modules/settings/countingunit/countingunitRoutes");
 const departmentRoutes = require("./src/modules/settings/department/departmentRoutes");
+const areaRoutes = require("./src/modules/settings/area/areaRoutes");
+const packagingRoutes = require("./src/modules/settings/packaging/packagingRoutes");
 const positionRoutes = require("./src/modules/settings/position/positionRoutes");
+const zoneRoutes = require("./src/modules/settings/zone/zoneRoutes");
 
 const reportEmployeeRoutes = require("./src/modules/reports/reportEmployee/reportEmployeeRoutes");
 const reportTrainingRoutes = require("./src/modules/reports/reportTraining/reportTrainingRoutes");
@@ -75,10 +79,14 @@ app.use("/api/management", managementRoutes);
  * Settings (main=30)
  * =========================
  */
-app.use("/api/branch", auth, permit({ mainId: "30", subId: "301" }), branchRoutes);
-app.use("/api/company", auth, permit({ mainId: "30", subId: "302" }), companyRoutes);
-app.use("/api/department", auth, permit({ mainId: "30", subId: "302" }), departmentRoutes);
-app.use("/api/position", auth, permit({ mainId: "30", subId: "303" }), positionRoutes);
+app.use("/api/settings/branch", auth, permit({ mainId: "30", subId: "301" }), branchRoutes);
+app.use("/api/settings/company", auth, permit({ mainId: "30", subId: "302" }), companyRoutes);
+app.use("/api/settings/department", auth, permit({ mainId: "30", subId: "302" }), departmentRoutes);
+app.use("/api/settings/position", auth, permit({ mainId: "30", subId: "303" }), positionRoutes);
+app.use("/api/settings/zone", auth, permit({ mainId: "30", subId: "304" }), zoneRoutes);
+app.use("/api/settings/area", auth, permit({ mainId: "30", subId: "305" }), areaRoutes);
+app.use("/api/settings/countingunit", auth, permit({ mainId: "30", subId: "306" }), countingunitRoutes);
+app.use("/api/settings/packaging", auth, permit({ mainId: "30", subId: "307" }), packagingRoutes);
 
 /**
  * =========================

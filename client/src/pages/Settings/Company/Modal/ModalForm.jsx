@@ -27,7 +27,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     const fetchDetail = useCallback(async (id) => {
         try {
             setFetching(true);
-            const res = await api.get(`/company/${id}`);
+            const res = await api.get(`/settings/company/${id}`);
             const data = res?.data?.data;
             if (data) {
                 // ✅ Map ข้อมูลให้ตรง Form
@@ -68,7 +68,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         timerRef.current = setTimeout(async () => {
             try {
                 setCheckingCode(true);
-                let url = `/company/check-code?code=${encodeURIComponent(value)}`;
+                let url = `/settings/company/check-code?code=${encodeURIComponent(value)}`;
                 if (isEditMode) url += `&excludeId=${record.id}`;
                 const res = await api.get(url);
                 if (res?.data?.exists) reject('รหัสนี้มีแล้วในระบบ'); else resolve();
@@ -97,11 +97,11 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             let resData;
 
             if (isEditMode) {
-                const res = await api.put(`/company/${record.id}`, payload);
+                const res = await api.put(`/settings/company/${record.id}`, payload);
                 message.success('อัปเดตข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             } else {
-                const res = await api.post('/company', payload);
+                const res = await api.post('/settings/company', payload);
                 message.success('เพิ่มข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             }

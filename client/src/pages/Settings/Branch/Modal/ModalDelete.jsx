@@ -19,7 +19,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
     if (!record?.G_ID) return;
     try {
       setLoading(true);
-      await api.delete(`/branch/${record.G_ID}`);
+      await api.delete(`/settings/branch/${record.G_ID}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
       onClose?.();

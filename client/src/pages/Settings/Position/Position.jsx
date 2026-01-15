@@ -40,7 +40,7 @@ function Position() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get('/position');
+      const res = await api.get('/settings/position');
       setRows(res?.data?.data || []);
     } catch (err) {
       console.error(err);

@@ -30,7 +30,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     useEffect(() => {
         const fetchDepts = async () => {
             try {
-                const res = await api.get('/position/department-codes');
+                const res = await api.get('/settings/position/department-codes');
                 setDeptList(res?.data?.data || []);
             } catch (err) {
                 console.error("Fetch departments error:", err);
@@ -50,7 +50,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     const fetchDetail = useCallback(async (id) => {
         try {
             setFetching(true);
-            const res = await api.get(`/position/${id}`);
+            const res = await api.get(`/settings/position/${id}`);
             const data = res?.data?.data;
             if (data) {
                 form.setFieldsValue({
@@ -102,11 +102,11 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             setLoading(true);
             let resData;
             if (isEditMode) {
-                const res = await api.put(`/position/${record.G_ID}`, payload);
+                const res = await api.put(`/settings/position/${record.G_ID}`, payload);
                 message.success('อัปเดตข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             } else {
-                const res = await api.post('/position', payload);
+                const res = await api.post('/settings/position', payload);
                 message.success('เพิ่มข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             }

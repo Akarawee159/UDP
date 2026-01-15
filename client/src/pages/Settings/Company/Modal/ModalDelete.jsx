@@ -18,7 +18,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
     try {
       setLoading(true);
       // ✅ API Endpoint สำหรับ Department
-      await api.delete(`/company/${record.id}`);
+      await api.delete(`/settings/company/${record.id}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
       onClose?.();

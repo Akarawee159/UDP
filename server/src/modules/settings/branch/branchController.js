@@ -7,15 +7,17 @@ const model = require('./branchModel');
 function parsePayload(body) {
   const G_CODE = String(body.G_CODE || '').trim();
   const G_NAME = String(body.G_NAME || '').trim();
+  const G_ADDRESS = String(body.G_ADDRESS || '').trim();
   const company_code = String(body.company_code || '').trim();
 
-  return { G_CODE, G_NAME, company_code };
+  return { G_CODE, G_NAME, G_ADDRESS, company_code };
 }
 
-function ensureRequired({ G_CODE, G_NAME, company_code }) {
+function ensureRequired({ G_CODE, G_NAME, G_ADDRESS, company_code }) {
   const missing = [];
   if (!G_CODE) missing.push('กรุณาพิมพ์รหัส');
   if (!G_NAME) missing.push('กรุณาพิมพ์ชื่อ');
+  if (!G_ADDRESS) missing.push('กรุณาพิมพ์ที่อยู่');
   if (!company_code) missing.push('กรุณาเลือกบริษัท');
   if (missing.length) {
     const err = new Error(`กรอกข้อมูลไม่ครบ: ${missing.join(', ')}`);

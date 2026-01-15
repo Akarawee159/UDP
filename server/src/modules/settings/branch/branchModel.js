@@ -9,6 +9,7 @@ async function getAll() {
       b.G_ID, 
       b.G_CODE, 
       b.G_NAME, 
+      b.G_ADDRESS,
       b.company_code,
       c.company_name_th
     FROM tb_branch b
@@ -21,10 +22,18 @@ async function getAll() {
 
 /** ดึงสาขาตาม G_ID */
 async function getById(G_ID) {
+  // ✅ แก้ไข: เพิ่ม LEFT JOIN และ Alias ชื่อคอลัมน์ให้เหมือน getAll
   const sql = `
-    SELECT G_ID, G_CODE, G_NAME, company_code
-    FROM tb_branch
-    WHERE G_ID = ?
+    SELECT 
+      b.G_ID, 
+      b.G_CODE, 
+      b.G_NAME, 
+      b.G_ADDRESS, 
+      b.company_code,
+      c.company_name_th
+    FROM tb_branch b
+    LEFT JOIN tb_company c ON b.company_code = c.company_code
+    WHERE b.G_ID = ?
     LIMIT 1
   `;
   const [rows] = await db.query(sql, [G_ID]);
@@ -56,7 +65,7 @@ async function isBranchCodeTaken(G_CODE, excludeId = null) {
 }
 
 /** เพิ่มสาขาใหม่ (กำหนด G_ID เอง เริ่มที่ 1 และบวกจากค่าล่าสุดแบบกันชนกัน) */
-async function create({ G_CODE, G_NAME, company_code }) {
+async function create({ G_CODE, G_NAME, G_ADDRESS, company_code }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -69,10 +78,10 @@ async function create({ G_CODE, G_NAME, company_code }) {
     const nextId = lastRows.length ? Number(lastRows[0].G_ID) + 1 : 1;
 
     const sql = `
-      INSERT INTO tb_branch (G_ID, G_CODE, G_NAME, company_code)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO tb_branch (G_ID, G_CODE, G_NAME, G_ADDRESS, company_code)
+      VALUES (?, ?, ?, ?, ?)
     `;
-    await conn.query(sql, [nextId, G_CODE, G_NAME, company_code]);
+    await conn.query(sql, [nextId, G_CODE, G_NAME, G_ADDRESS, company_code]);
 
     await conn.commit();
     return nextId; // คืนค่าที่เราออกเอง แทนการพึ่งพา insertId
@@ -86,7 +95,7 @@ async function create({ G_CODE, G_NAME, company_code }) {
 
 
 /** แก้ไขสาขา และอัปเดต tb_department ด้วย */
-async function update(G_ID, { G_CODE, G_NAME, company_code }) {
+async function update(G_ID, { G_CODE, G_NAME, G_ADDRESS, company_code }) {
   const conn = await db.getConnection(); // 1. ขอ Connection
   try {
     await conn.beginTransaction(); // 2. เริ่ม Transaction
@@ -101,11 +110,11 @@ async function update(G_ID, { G_CODE, G_NAME, company_code }) {
     // 4. อัปเดตตารางแม่ (tb_branch)
     const sqlBranch = `
       UPDATE tb_branch
-      SET G_CODE = ?, G_NAME = ?, company_code = ?
+      SET G_CODE = ?, G_NAME = ?, G_ADDRESS = ?, company_code = ?
       WHERE G_ID = ?
     `;
     const [result] = await conn.query(sqlBranch, [
-      G_CODE, G_NAME, company_code, G_ID
+      G_CODE, G_NAME, G_ADDRESS, company_code, G_ID
     ]);
 
     // 5. ถ้ามีการเปลี่ยน G_CODE และมีค่าเดิมอยู่ -> ไปตามแก้ใน tb_department

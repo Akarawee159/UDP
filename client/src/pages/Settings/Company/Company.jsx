@@ -40,7 +40,7 @@ function Company() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/company');
+            const res = await api.get('/settings/company');
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);

@@ -41,7 +41,7 @@ export const menuItems = [
   },
   {
     id: "30",
-    label: "ตั้งค่าเริ่มต้น",
+    label: "ข้อมูลตั้งค่า",
     icon: <SettingOutlined />,
     type: "dropdown",
     path: "/settings",
@@ -50,9 +50,9 @@ export const menuItems = [
       { id: "301", label: "สาขา", path: "/settings/branch" },
       { id: "302", label: "แผนก", path: "/settings/department" },
       { id: "303", label: "ตำแหน่งงาน", path: "/settings/position" },
-      { id: "304", label: "โซน (Zone)", path: "/settings/zone" },
-      { id: "305", label: "โลเคชั่น (Location) ", path: "/settings/location" },
-      { id: "306", label: "หน่วย (Unit)", path: "/settings/counting-unit" },
+      { id: "304", label: "โซน", path: "/settings/zone" },
+      { id: "305", label: "โลเคชั่น", path: "/settings/location" },
+      { id: "306", label: "หน่วยนับ", path: "/settings/counting-unit" },
       { id: "307", label: "ขนาดบรรจุภัณฑ์", path: "/settings/packaging-size" },
     ]
   },
