@@ -21,11 +21,10 @@ const permissionRoutes = require("./src/modules/management/permissionRole/permis
 const managementRoutes = require("./src/modules/management/userManagement/managementRoutes");
 
 const employeeRoutes = require("./src/modules/masterdata/employee/employeeRoutes");
-const trainingsRoutes = require("./src/modules/masterdata/trainings/trainingsRoutes");
-const trainingsModel = require("./src/modules/masterdata/trainings/trainingsModel");
 const workhistoryRoutes = require("./src/modules/masterdata/workhistory/workhistoryRoutes");
 const relativesRoutes = require("./src/modules/masterdata/relatives/relativesRoutes");
 const locationRoutes = require("./src/modules/masterdata/location/locationRoutes");
+const materialRoutes = require("./src/modules/masterdata/material/materialRoutes");
 
 const branchRoutes = require("./src/modules/settings/branch/branchRoutes");
 const companyRoutes = require("./src/modules/settings/company/companyRoutes");
@@ -97,7 +96,7 @@ app.use("/api/employee", auth, permit({ mainId: "40", subId: "401" }), employeeR
 app.use("/api/workhistory", auth, permit({ mainId: "40", subId: "401" }), workhistoryRoutes);
 app.use("/api/relatives", auth, permit({ mainId: "40", subId: "401" }), relativesRoutes);
 app.use("/api/location", auth, permit({ mainId: "40", subId: "401" }), locationRoutes);
-app.use("/api/trainings", auth, permit({ mainId: "40", subId: "402" }), trainingsRoutes);
+app.use("/api/masterdata/material", auth, permit({ mainId: "40", subId: "402" }), materialRoutes);
 
 /**
  * =========================
@@ -118,6 +117,7 @@ app.use("/api/report/training", auth, permit({ mainId: "60", subId: "602" }), re
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));
 app.use("/img/signature", express.static(path.join(__dirname, "src/img/signature")));
 app.use("/img/employee", express.static(path.join(__dirname, "src/img/employee")));
+app.use("/img/material", express.static(path.join(__dirname, "img/material")));
 
 // Health & root
 app.get("/", (_req, res) => res.send("UDP API is running"));
@@ -181,9 +181,6 @@ io.use(async (socket, next) => {
 });
 
 app.set("io", io);
-
-// ✅ เริ่มต้นระบบ Auto Update Status ทันทีที่ Server รัน
-trainingsModel.startAutoUpdate(io);
 
 /* -------------------------- Boot ---------------------------- */
 const PORT = process.env.PORT;

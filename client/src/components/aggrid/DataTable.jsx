@@ -68,6 +68,14 @@ const DataTable = ({
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
     }
+    /* 7. แก้ไข CSS สำหรับจัดกึ่งกลาง Header Group (เพิ่ม width และ flex) */
+    .ag-theme-alpine .header-group-center .ag-header-group-cell-label {
+      display: flex !important;
+      justify-content: center !important;
+      align-items: center !important;
+      width: 100% !important; /* บังคับให้ container ขยายเต็มความกว้างของ Group */
+      flex: 1 !important;
+    }
   `;
 
   const defaultColDef = useMemo(() => ({
@@ -114,9 +122,9 @@ const DataTable = ({
 
         // Responsive Logic (มือถือเลื่อนซ้ายขวาได้ Desktop บีบเต็มจอ)
         onGridReady={(params) => {
-          if (window.innerWidth > 768) {
-            params.api.sizeColumnsToFit();
-          }
+          // if (window.innerWidth > 768) {
+          //   params.api.sizeColumnsToFit();
+          // }
           if (props.onGridReady) props.onGridReady(params);
         }}
 

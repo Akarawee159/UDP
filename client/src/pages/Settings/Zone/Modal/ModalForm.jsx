@@ -1,4 +1,3 @@
-// src/pages/Masterdata/Zone/Modal/ModalForm.jsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Modal, Form, Input, App, Button, ConfigProvider, Spin } from 'antd';
 import {
@@ -6,11 +5,13 @@ import {
     TagOutlined,
     PlusCircleOutlined,
     EditOutlined,
-    SaveOutlined
+    SaveOutlined,
+    DeleteOutlined // ✅ เพิ่ม Icon
 } from '@ant-design/icons';
 import api from "../../../../api";
 
-function ModalForm({ open, record, onClose, onSuccess }) {
+// ✅ รับ prop onDelete เพิ่ม
+function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
     const isEditMode = !!record?.G_ID;
@@ -129,7 +130,8 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                 width={480}
                 closable={false}
                 centered
-                maskClosable={!loading}
+                // ✅ ป้องกันคลิกปิด
+                maskClosable={false}
                 destroyOnClose
                 styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
             >
@@ -155,22 +157,42 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                     <div className="p-8">
                         <Form form={form} layout="vertical" autoComplete="off" className="space-y-2">
                             <Form.Item label={<span className="font-semibold text-gray-700">รหัสโซน</span>} name="G_CODE" rules={[{ required: true, message: 'กรุณาระบุรหัสโซน' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
-                                <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น ZONE01" className="h-11 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400 bg-gray-50 focus:bg-white transition-all" allowClear />
+                                {/* ✅ ปรับเป็น h-9 */}
+                                <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น ZONE01" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
                             </Form.Item>
                             <Form.Item label={<span className="font-semibold text-gray-700">ชื่อโซน</span>} name="G_NAME" rules={[{ required: true, message: 'กรุณาระบุชื่อโซน' }]}>
-                                <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อโซน" className="h-11 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400 bg-gray-50 focus:bg-white transition-all" allowClear />
+                                {/* ✅ ปรับเป็น h-9 */}
+                                <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อโซน" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
                             </Form.Item>
                         </Form>
                     </div>
                 </Spin>
 
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-                    <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
-                        {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
-                    </Button>
-                    <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
-                        ยกเลิก
-                    </Button>
+                {/* Footer - ปรับ Layout */}
+                <div className={` px-6 py-4 border-t border-gray-100 flex ${isEditMode ? 'justify-between' : 'justify-end'} items-center gap-3`}>
+
+                    {/* ปุ่มลบ (แสดงเฉพาะโหมดแก้ไข) */}
+                    {isEditMode && (
+                        <Button
+                            danger
+                            type="text"
+                            onClick={onDelete}
+                            disabled={loading}
+                            icon={<DeleteOutlined />}
+                            className="hover:bg-red-50 text-red-500"
+                        >
+                            ลบข้อมูล
+                        </Button>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
+                            {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
+                        </Button>
+                        <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
+                            ยกเลิก
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </ConfigProvider>

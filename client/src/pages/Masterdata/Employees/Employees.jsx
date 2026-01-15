@@ -295,7 +295,7 @@ function Employees() {
         </div>
 
         {/* ✅ Table Content (ใช้ DataTable ที่สร้างใหม่) */}
-        <div className="w-full flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden relative">
+        <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
           <DataTable
             rowData={filteredRows}
             columnDefs={columnDefs}

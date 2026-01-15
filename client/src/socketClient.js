@@ -58,6 +58,7 @@ export function connectWithStoredToken() {
             'countingunit',
             'area',
             'packaging',
+            'material',
         ];
 
         standardEntities.forEach(entity => {

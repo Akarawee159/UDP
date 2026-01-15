@@ -6,10 +6,11 @@ import {
     PlusCircleOutlined,
     EditOutlined,
     SaveOutlined,
+    DeleteOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
-function ModalForm({ open, record, onClose, onSuccess }) {
+function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
 
@@ -30,7 +31,6 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             const res = await api.get(`/settings/company/${id}`);
             const data = res?.data?.data;
             if (data) {
-                // ✅ Map ข้อมูลให้ตรง Form
                 form.setFieldsValue(data);
                 setOriginalCode(data.company_code || null);
             }
@@ -42,26 +42,20 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         }
     }, [form, message]);
 
-    // ✅ เหลือ useEffect เดียวที่ถูกต้อง (ใช้ record.id)
     useEffect(() => {
         if (open) {
             form.resetFields();
             setOriginalCode(null);
 
             if (isEditMode) {
-                form.setFieldsValue(record); // Pre-fill ข้อมูลจากตารางก่อน
+                form.setFieldsValue(record);
                 setOriginalCode(record.company_code || null);
-                // เรียกดึงข้อมูลล่าสุดจาก API โดยใช้ id
                 fetchDetail(record.id);
             }
         }
     }, [open, isEditMode, record, form, fetchDetail]);
 
-    // ❌ ลบ useEffect ชุดที่ 2 ที่ใช้ G_ID ออกไปเลย (เพราะมันซ้ำและผิด)
-    /* useEffect(() => { ... }, ...); 
-    */
-
-    // 3. ฟังก์ชันตรวจสอบรหัสซ้ำ (Debounce)
+    // Validation
     const validateCode = (_rule, value) => new Promise((resolve, reject) => {
         clearTimeout(timerRef.current);
         if (!value || (isEditMode && value === originalCode)) { setCheckingCode(false); return resolve(); }
@@ -76,22 +70,10 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         }, 400);
     });
 
-    // 4. Submit Form
     const handleOk = async () => {
         try {
             const raw = await form.validateFields();
-            // ✅ ส่งข้อมูลใหม่ทั้งหมด
-            const payload = {
-                company_code: (raw.company_code || '').trim(),
-                business_type: (raw.business_type || '').trim(),
-                branch_name: (raw.branch_name || '').trim(),
-                company_name_th: (raw.company_name_th || '').trim(),
-                company_name_en: (raw.company_name_en || '').trim(),
-                address_th: (raw.address_th || '').trim(),
-                address_en: (raw.address_en || '').trim(),
-                phone: (raw.phone || '').trim(),
-                tax_no: (raw.tax_no || '').trim(),
-            };
+            const payload = { ...raw };
 
             setLoading(true);
             let resData;
@@ -111,8 +93,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             onClose?.();
         } catch (err) {
             if (err?.errorFields) return;
-            const apiMsg = err?.response?.data?.message || 'บันทึกไม่สำเร็จ';
-            message.error(apiMsg);
+            message.error(err?.response?.data?.message || 'บันทึกไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -124,29 +105,17 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     };
 
     return (
-        <ConfigProvider
-            theme={{
-                token: {
-                    colorPrimary: '#2563eb',
-                    borderRadius: 8,
-                },
-                components: {
-                    Button: {
-                        primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)',
-                    }
-                }
-            }}
-        >
+        <ConfigProvider theme={{ token: { colorPrimary: '#2563eb', borderRadius: 8 } }}>
             <Modal
                 open={open}
                 title={null}
                 onCancel={handleCancel}
                 footer={null}
-                width={560}
+                width={1100}
                 closable={false}
-                maskClosable={!loading}
+                maskClosable={false}
                 destroyOnClose
-                className="custom-modal-company"
+                centered
                 styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
             >
                 {/* Header */}
@@ -157,88 +126,105 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                         </div>
                         <div>
                             <h3 className="text-lg font-bold m-0 leading-tight">
-                                {isEditMode ? 'แก้ไขข้อมูลชื่อบริษัท' : 'เพิ่มข้อมูลชื่อบริษัท'}
+                                {isEditMode ? 'แก้ไขข้อมูลบริษัท' : 'เพิ่มข้อมูลบริษัท'}
                             </h3>
                             <span className="text-xs text-slate-700">
-                                {isEditMode ? 'ปรับปรุงรายละเอียดข้อมูลชื่อบริษัท' : 'กรอกข้อมูลเพื่อสร้างชื่อบริษัทใหม่'}
+                                {isEditMode ? 'ปรับปรุงรายละเอียดข้อมูล' : 'กรอกข้อมูลเพื่อสร้างใหม่'}
                             </span>
                         </div>
                     </div>
-                    <button
-                        onClick={handleCancel}
-                        disabled={loading}
-                        className="text-slate-400 hover:text-slate-700 transition-colors text-3xl"
-                    >
-                        &times;
-                    </button>
+                    <button onClick={handleCancel} disabled={loading} className="text-slate-400 hover:text-slate-700 transition-colors text-3xl">&times;</button>
                 </div>
 
                 <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
                     <div className="p-8">
                         <Form form={form} layout="vertical" autoComplete="off">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-                                {/* Row 1: Code & Type */}
-                                <Form.Item label="รหัสบริษัท" name="company_code" rules={[{ required: true }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
-                                    <Input prefix={<IdcardOutlined className="text-gray-400" />} />
-                                </Form.Item>
-                                <Form.Item label="ประเภทธุรกิจ" name="business_type">
-                                    <Input />
-                                </Form.Item>
+                            {/* Grid Layout 4 Columns */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 
-                                {/* Row 2: Names */}
-                                <Form.Item label="ชื่อบริษัท (ไทย)" name="company_name_th" rules={[{ required: true }]}>
-                                    <Input prefix={<TagOutlined className="text-gray-400" />} />
+                                {/* Row 1: รหัส, ชื่อไทย, ชื่ออังกฤษ, ประเภท */}
+                                <Form.Item label={<span className="font-semibold text-gray-700">รหัสบริษัท</span>} name="company_code" rules={[{ required: true, message: 'กรุณาระบุรหัส' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น UPD" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
-                                <Form.Item label="ชื่อบริษัท (อังกฤษ)" name="company_name_en">
-                                    <Input prefix={<TagOutlined className="text-gray-400" />} />
+                                <Form.Item label={<span className="font-semibold text-gray-700">ชื่อบริษัท (ไทย)</span>} name="company_name_th" rules={[{ required: true, message: 'กรุณาระบุชื่อบริษัท' }]}>
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อบริษัท" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
-
-                                {/* Row 3: Tax & Phone */}
-                                <Form.Item label="เลขผู้เสียภาษี" name="tax_no">
-                                    <Input />
+                                <Form.Item label={<span className="font-semibold text-gray-700">ชื่อบริษัท (อังกฤษ)</span>} name="company_name_en">
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="Company Name" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
-                                <Form.Item label="เบอร์โทรศัพท์" name="phone">
-                                    <Input />
+                                <Form.Item label={<span className="font-semibold text-gray-700">ประเภทธุรกิจ</span>} name="business_type">
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input placeholder="เช่น พ่นสีฉีดพลาสติก" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
 
-                                {/* Row 4: Branch Name */}
-                                <Form.Item label="ชื่อสาขา (ถ้ามี)" name="branch_name" className="md:col-span-2">
-                                    <Input placeholder="เช่น สำนักงานใหญ่, สาขาลาดพร้าว" />
+                                {/* Row 2: ผู้เสียภาษี, เบอร์โทร, สาขา */}
+                                <Form.Item label={<span className="font-semibold text-gray-700">เลขผู้เสียภาษี</span>} name="tax_no">
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input placeholder="ระบุเลขผู้เสียภาษี" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
+                                </Form.Item>
+                                <Form.Item label={<span className="font-semibold text-gray-700">เบอร์โทรศัพท์</span>} name="phone">
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input placeholder="ระบุเบอร์โทร" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
+                                </Form.Item>
+                                <Form.Item label={<span className="font-semibold text-gray-700">ชื่อสาขา (ถ้ามี)</span>} name="branch_name" className="md:col-span-2">
+                                    {/* ✅ ปรับ h-9 */}
+                                    <Input placeholder="เช่น สำนักงานใหญ่" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
 
-                                {/* Row 5: Addresses */}
-                                <Form.Item label="ที่อยู่ (ไทย)" name="address_th" className="md:col-span-2">
-                                    <Input.TextArea rows={2} />
+                                {/* Row 3: ที่อยู่ (TextArea) - ไม่ต้องใส่ h-9 แต่ใส่ style อื่นๆ ให้เหมือนกัน */}
+                                <Form.Item label={<span className="font-semibold text-gray-700">ที่อยู่ (ไทย)</span>} name="address_th" className="md:col-span-2">
+                                    <Input.TextArea rows={2} placeholder="บ้านเลขที่, ถนน, แขวง/ตำบล" className="rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
-                                <Form.Item label="ที่อยู่ (อังกฤษ)" name="address_en" className="md:col-span-2">
-                                    <Input.TextArea rows={2} />
+                                <Form.Item label={<span className="font-semibold text-gray-700">ที่อยู่ (อังกฤษ)</span>} name="address_en" className="md:col-span-2">
+                                    <Input.TextArea rows={2} placeholder="Address detail" className="rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" />
                                 </Form.Item>
+
                             </div>
                         </Form>
                     </div>
                 </Spin>
 
                 {/* Footer */}
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-                    <Button
-                        key="submit"
-                        type="primary"
-                        loading={loading}
-                        onClick={handleOk}
-                        icon={<SaveOutlined />}
-                        className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold"
-                    >
-                        {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
-                    </Button>
-                    <Button
-                        key="back"
-                        onClick={handleCancel}
-                        disabled={loading}
-                        className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white"
-                    >
-                        ยกเลิก
-                    </Button>
+                <div className={` px-6 py-4 border-t border-gray-100 flex ${isEditMode ? 'justify-between' : 'justify-end'} items-center gap-3`}>
+
+                    {/* ปุ่มลบ (แสดงเฉพาะโหมดแก้ไข) */}
+                    {isEditMode && (
+                        <Button
+                            danger
+                            type="text"
+                            onClick={onDelete}
+                            disabled={loading || fetching}
+                            icon={<DeleteOutlined />}
+                            className="hover:bg-red-50 text-red-500"
+                        >
+                            ลบข้อมูล
+                        </Button>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button
+                            key="submit"
+                            type="primary"
+                            loading={loading}
+                            onClick={handleOk}
+                            icon={<SaveOutlined />}
+                            className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold"
+                        >
+                            {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
+                        </Button>
+                        <Button
+                            key="back"
+                            onClick={handleCancel}
+                            disabled={loading}
+                            className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white"
+                        >
+                            ยกเลิก
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </ConfigProvider>

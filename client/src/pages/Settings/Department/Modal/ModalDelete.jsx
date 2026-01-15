@@ -4,7 +4,6 @@ import {
   DeleteOutlined,
   WarningOutlined,
   ApartmentOutlined,
-  GlobalOutlined,
   BarcodeOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
@@ -17,11 +16,10 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
     if (!record?.G_ID) return;
     try {
       setLoading(true);
-      // ✅ API Endpoint สำหรับ Department
       await api.delete(`/settings/department/${record.G_ID}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
-      onClose?.();
+      // onClose?.(); // ให้ Parent จัดการปิดเอง
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
       message.error(apiMsg);
@@ -46,10 +44,13 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         footer={null}
         closable={false}
         onCancel={onClose}
-        maskClosable={!loading}
+        // ✅ ป้องกันคลิกปิด
+        maskClosable={false}
         destroyOnClose
         width={480}
         centered
+        // ✅ เพิ่ม zIndex ให้สูงกว่า ModalForm (ปกติ antd จัดการให้ แต่ใส่เพื่อความชัวร์เมื่อเปิดซ้อน)
+        zIndex={1001}
         className="custom-modal-delete"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >
@@ -75,7 +76,6 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Content */}
         <div className="p-6">
-          {/* Warning Banner */}
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6 flex gap-3 items-start">
             <WarningOutlined className="text-orange-500 mt-1 text-lg" />
             <div>
@@ -98,9 +98,6 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                   <div>
                     <div className="text-xs text-gray-400 mb-1">ชื่อแผนก (ไทย)</div>
                     <div className="font-bold text-gray-800 text-base leading-tight">{record.G_NAME || '-'}</div>
-                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <GlobalOutlined className="text-[10px]" /> {record.G_NAME_EN || '-'}
-                    </div>
                   </div>
                 </div>
 

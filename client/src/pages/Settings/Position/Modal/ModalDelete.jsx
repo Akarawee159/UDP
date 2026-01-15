@@ -17,11 +17,10 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
     if (!record?.G_ID) return;
     try {
       setLoading(true);
-      // ✅ API Endpoint สำหรับ Position
       await api.delete(`/settings/position/${record.G_ID}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
-      onClose?.();
+      // onClose?.(); // ให้ Parent จัดการปิดเอง
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
       message.error(apiMsg);
@@ -46,10 +45,13 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         footer={null}
         closable={false}
         onCancel={onClose}
-        maskClosable={!loading}
+        // ✅ ป้องกันคลิกปิด
+        maskClosable={false}
         destroyOnClose
         width={480}
         centered
+        // ✅ เพิ่ม zIndex ให้สูงกว่า ModalForm (เพื่อให้ซ้อนทับ)
+        zIndex={1001}
         className="custom-modal-delete"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >
@@ -60,7 +62,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
               <DeleteOutlined />
             </div>
             <div>
-              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบแผนก</h3>
+              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบตำแหน่งงาน</h3>
               <span className="text-xs text-red-600/70">การดำเนินการนี้ไม่สามารถกู้คืนได้</span>
             </div>
           </div>
@@ -75,13 +77,12 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Content */}
         <div className="p-6">
-          {/* Warning Banner */}
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6 flex gap-3 items-start">
             <WarningOutlined className="text-orange-500 mt-1 text-lg" />
             <div>
               <div className="font-bold text-orange-800 text-sm mb-1">คำเตือน: การลบข้อมูลถาวร</div>
               <p className="text-xs text-orange-700/80 leading-relaxed">
-                คุณกำลังจะลบข้อมูลแผนกนี้ออกจากระบบ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ
+                คุณกำลังจะลบข้อมูลตำแหน่งงานนี้ออกจากระบบ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ
               </p>
             </div>
           </div>
@@ -96,18 +97,15 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                     <ApartmentOutlined className="text-xl" />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">ชื่อแผนก (ไทย)</div>
+                    <div className="text-xs text-gray-400 mb-1">ชื่อตำแหน่ง (ไทย)</div>
                     <div className="font-bold text-gray-800 text-base leading-tight">{record.G_NAME || '-'}</div>
-                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <GlobalOutlined className="text-[10px]" /> {record.G_NAME_EN || '-'}
-                    </div>
                   </div>
                 </div>
 
                 {/* Code Grid */}
                 <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
                   <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
-                    <BarcodeOutlined /> รหัสแผนก
+                    <BarcodeOutlined /> รหัสตำแหน่ง
                   </div>
                   <div className="font-mono text-sm font-semibold text-emerald-700">
                     {record.G_CODE || '-'}

@@ -1,10 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Tooltip, Grid, Space } from 'antd';
+import { App, Button, Input, ConfigProvider, Grid } from 'antd';
 import {
     PlusOutlined,
-    DeleteOutlined,
-    EditOutlined,
-    SettingFilled,
     SearchOutlined
 } from '@ant-design/icons';
 import api from "../../../api";
@@ -19,11 +16,10 @@ function Company() {
 
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
 
-    // ✅ Logic Style เดิม
     const containerStyle = useMemo(() => ({
         margin: isMd ? '-8px' : '0',
         padding: isMd ? '16px' : '12px',
-        height: '100vh', // ปรับเป็น height fixed เพื่อให้ AG Grid scroll ได้
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
     }), [isMd]);
@@ -36,7 +32,7 @@ function Company() {
     const [currentRecord, setCurrentRecord] = useState(null);
     const [openDelete, setOpenDelete] = useState(false);
 
-    // ====== Fetching & Socket Logic (เหมือนเดิม) ======
+    // ====== Fetching & Socket Logic ======
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
@@ -44,7 +40,7 @@ function Company() {
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลสถานที่อบรมไม่สำเร็จ');
+            message.error('ดึงข้อมูลไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -85,113 +81,93 @@ function Company() {
 
     // ====== Actions ======
     const handleCreate = () => { setCurrentRecord(null); setModalFormOpen(true); };
+
+    // คลิกแถวเพื่อแก้ไข
     const handleUpdate = (record) => { setCurrentRecord(record); setModalFormOpen(true); };
-    const openDeleteModal = (record) => { setCurrentRecord(record); setOpenDelete(true); };
-    const refreshAfterSuccess = () => fetchData();
 
-
-    // ====== AG Grid Definitions (แปลงจาก Antd Table) ======
-
-    // 1. Renderer สำหรับปุ่มจัดการ
-    const ActionRenderer = (params) => {
-        const record = params.data;
-        if (!record) return null;
-
-        return (
-            <Space size="small" className='h-full flex items-center justify-center w-full'>
-                <Tooltip title="แก้ไขข้อมูล">
-                    <Button
-                        type="text"
-                        shape="circle"
-                        size='small'
-                        icon={<EditOutlined className="text-blue-700" />}
-                        className="hover:bg-blue-50 flex items-center justify-center"
-                        onClick={(e) => { e.stopPropagation(); handleUpdate(record); }}
-                    />
-                </Tooltip>
-                <Tooltip title="ลบข้อมูล">
-                    <Button
-                        type="text"
-                        shape="circle"
-                        size='small'
-                        danger
-                        icon={<DeleteOutlined />}
-                        className="hover:bg-red-50 flex items-center justify-center"
-                        onClick={(e) => { e.stopPropagation(); openDeleteModal(record); }}
-                    />
-                </Tooltip>
-            </Space>
-        );
+    // เปิด Modal ลบ (เรียกจากปุ่มใน ModalForm หรือที่อื่น)
+    const openDeleteModal = (record) => {
+        // ไม่ต้อง setModalFormOpen(false) เพื่อให้ Modal ลบ ซ้อนทับ Modal แก้ไข
+        setCurrentRecord(record);
+        setOpenDelete(true);
     };
 
-    // 2. กำหนด Columns
+    // Callback เมื่อลบสำเร็จ
+    const handleDeleteSuccess = () => {
+        setOpenDelete(false);
+        setModalFormOpen(false); // ปิดหน้าฟอร์มด้วย เพราะข้อมูลถูกลบไปแล้ว
+        fetchData();
+    };
+
+    // Callback เมื่อบันทึก/แก้ไขสำเร็จ
+    const handleFormSuccess = () => {
+        // setModalFormOpen(false); // ปิดใน ModalForm แล้ว
+        fetchData();
+    };
+
+    // ====== Columns ======
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 100,
-            maxWidth: 100,
+            width: 80,
+            maxWidth: 80,
             valueGetter: "node.rowIndex + 1",
-            cellClass: "text-center flex items-center justify-center",
+            cellClass: "text-center flex items-center justify-center cursor-pointer",
             sortable: false,
             filter: false,
             pinned: 'left',
             lockVisible: true,
             suppressMovable: true,
-            headerComponent: undefined
+            headerComponent: undefined,
+            headerComponentParams: { align: 'center' }
         },
         {
             headerName: 'รหัสบริษัท',
             field: 'company_code',
-            width: 80,
+            width: 120,
             filter: true,
-            filterParams: { buttons: ['reset'] }
-        },
-        {
-            headerName: 'เลขผู้เสียภาษี',
-            field: 'tax_no',
-            width: 100,
-            valueFormatter: (p) => p.value || '-',
-            filter: true,
-            filterParams: { buttons: ['reset'] }
+            cellClass: "cursor-pointer text-blue-600 font-semibold",
+            headerComponentParams: { align: 'center' }
         },
         {
             headerName: 'ชื่อบริษัท',
             field: 'company_name_th',
-            minWidth: 100,
+            minWidth: 200,
             flex: 1,
             filter: true,
-            filterParams: { buttons: ['reset'] }
+            cellClass: "cursor-pointer",
+            headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'ที่อยู่',
-            field: 'address_th',
-            width: 260,
+            headerName: 'เลขผู้เสียภาษี',
+            field: 'tax_no',
+            width: 140,
             valueFormatter: (p) => p.value || '-',
             filter: true,
-            filterParams: { buttons: ['reset'] }
+            cellClass: "cursor-pointer",
+            headerComponentParams: { align: 'center' }
         },
         {
             headerName: 'เบอร์โทร',
             field: 'phone',
-            width: 120,
+            width: 140,
             valueFormatter: (p) => p.value || '-',
             filter: true,
-            filterParams: { buttons: ['reset'] }
+            cellClass: "cursor-pointer",
+            headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'จัดการ',
-            width: 100,
-            cellRenderer: ActionRenderer,
-            sortable: false,
-            filter: false,
-            lockVisible: true,
-            cellClass: "flex items-center justify-center",
-            suppressMovable: true,
-            headerComponent: undefined
+            headerName: 'ที่อยู่',
+            field: 'address_th',
+            width: 300,
+            valueFormatter: (p) => p.value || '-',
+            filter: true,
+            cellClass: "cursor-pointer",
+            headerComponentParams: { align: 'center' }
         }
     ], []);
 
-    // Logic กรองข้อมูล (Client-side search)
+    // Filter Logic
     const filteredRows = useMemo(() => {
         if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase().trim();
@@ -219,17 +195,8 @@ function Company() {
             <div style={containerStyle} className="bg-gray-50">
 
                 {/* Header Section */}
-                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                            ข้อมูลบริษัท
-                        </h1>
-                        <p className="text-slate-700 text-sm mt-1 pl-1">
-                            จัดการโครงสร้างบริษัท
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
+                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
+                    <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-200">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
                             placeholder="ค้นหารหัส, ชื่อบริษัท..."
@@ -250,12 +217,14 @@ function Company() {
                     </div>
                 </div>
 
-                {/* ✅ Table Content (ใช้ DataTable ที่สร้างใหม่) */}
+                {/* Table Content */}
                 <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                     <DataTable
                         rowData={filteredRows}
                         columnDefs={columnDefs}
                         loading={loading}
+                        onRowClicked={(params) => handleUpdate(params.data)}
+                        rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
                     />
                 </div>
 
@@ -264,14 +233,16 @@ function Company() {
                     open={modalFormOpen}
                     record={currentRecord}
                     onClose={() => { setModalFormOpen(false); setCurrentRecord(null); }}
-                    onSuccess={refreshAfterSuccess}
+                    onSuccess={handleFormSuccess}
+                    // ✅ ส่งฟังก์ชันเพื่อเปิด ModalDelete โดยไม่ต้องปิด ModalForm
+                    onDelete={() => openDeleteModal(currentRecord)}
                 />
 
                 <ModalDelete
                     open={openDelete}
                     record={currentRecord}
-                    onClose={() => { setOpenDelete(false); setCurrentRecord(null); }}
-                    onSuccess={refreshAfterSuccess}
+                    onClose={() => { setOpenDelete(false); }}
+                    onSuccess={handleDeleteSuccess}
                 />
             </div>
         </ConfigProvider>

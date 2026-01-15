@@ -19,7 +19,7 @@ import UserManagement from "./pages/Management/UserManagement/UserManagement";
 
 // ข้อมูลหลัก
 import Employees from "./pages/Masterdata/Employees/Employees";
-import CreateBox from "./pages/Masterdata/CreateBox/CreateBox";
+import Material from "./pages/Masterdata/Material/Material";
 
 // ระบบขึ้นทะเบียนกล่อง
 import RegisterBox from "./pages/Registration/RegisterBox/RegisterBox";
@@ -190,11 +190,11 @@ export default function App() {
           />
 
           <Route
-            path="/create-box"
+            path="/material"
             element={
               <ProtectedRoute mainId="40" subId="402">
                 <AdminLayout>
-                  <CreateBox />
+                  <Material />
                 </AdminLayout>
               </ProtectedRoute>
             }

@@ -1,10 +1,7 @@
-// src/pages/Masterdata/Location/Location.jsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Tooltip, Grid, Space } from 'antd';
+import { App, Button, Input, ConfigProvider, Grid } from 'antd';
 import {
     PlusOutlined,
-    DeleteOutlined,
-    EditOutlined,
     SearchOutlined
 } from '@ant-design/icons';
 import api from "../../../api";
@@ -14,12 +11,10 @@ import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
 
 function Location() {
-    // ... Hooks เดิม ...
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
 
-    // ... Container Style เดิม ...
     const containerStyle = useMemo(() => ({
         margin: isMd ? '-8px' : '0',
         padding: isMd ? '16px' : '12px',
@@ -35,7 +30,7 @@ function Location() {
     const [currentRecord, setCurrentRecord] = useState(null);
     const [openDelete, setOpenDelete] = useState(false);
 
-    // ✅ Fetch API: /settings/area
+    // ✅ Fetch API
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
@@ -53,7 +48,7 @@ function Location() {
         fetchData();
     }, [fetchData]);
 
-    // ✅ Socket: area:upsert, area:delete
+    // ✅ Socket
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
@@ -83,49 +78,46 @@ function Location() {
         };
     }, []);
 
-    // ... Actions เดิม ...
+    // Actions
     const handleCreate = () => { setCurrentRecord(null); setModalFormOpen(true); };
     const handleUpdate = (record) => { setCurrentRecord(record); setModalFormOpen(true); };
-    const openDeleteModal = (record) => { setCurrentRecord(record); setOpenDelete(true); };
-    const refreshAfterSuccess = () => fetchData();
 
-    // ... ActionRenderer เดิม ...
-    const ActionRenderer = (params) => {
-        const record = params.data;
-        if (!record) return null;
-        return (
-            <Space size="small" className='h-full flex items-center justify-center w-full'>
-                <Tooltip title="แก้ไขข้อมูล">
-                    <Button type="text" shape="circle" size='small' icon={<EditOutlined className="text-blue-700" />} className="hover:bg-blue-50 flex items-center justify-center" onClick={(e) => { e.stopPropagation(); handleUpdate(record); }} />
-                </Tooltip>
-                <Tooltip title="ลบข้อมูล">
-                    <Button type="text" shape="circle" size='small' danger icon={<DeleteOutlined />} className="hover:bg-red-50 flex items-center justify-center" onClick={(e) => { e.stopPropagation(); openDeleteModal(record); }} />
-                </Tooltip>
-            </Space>
-        );
+    // ✅ เปิด Modal ลบ (โดยไม่ปิด ModalForm เพื่อให้ซ้อนกัน)
+    const openDeleteModal = (record) => { setCurrentRecord(record); setOpenDelete(true); };
+
+    const handleFormSuccess = () => {
+        fetchData();
     };
 
-    // ✅ Columns: ตัด Department ออก
+    const handleDeleteSuccess = () => {
+        setOpenDelete(false);
+        setModalFormOpen(false); // ปิดฟอร์มด้วยเมื่อลบเสร็จ
+        fetchData();
+    };
+
+    // ✅ Columns: ลบคอลัมน์จัดการออก
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 80,
-            maxWidth: 80,
+            width: 100,
+            maxWidth: 100,
             valueGetter: "node.rowIndex + 1",
-            cellClass: "text-center flex items-center justify-center",
+            cellClass: "text-center flex items-center justify-center cursor-pointer",
             sortable: false,
             filter: false,
             pinned: 'left',
             lockVisible: true,
-            suppressMovable: true
+            suppressMovable: true,
+            headerComponentParams: { align: 'center' }
         },
         {
             headerName: 'รหัสโลเคชั่น',
             field: 'G_CODE',
             width: 150,
             filter: true,
-            cellClass: "font-mono font-semibold text-blue-700",
-            filterParams: { buttons: ['reset'] }
+            cellClass: "pl-2 flex items-center font-mono font-semibold text-blue-700 cursor-pointer",
+            filterParams: { buttons: ['reset'] },
+            headerComponentParams: { align: 'center' }
         },
         {
             headerName: 'ชื่อโลเคชั่น',
@@ -133,17 +125,9 @@ function Location() {
             minWidth: 200,
             flex: 1,
             filter: true,
-            filterParams: { buttons: ['reset'] }
-        },
-        {
-            headerName: 'จัดการ',
-            width: 100,
-            cellRenderer: ActionRenderer,
-            sortable: false,
-            filter: false,
-            lockVisible: true,
-            cellClass: "flex items-center justify-center",
-            suppressMovable: true
+            cellClass: "cursor-pointer",
+            filterParams: { buttons: ['reset'] },
+            headerComponentParams: { align: 'center' }
         }
     ], []);
 
@@ -166,23 +150,58 @@ function Location() {
             }}
         >
             <div style={containerStyle} className="bg-gray-50">
-                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">ข้อมูลโลเคชั่น</h1>
-                        <p className="text-slate-700 text-sm mt-1 pl-1">จัดการข้อมูลโลเคชั่นในระบบ</p>
-                    </div>
+
+                {/* Header Section: ปรับ Layout ให้ปุ่มอยู่ซ้าย (justify-start) */}
+                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                        <Input prefix={<SearchOutlined className="text-gray-400" />} placeholder="ค้นหารหัส, ชื่อโลเคชั่น..." allowClear bordered={false} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-transparent" />
-                        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate} className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md">เพิ่มโลเคชั่น</Button>
+                        <Input
+                            prefix={<SearchOutlined className="text-gray-400" />}
+                            placeholder="ค้นหารหัส, ชื่อโลเคชั่น..."
+                            allowClear
+                            bordered={false}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full md:w-64 bg-transparent"
+                        />
+                        <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
+                        <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={handleCreate}
+                            className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                        >
+                            เพิ่มโลเคชั่น
+                        </Button>
                     </div>
                 </div>
 
+                {/* Table Content */}
                 <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-                    <DataTable rowData={filteredRows} columnDefs={columnDefs} loading={loading} />
+                    <DataTable
+                        rowData={filteredRows}
+                        columnDefs={columnDefs}
+                        loading={loading}
+                        // ✅ คลิกแถวเพื่อแก้ไข
+                        onRowClicked={(params) => handleUpdate(params.data)}
+                        rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
+                    />
                 </div>
 
-                <ModalForm open={modalFormOpen} record={currentRecord} onClose={() => { setModalFormOpen(false); setCurrentRecord(null); }} onSuccess={refreshAfterSuccess} />
-                <ModalDelete open={openDelete} record={currentRecord} onClose={() => { setOpenDelete(false); setCurrentRecord(null); }} onSuccess={refreshAfterSuccess} />
+                {/* Modals */}
+                <ModalForm
+                    open={modalFormOpen}
+                    record={currentRecord}
+                    onClose={() => { setModalFormOpen(false); setCurrentRecord(null); }}
+                    onSuccess={handleFormSuccess}
+                    // ✅ ส่งฟังก์ชัน onDelete ไปให้ ModalForm
+                    onDelete={() => openDeleteModal(currentRecord)}
+                />
+
+                <ModalDelete
+                    open={openDelete}
+                    record={currentRecord}
+                    onClose={() => { setOpenDelete(false); }}
+                    onSuccess={handleDeleteSuccess}
+                />
             </div>
         </ConfigProvider>
     );

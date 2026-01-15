@@ -17,11 +17,10 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
     if (!record?.G_ID) return;
     try {
       setLoading(true);
-      // ✅ API Endpoint สำหรับ Position
       await api.delete(`/settings/packaging/${record.G_ID}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
-      onClose?.();
+      // onClose?.(); // ให้ Parent จัดการปิดเอง
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
       message.error(apiMsg);
@@ -46,10 +45,13 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         footer={null}
         closable={false}
         onCancel={onClose}
-        maskClosable={!loading}
+        // ✅ ป้องกันคลิกปิด
+        maskClosable={false}
         destroyOnClose
         width={480}
         centered
+        // ✅ เพิ่ม zIndex ให้สูงกว่า ModalForm (เพื่อให้ซ้อนทับ)
+        zIndex={1001}
         className="custom-modal-delete"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >
@@ -75,7 +77,6 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Content */}
         <div className="p-6">
-          {/* Warning Banner */}
           <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6 flex gap-3 items-start">
             <WarningOutlined className="text-orange-500 mt-1 text-lg" />
             <div>
@@ -90,7 +91,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
           {record && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
               <div className="grid grid-cols-1 gap-4">
-                {/* Position Name */}
+                {/* Name */}
                 <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
                   <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
                     <ApartmentOutlined className="text-xl" />
@@ -98,9 +99,6 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                   <div>
                     <div className="text-xs text-gray-400 mb-1">ชื่อขนาดบรรจุภัณฑ์</div>
                     <div className="font-bold text-gray-800 text-base leading-tight">{record.G_NAME || '-'}</div>
-                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <GlobalOutlined className="text-[10px]" /> {record.G_NAME_EN || '-'}
-                    </div>
                   </div>
                 </div>
 

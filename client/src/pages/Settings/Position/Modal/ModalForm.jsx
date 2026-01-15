@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-// ✅ เพิ่ม Select
 import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Select } from 'antd';
 import {
     IdcardOutlined,
@@ -7,11 +6,13 @@ import {
     PlusCircleOutlined,
     EditOutlined,
     SaveOutlined,
-    ApartmentOutlined // ✅ ใช้ Icon นี้สื่อถึงแผนก
+    ApartmentOutlined,
+    DeleteOutlined // ✅ เพิ่ม Icon Delete
 } from '@ant-design/icons';
 import api from "../../../../api";
 
-function ModalForm({ open, record, onClose, onSuccess }) {
+// ✅ รับ prop onDelete เพิ่ม
+function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
     const isEditMode = !!record?.G_ID;
@@ -21,12 +22,10 @@ function ModalForm({ open, record, onClose, onSuccess }) {
     const [checkingCode, setCheckingCode] = useState(false);
     const [originalCode, setOriginalCode] = useState(null);
 
-    // ✅ State เก็บรายชื่อแผนก
     const [deptList, setDeptList] = useState([]);
-
     const timerRef = useRef(null);
 
-    // ✅ 1. โหลดรายชื่อแผนกตอน Component Mount
+    // 1. โหลดรายชื่อแผนก
     useEffect(() => {
         const fetchDepts = async () => {
             try {
@@ -39,10 +38,9 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         fetchDepts();
     }, []);
 
-    // ✅ 2. แปลงข้อมูลแผนกเป็น Options
     const deptOptions = useMemo(() => {
         return deptList.map(d => ({
-            label: `${d.G_CODE} : ${d.G_NAME}`, // รูปแบบ IT01 : ไอที
+            label: `${d.G_CODE} : ${d.G_NAME}`,
             value: d.G_CODE
         }));
     }, [deptList]);
@@ -56,7 +54,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                 form.setFieldsValue({
                     G_CODE: data.G_CODE || '',
                     G_NAME: data.G_NAME || '',
-                    department_code: data.department_code || undefined, // ✅ Set ค่า Dept
+                    department_code: data.department_code || undefined,
                 });
                 setOriginalCode(data.G_CODE || null);
             }
@@ -78,7 +76,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                 form.setFieldsValue({
                     G_CODE: record.G_CODE || '',
                     G_NAME: record.G_NAME || '',
-                    department_code: record.department_code || undefined, // ✅
+                    department_code: record.department_code || undefined,
                 });
                 setOriginalCode(record.G_CODE || null);
                 fetchDetail(record.G_ID);
@@ -86,9 +84,19 @@ function ModalForm({ open, record, onClose, onSuccess }) {
         }
     }, [open, isEditMode, record, form, fetchDetail]);
 
-    // ... validateCode เหมือนเดิม ...
-    const validateCode = (_rule, value) => new Promise((resolve, reject) => { /* ...code เดิม... */ resolve(); });
-
+    const validateCode = (_rule, value) => new Promise((resolve, reject) => {
+        clearTimeout(timerRef.current);
+        if (!value || (isEditMode && value === originalCode)) { setCheckingCode(false); return resolve(); }
+        timerRef.current = setTimeout(async () => {
+            try {
+                setCheckingCode(true);
+                let url = `/settings/position/check-code?code=${encodeURIComponent(value)}`;
+                if (isEditMode) url += `&excludeId=${record.G_ID}`;
+                const res = await api.get(url);
+                if (res?.data?.exists) reject('รหัสนี้มีแล้วในระบบ'); else resolve();
+            } catch (err) { resolve(); } finally { setCheckingCode(false); }
+        }, 400);
+    });
 
     const handleOk = async () => {
         try {
@@ -96,7 +104,7 @@ function ModalForm({ open, record, onClose, onSuccess }) {
             const payload = {
                 G_CODE: (raw.G_CODE || '').trim(),
                 G_NAME: (raw.G_NAME || '').trim(),
-                department_code: raw.department_code, // ✅ ส่งค่า department_code
+                department_code: raw.department_code,
             };
 
             setLoading(true);
@@ -134,11 +142,12 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                 width={560}
                 closable={false}
                 centered
-                maskClosable={!loading}
+                // ✅ ป้องกันคลิกปิด
+                maskClosable={false}
                 destroyOnClose
                 styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
             >
-                {/* Header ... */}
+                {/* Header */}
                 <div className="bg-slate-200 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-3 text-slate-800">
                         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 text-xl">
@@ -162,22 +171,22 @@ function ModalForm({ open, record, onClose, onSuccess }) {
 
                             {/* Row 1: G_CODE */}
                             <Form.Item label={<span className="font-semibold text-gray-700">รหัสตำแหน่งงาน</span>} name="G_CODE" rules={[{ required: true, message: 'กรุณาระบุรหัสตำแหน่งงาน' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
-                                <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น POS001" className="h-11 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400 bg-gray-50 focus:bg-white transition-all" allowClear />
+                                {/* ✅ ปรับเป็น h-9 */}
+                                <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น POS001" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
                             </Form.Item>
 
                             {/* Row 2: G_NAME */}
                             <Form.Item label={<span className="font-semibold text-gray-700">ชื่อตำแหน่งงาน (ไทย)</span>} name="G_NAME" rules={[{ required: true, message: 'กรุณาระบุชื่อตำแหน่งงาน (ไทย)' }]}>
-                                <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อภาษาไทย" className="h-11 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400 bg-gray-50 focus:bg-white transition-all" allowClear />
+                                {/* ✅ ปรับเป็น h-9 */}
+                                <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อภาษาไทย" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
                             </Form.Item>
 
-                            {/* Row 3: Department Code (New) */}
-                            <Form.Item
-                                label={<span className="font-semibold text-gray-700">อยู่ภายใต้แผนก</span>}
-                                name="department_code"
-                            >
+                            {/* Row 3: Department Code */}
+                            <Form.Item label={<span className="font-semibold text-gray-700">อยู่ภายใต้แผนก</span>} name="department_code">
+                                {/* ✅ ปรับเป็น h-9 */}
                                 <Select
                                     placeholder="เลือกแผนก"
-                                    className="h-11 custom-select-rounded"
+                                    className="h-9 custom-select-rounded"
                                     options={deptOptions}
                                     allowClear
                                     showSearch
@@ -192,14 +201,31 @@ function ModalForm({ open, record, onClose, onSuccess }) {
                     </div>
                 </Spin>
 
-                {/* Footer ... */}
-                <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-                    <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
-                        {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
-                    </Button>
-                    <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
-                        ยกเลิก
-                    </Button>
+                {/* Footer - ปรับ Layout */}
+                <div className={` px-6 py-4 border-t border-gray-100 flex ${isEditMode ? 'justify-between' : 'justify-end'} items-center gap-3`}>
+
+                    {/* ปุ่มลบ (แสดงเฉพาะโหมดแก้ไข) */}
+                    {isEditMode && (
+                        <Button
+                            danger
+                            type="text"
+                            onClick={onDelete}
+                            disabled={loading}
+                            icon={<DeleteOutlined />}
+                            className="hover:bg-red-50 text-red-500"
+                        >
+                            ลบข้อมูล
+                        </Button>
+                    )}
+
+                    <div className="flex gap-3">
+                        <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
+                            {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
+                        </Button>
+                        <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
+                            ยกเลิก
+                        </Button>
+                    </div>
                 </div>
             </Modal>
         </ConfigProvider>

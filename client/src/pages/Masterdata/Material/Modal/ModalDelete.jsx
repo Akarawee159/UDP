@@ -3,7 +3,7 @@ import { Modal, App, Button, ConfigProvider } from 'antd';
 import {
   DeleteOutlined,
   WarningOutlined,
-  BankOutlined, // ใช้ Icon นี้แทน Apartment
+  ApartmentOutlined,
   GlobalOutlined,
   BarcodeOutlined
 } from '@ant-design/icons';
@@ -14,13 +14,12 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const handleOk = async () => {
-    if (!record?.id) return;
+    if (!record?.material_id) return;
     try {
       setLoading(true);
-      // ✅ API Endpoint สำหรับ Company
-      await api.delete(`/settings/company/${record.id}`);
+      await api.delete(`/masterdata/material/${record.material_id}`);
       message.success('ลบข้อมูลสำเร็จ');
-      onSuccess?.(record?.id);
+      onSuccess?.(record?.material_id);
       // onClose?.(); // ให้ Parent จัดการปิดเอง
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
@@ -31,19 +30,29 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
   };
 
   return (
-    <ConfigProvider theme={{ components: { Button: { dangerShadow: '0 4px 14px 0 rgba(220, 38, 38, 0.25)' } } }}>
+    <ConfigProvider
+      theme={{
+        components: {
+          Button: {
+            dangerShadow: '0 4px 14px 0 rgba(220, 38, 38, 0.25)',
+          }
+        }
+      }}
+    >
       <Modal
         open={open}
         title={null}
         footer={null}
         closable={false}
         onCancel={onClose}
-        maskClosable={false} // ✅ ห้ามคลิกนอกกรอบเพื่อปิด
+        // ✅ ป้องกันคลิกปิด
+        maskClosable={false}
         destroyOnClose
         width={480}
         centered
-        // ✅ z-index สูงกว่า Modal ปกติ (antd ปกติจัดการให้อยู่แล้วถ้าเปิดทีหลัง แต่ใส่เผื่อไว้ได้)
+        // ✅ เพิ่ม zIndex ให้สูงกว่า ModalForm
         zIndex={1001}
+        className="custom-modal-delete"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >
         {/* Header (Red for Danger) */}
@@ -53,11 +62,17 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
               <DeleteOutlined />
             </div>
             <div>
-              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบข้อมูลบริษัท</h3>
+              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบวัสดุ</h3>
               <span className="text-xs text-red-600/70">การดำเนินการนี้ไม่สามารถกู้คืนได้</span>
             </div>
           </div>
-          <button onClick={onClose} disabled={loading} className="text-red-400 hover:text-red-700 transition-colors text-3xl">&times;</button>
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="text-red-400 hover:text-red-700 transition-colors text-3xl"
+          >
+            &times;
+          </button>
         </div>
 
         {/* Content */}
@@ -67,34 +82,33 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
             <div>
               <div className="font-bold text-orange-800 text-sm mb-1">คำเตือน: การลบข้อมูลถาวร</div>
               <p className="text-xs text-orange-700/80 leading-relaxed">
-                คุณกำลังจะลบข้อมูลบริษัทนี้ออกจากระบบ ข้อมูลที่เกี่ยวข้องอาจได้รับผลกระทบ
+                คุณกำลังจะลบข้อมูลวัสดุนี้ออกจากระบบ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ
               </p>
             </div>
           </div>
 
-          {/* Record Details */}
+          {/* Record Details Card */}
           {record && (
             <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
               <div className="grid grid-cols-1 gap-4">
+                {/* Zone Name */}
                 <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
                   <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
-                    <BankOutlined className="text-xl" />
+                    <ApartmentOutlined className="text-xl" />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">ชื่อบริษัท</div>
-                    <div className="font-bold text-gray-800 text-base leading-tight">{record.company_name_th || '-'}</div>
-                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <GlobalOutlined className="text-[10px]" /> {record.company_name_en || '-'}
-                    </div>
+                    <div className="text-xs text-gray-400 mb-1">ชื่อวัสดุ</div>
+                    <div className="font-bold text-gray-800 text-base leading-tight">{record.material_name || '-'}</div>
                   </div>
                 </div>
 
+                {/* Code Grid */}
                 <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
                   <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
-                    <BarcodeOutlined /> รหัสบริษัท
+                    <BarcodeOutlined /> รหัสวัสดุ
                   </div>
                   <div className="font-mono text-sm font-semibold text-emerald-700">
-                    {record.company_code || '-'}
+                    {record.material_code || '-'}
                   </div>
                 </div>
               </div>
@@ -104,10 +118,23 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <Button key="submit" danger type="primary" onClick={handleOk} loading={loading} icon={<DeleteOutlined />} className="h-10 px-6 rounded-lg shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none">
+          <Button
+            key="submit"
+            danger
+            type="primary"
+            onClick={handleOk}
+            loading={loading}
+            icon={<DeleteOutlined />}
+            className="h-10 px-6 rounded-lg shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none"
+          >
             ยืนยันการลบ
           </Button>
-          <Button key="back" onClick={onClose} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300">
+          <Button
+            key="back"
+            onClick={onClose}
+            disabled={loading}
+            className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white"
+          >
             ยกเลิก
           </Button>
         </div>

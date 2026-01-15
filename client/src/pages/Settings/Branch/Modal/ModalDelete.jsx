@@ -1,11 +1,9 @@
-// ./src/pages/Settings/Branch/Modal/ModalDelete.jsx
 import React, { useState } from 'react';
 import { Modal, App, Button, ConfigProvider } from 'antd';
 import {
   DeleteOutlined,
   WarningOutlined,
   BankOutlined,
-  GlobalOutlined,
   BarcodeOutlined,
   ApartmentOutlined
 } from '@ant-design/icons';
@@ -22,7 +20,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
       await api.delete(`/settings/branch/${record.G_ID}`);
       message.success('ลบข้อมูลสำเร็จ');
       onSuccess?.(record?.G_ID);
-      onClose?.();
+      // onClose?.(); // ให้ Parent จัดการปิดเอง
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
       message.error(apiMsg);
@@ -47,10 +45,13 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         footer={null}
         closable={false}
         onCancel={onClose}
-        maskClosable={!loading}
+        // ✅ ป้องกันการคลิกนอกกรอบเพื่อปิด
+        maskClosable={false}
         destroyOnClose
         width={480}
         centered
+        // ✅ zIndex สูงกว่าปกติเล็กน้อยเพื่อให้แน่ใจว่าอยู่เหนือ ModalForm
+        zIndex={1001}
         className="custom-modal-delete"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >

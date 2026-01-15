@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 
 const CustomHeader = (props) => {
-    const { column, displayName, setSort, showColumnMenu } = props;
+    const { column, displayName, setSort, showColumnMenu, align } = props;
     const menuRef = useRef(null);
 
     const sort = column.getSort();
@@ -41,7 +41,7 @@ const CustomHeader = (props) => {
         <div className="flex items-center justify-between w-full h-full">
             <div
                 onClick={() => props.progressSort()}
-                className="flex-1 cursor-pointer flex items-center gap-1 overflow-hidden"
+                className={`flex-1 cursor-pointer flex items-center gap-1 overflow-hidden ${align === 'center' ? 'justify-center' : ''}`}
             >
                 <span className="truncate">{displayName}</span>
                 {sort === 'asc' && <SortAscendingOutlined className="text-blue-600 text-xs" />}

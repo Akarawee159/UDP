@@ -63,7 +63,7 @@ export const menuItems = [
     type: "dropdown",
     children: [
       { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
-      { id: "402", label: "สร้างข้อมูลกล่อง", path: "/create-box" },
+      { id: "402", label: "สร้างข้อมูลกล่อง", path: "/material" },
     ]
   },
   {
