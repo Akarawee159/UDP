@@ -335,18 +335,13 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
-                                            <Form.Item label="แบรนด์ / ยี่ห้อ" name="material_brand" className="mb-1">
-                                                <Input placeholder="ระบุแบรนด์" />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col span={12}>
                                             <Form.Item label="ผู้ผลิต / Supplier" name="supplier_name" className="mb-1">
                                                 <Input prefix={<ShopOutlined className="text-slate-400" />} placeholder="ชื่อบริษัทผู้ผลิต" />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
-                                            <Form.Item label="รุ่น (Model)" name="material_model" className="mb-1">
-                                                <Input prefix={<BarcodeOutlined className="text-slate-400" />} placeholder="ระบุรุ่น" />
+                                            <Form.Item label="แบรนด์ / ยี่ห้อ" name="material_brand" className="mb-1">
+                                                <Input placeholder="ระบุแบรนด์" />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
@@ -355,8 +350,23 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
+                                            <Form.Item label="รุ่น (Model)" name="material_model" className="mb-1">
+                                                <Input prefix={<BarcodeOutlined className="text-slate-400" />} placeholder="ระบุรุ่น" />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
                                             <Form.Item label="คุณสมบัติพิเศษ" name="material_feature" className="mb-1">
                                                 <Input placeholder="เช่น กันน้ำ, ทนความร้อน" />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item label="แหล่งที่มา" name="material_source" className="mb-1">
+                                                <Input placeholder="เช่น จัดซื้อ, จัดจ้าง" />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item label="ใช้สำหรับงาน" name="material_usedfor" className="mb-1">
+                                                <Input placeholder="เช่น ใช้บรรจุภัณฑ์" />
                                             </Form.Item>
                                         </Col>
                                     </Row>

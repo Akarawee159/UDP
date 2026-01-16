@@ -114,8 +114,8 @@ function Branch() {
   const columnDefs = useMemo(() => [
     {
       headerName: 'ลำดับ',
-      width: 80,
-      maxWidth: 80,
+      width: 140,
+      maxWidth: 140,
       valueGetter: "node.rowIndex + 1",
       cellClass: "text-center flex items-center justify-center cursor-pointer",
       sortable: false,
@@ -129,7 +129,7 @@ function Branch() {
     {
       headerName: 'รหัสสาขา',
       field: 'G_CODE',
-      width: 120,
+      width: 140,
       filter: true,
       cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
       filterParams: { buttons: ['reset'] },
@@ -148,7 +148,7 @@ function Branch() {
     {
       headerName: 'ที่อยู่สาขา',
       field: 'G_ADDRESS',
-      minWidth: 200,
+      minWidth: 800,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -158,7 +158,7 @@ function Branch() {
     {
       headerName: 'อยู่ภายใต้บริษัท',
       field: 'company_name_th',
-      minWidth: 200,
+      minWidth: 300,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -168,7 +168,7 @@ function Branch() {
     {
       headerName: 'รหัสบริษัท',
       field: 'company_code',
-      width: 120,
+      width: 140,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -224,7 +224,7 @@ function Branch() {
               onClick={handleCreate}
               className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
             >
-              เพิ่มสาขาใหม่
+              เพิ่มข้อมูลใหม่
             </Button>
           </div>
         </div>

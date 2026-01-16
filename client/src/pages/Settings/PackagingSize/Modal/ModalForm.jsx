@@ -1,16 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Modal, Form, Input, App, Button, ConfigProvider, Spin, InputNumber, Row, Col, AutoComplete, Divider } from 'antd';
+import { Modal, Form, Input, App, Button, ConfigProvider, Spin, InputNumber, Row, Col, Select, Typography } from 'antd';
 import {
-    IdcardOutlined,
-    TagOutlined,
-    PlusCircleOutlined,
-    EditOutlined,
-    SaveOutlined,
-    DeleteOutlined // ✅ เพิ่ม Icon
+    IdcardOutlined, TagOutlined, EditOutlined, SaveOutlined,
+    DeleteOutlined, CodepenOutlined, ExpandAltOutlined, DeploymentUnitOutlined,
+    ColumnWidthOutlined, ColumnHeightOutlined, GatewayOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
-// ✅ รับ prop onDelete เพิ่ม
+const { Title, Text } = Typography;
+
 function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
@@ -20,18 +18,16 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const [fetching, setFetching] = useState(false);
     const [checkingCode, setCheckingCode] = useState(false);
     const [originalCode, setOriginalCode] = useState(null);
-
-    // State สำหรับเก็บรายการหน่วยนับ
     const [unitOptions, setUnitOptions] = useState([]);
     const timerRef = useRef(null);
 
-    // ดึงรายการหน่วยนับ
+    // Fetch Units
     const fetchUnits = useCallback(async () => {
         try {
             const res = await api.get('/settings/countingunit');
             const units = res?.data?.data || [];
             const options = units
-                .map(u => ({ value: u.G_NAME }))
+                .map(u => ({ label: u.G_NAME, value: u.G_NAME }))
                 .filter((v, i, a) => a.findIndex(t => t.value === v.value) === i);
             setUnitOptions(options);
         } catch (err) {
@@ -45,22 +41,12 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             const res = await api.get(`/settings/packaging/${id}`);
             const data = res?.data?.data;
             if (data) {
-                form.setFieldsValue({
-                    G_CODE: data.G_CODE || '',
-                    G_NAME: data.G_NAME || '',
-                    // Dimensions
-                    G_WIDTH: data.G_WIDTH, G_WIDTH_UNIT: data.G_WIDTH_UNIT,
-                    G_LENGTH: data.G_LENGTH, G_LENGTH_UNIT: data.G_LENGTH_UNIT,
-                    G_HEIGHT: data.G_HEIGHT, G_HEIGHT_UNIT: data.G_HEIGHT_UNIT,
-                    // Capacity & Weight
-                    G_CAPACITY: data.G_CAPACITY, G_CAPACITY_UNIT: data.G_CAPACITY_UNIT,
-                    G_WEIGHT: data.G_WEIGHT, G_WEIGHT_UNIT: data.G_WEIGHT_UNIT,
-                });
+                form.setFieldsValue(data);
                 setOriginalCode(data.G_CODE || null);
             }
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลขนาดบรรจุภัณฑ์ไม่สำเร็จ');
+            message.error('ดึงข้อมูลไม่สำเร็จ');
         } finally {
             setFetching(false);
         }
@@ -74,15 +60,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             setOriginalCode(null);
 
             if (isEditMode) {
-                form.setFieldsValue({
-                    G_CODE: record.G_CODE || '',
-                    G_NAME: record.G_NAME || '',
-                    G_WIDTH: record.G_WIDTH, G_WIDTH_UNIT: record.G_WIDTH_UNIT,
-                    G_LENGTH: record.G_LENGTH, G_LENGTH_UNIT: record.G_LENGTH_UNIT,
-                    G_HEIGHT: record.G_HEIGHT, G_HEIGHT_UNIT: record.G_HEIGHT_UNIT,
-                    G_CAPACITY: record.G_CAPACITY, G_CAPACITY_UNIT: record.G_CAPACITY_UNIT,
-                    G_WEIGHT: record.G_WEIGHT, G_WEIGHT_UNIT: record.G_WEIGHT_UNIT,
-                });
+                form.setFieldsValue(record);
                 setOriginalCode(record.G_CODE || null);
                 fetchDetail(record.G_ID);
             }
@@ -94,21 +72,19 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         const code = (value || '').trim();
         if (!code) return resolve();
         if (isEditMode && code === originalCode) return resolve();
-
         if (timerRef.current) clearTimeout(timerRef.current);
         setCheckingCode(true);
-
         timerRef.current = setTimeout(async () => {
             try {
                 const res = await api.get('/settings/packaging/check-code', {
                     params: { code, excludeId: isEditMode ? record.G_ID : undefined }
                 });
                 setCheckingCode(false);
-                if (res.data?.exists) reject(new Error('รหัสนี้มีอยู่แล้ว'));
+                if (res.data?.exists) reject(new Error('รหัสซ้ำ'));
                 else resolve();
             } catch (err) {
                 setCheckingCode(false);
-                reject(new Error('ตรวจสอบรหัสไม่ได้'));
+                reject(new Error('ตรวจสอบล้มเหลว'));
             }
         }, 600);
     });
@@ -138,147 +114,202 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             onClose?.();
         } catch (err) {
             if (err?.errorFields) return;
-            const apiMsg = err?.response?.data?.message || (isEditMode ? 'อัปเดตไม่สำเร็จ' : 'เพิ่มข้อมูลไม่สำเร็จ');
+            const apiMsg = err?.response?.data?.message || 'เกิดข้อผิดพลาด';
             message.error(apiMsg);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleCancel = () => { form.resetFields(); onClose?.(); };
-
-    // ✅ Component สำหรับ Input + Unit (ปรับให้ compact h-9)
-    const SpecInput = ({ label, fieldName, unitName, placeholder }) => (
-        <Form.Item label={label} style={{ marginBottom: 0 }}>
-            <Row gutter={8}>
-                <Col span={14}>
-                    <Form.Item name={fieldName} noStyle>
-                        <InputNumber
-                            placeholder={placeholder}
-                            style={{ width: '100%' }}
-                            className="h-9 input-number-center" // ✅ h-9
-                            min={0}
-                            precision={2}
-                            step={0.01}
-                        />
-                    </Form.Item>
-                </Col>
-                <Col span={10}>
-                    <Form.Item name={unitName} noStyle>
-                        <AutoComplete
-                            options={unitOptions}
-                            placeholder="หน่วย"
-                            className="h-9" // ✅ h-9
-                            filterOption={(inputValue, option) =>
-                                option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
-                            }
-                            popupMatchSelectWidth={false}
-                        />
-                    </Form.Item>
-                </Col>
-            </Row>
-        </Form.Item>
+    // --- Components ---
+    const SpecInput = ({ label, fieldName, unitName, placeholder, icon }) => (
+        <div className="mb-4">
+            <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
+                {icon} {label}
+            </div>
+            <div className="flex">
+                <Form.Item name={fieldName} noStyle>
+                    <InputNumber
+                        placeholder={placeholder}
+                        className="!rounded-r-none flex-1 border-r-0"
+                        min={0}
+                        precision={2}
+                    />
+                </Form.Item>
+                <Form.Item name={unitName} noStyle>
+                    <Select
+                        options={unitOptions}
+                        placeholder="หน่วย"
+                        style={{ width: 90 }}
+                        className="custom-select-right"
+                        showSearch
+                        allowClear
+                        // ✅ แก้ไข: ให้ Dropdown ขยายความกว้างตามเนื้อหา ไม่ถูกจำกัดแค่ 90px
+                        popupMatchSelectWidth={false}
+                        dropdownStyle={{ minWidth: 120 }}
+                        // ✅ แก้ไข: ป้องกันการถูก Modal บัง (Render ไปที่ Body)
+                        getPopupContainer={(trigger) => document.body}
+                    />
+                </Form.Item>
+            </div>
+        </div>
     );
 
     return (
-        <ConfigProvider theme={{ token: { colorPrimary: '#2563eb', borderRadius: 8 } }}>
+        <ConfigProvider
+            theme={{
+                token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: "'Prompt', 'Inter', sans-serif" },
+                components: {
+                    Input: { controlHeight: 40 },
+                    InputNumber: { controlHeight: 40 },
+                    Select: { controlHeight: 40 },
+                    Button: { controlHeight: 40 }
+                }
+            }}
+        >
             <Modal
                 open={open}
                 title={null}
-                onCancel={handleCancel}
+                onCancel={() => { form.resetFields(); onClose?.(); }}
                 footer={null}
-                width={1100}
+                width={900}
                 closable={false}
                 centered
-                // ✅ ป้องกันคลิกปิด
                 maskClosable={false}
                 destroyOnClose
-                styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
+                // ✅ เอา overflow: hidden ออก เพื่อให้ Dropdown ไม่ถูกตัดถ้ามันยาวทะลุ Modal
+                styles={{ content: { padding: 0, borderRadius: '20px' } }}
             >
-                {/* Header */}
-                <div className="bg-slate-200 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-slate-800">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 text-xl">
-                            {isEditMode ? <EditOutlined /> : <PlusCircleOutlined />}
+                {/* --- Header (เพิ่ม rounded-t-2xl เพื่อให้มุมบนยังโค้งอยู่) --- */}
+                <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50 rounded-t-2xl">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                            {isEditMode ? <EditOutlined /> : <CodepenOutlined />}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold m-0 leading-tight">
-                                {isEditMode ? 'แก้ไขข้อมูลขนาดบรรจุภัณฑ์' : 'เพิ่มข้อมูลขนาดบรรจุภัณฑ์'}
-                            </h3>
-                            <span className="text-xs text-slate-700">
-                                {isEditMode ? 'ปรับปรุงรายละเอียดและสเปค' : 'สร้างรายการใหม่'}
-                            </span>
+                            <Title level={4} style={{ margin: 0, fontWeight: 700 }} className="text-slate-800">
+                                {isEditMode ? 'แก้ไขบรรจุภัณฑ์' : 'เพิ่มบรรจุภัณฑ์'}
+                            </Title>
+                            <Text className="text-slate-500 text-sm">
+                                {isEditMode ? 'Packaging Settings' : 'Create New Packaging'}
+                            </Text>
                         </div>
                     </div>
-                    <button onClick={handleCancel} disabled={loading} className="text-slate-400 hover:text-slate-700 transition-colors text-3xl">&times;</button>
+                    <Button type="text" onClick={() => onClose?.()} className="text-slate-400 hover:text-slate-600 rounded-full w-10 h-10 flex items-center justify-center">
+                        <span className="text-2xl font-light">&times;</span>
+                    </Button>
                 </div>
 
                 <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
-                    <div className="p-8">
-                        <Form form={form} layout="vertical" autoComplete="off" className="space-y-4">
+                    <Form form={form} layout="vertical" autoComplete="off">
+                        {/* ✅ เพิ่ม rounded-b-2xl ที่ container หลักแทน */}
+                        <div className="flex flex-col md:flex-row h-[60vh] md:h-[500px]">
 
-                            {/* Row 1: Code & Name */}
-                            <Row gutter={16}>
-                                <Col span={10}>
-                                    <Form.Item label={<span className="font-semibold text-gray-700">รหัส (Code)</span>} name="G_CODE" rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
-                                        {/* ✅ h-9 */}
-                                        <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น BOX-01" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
-                                    </Form.Item>
-                                </Col>
-                                <Col span={14}>
-                                    <Form.Item label={<span className="font-semibold text-gray-700">ชื่อบรรจุภัณฑ์</span>} name="G_NAME" rules={[{ required: true, message: 'ระบุชื่อ' }]}>
-                                        {/* ✅ h-9 */}
-                                        <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ชื่อขนาดบรรจุภัณฑ์" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
-                                    </Form.Item>
-                                </Col>
-                            </Row>
+                            {/* --- LEFT: Identity --- */}
+                            <div className="w-full md:w-[320px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0 overflow-y-auto">
+                                <div className="text-center mb-6">
+                                    <div className="w-32 h-32 bg-white rounded-xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-300 mb-4">
+                                        <CodepenOutlined style={{ fontSize: '48px' }} />
+                                        <span className="text-xs mt-2">Packaging Model</span>
+                                    </div>
+                                    <div className="text-slate-500 text-sm">ระบุข้อมูลพื้นฐาน</div>
+                                </div>
 
-                            <Divider orientation="left" style={{ margin: '10px 0' }}><span className="text-xs text-gray-500">ข้อมูลขนาดและสเปค</span></Divider>
+                                <div className="space-y-4">
+                                    <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                                        <Form.Item label="รหัส (Code)" name="G_CODE" rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined} className="mb-4">
+                                            <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="Ex. BOX-A4" className="font-mono" maxLength={20} />
+                                        </Form.Item>
+                                        <Form.Item label="ชื่อบรรจุภัณฑ์" name="G_NAME" rules={[{ required: true, message: 'ระบุชื่อ' }]} className="mb-0">
+                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ชื่อเรียก" />
+                                        </Form.Item>
+                                    </div>
+                                </div>
+                            </div>
 
-                            {/* Row 2: Width / Length / Height */}
-                            <Row gutter={16}>
-                                <Col span={8}><SpecInput label="ความกว้าง" fieldName="G_WIDTH" unitName="G_WIDTH_UNIT" placeholder="กว้าง" /></Col>
-                                <Col span={8}><SpecInput label="ความยาว" fieldName="G_LENGTH" unitName="G_LENGTH_UNIT" placeholder="ยาว" /></Col>
-                                <Col span={8}><SpecInput label="ความสูง" fieldName="G_HEIGHT" unitName="G_HEIGHT_UNIT" placeholder="สูง" /></Col>
-                            </Row>
+                            {/* --- RIGHT: Specifications --- */}
+                            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar bg-white">
 
-                            {/* Row 3: Capacity / Weight */}
-                            <Row gutter={16} className="mt-2">
-                                <Col span={12}><SpecInput label="ความจุ (Capacity)" fieldName="G_CAPACITY" unitName="G_CAPACITY_UNIT" placeholder="ความจุ" /></Col>
-                                <Col span={12}><SpecInput label="น้ำหนัก (Weight)" fieldName="G_WEIGHT" unitName="G_WEIGHT_UNIT" placeholder="น้ำหนัก" /></Col>
-                            </Row>
+                                {/* Section 1: Dimensions */}
+                                <div className="mb-8">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><ExpandAltOutlined /></div>
+                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">Dimension Specs</h3>
+                                        <div className="flex-1 h-px bg-gray-100 ml-2"></div>
+                                    </div>
 
-                        </Form>
-                    </div>
+                                    <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
+                                        <Row gutter={16}>
+                                            <Col span={8}>
+                                                <SpecInput label="ความกว้าง" fieldName="G_WIDTH" unitName="G_WIDTH_UNIT" placeholder="0.00" icon={<ColumnWidthOutlined />} />
+                                            </Col>
+                                            <Col span={8}>
+                                                <SpecInput label="ความยาว" fieldName="G_LENGTH" unitName="G_LENGTH_UNIT" placeholder="0.00" icon={<ColumnHeightOutlined className="rotate-90" />} />
+                                            </Col>
+                                            <Col span={8}>
+                                                <SpecInput label="ความสูง" fieldName="G_HEIGHT" unitName="G_HEIGHT_UNIT" placeholder="0.00" icon={<ColumnHeightOutlined />} />
+                                            </Col>
+                                        </Row>
+                                        <div className="text-xs text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
+                                            <div className="w-16 h-px bg-slate-200"></div>
+                                            <span>กว้าง x ยาว x สูง</span>
+                                            <div className="w-16 h-px bg-slate-200"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section 2: Properties */}
+                                <div>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><DeploymentUnitOutlined /></div>
+                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">Capacity & Weight</h3>
+                                        <div className="flex-1 h-px bg-gray-100 ml-2"></div>
+                                    </div>
+
+                                    <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
+                                        <Row gutter={16}>
+                                            <Col span={12}>
+                                                <SpecInput label="ความจุ (Capacity)" fieldName="G_CAPACITY" unitName="G_CAPACITY_UNIT" placeholder="0.00" icon={<GatewayOutlined />} />
+                                            </Col>
+                                            <Col span={12}>
+                                                <SpecInput label="น้ำหนัก (Weight)" fieldName="G_WEIGHT" unitName="G_WEIGHT_UNIT" placeholder="0.00" icon={<span className="font-bold">W</span>} />
+                                            </Col>
+                                        </Row>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </Form>
                 </Spin>
 
-                {/* Footer - ปรับ Layout */}
-                <div className={` px-6 py-4 border-t border-gray-100 flex ${isEditMode ? 'justify-between' : 'justify-end'} items-center gap-3`}>
-
-                    {/* ปุ่มลบ (แสดงเฉพาะโหมดแก้ไข) */}
-                    {isEditMode && (
-                        <Button
-                            danger
-                            type="text"
-                            onClick={onDelete}
-                            disabled={loading}
-                            icon={<DeleteOutlined />}
-                            className="hover:bg-red-50 text-red-500"
-                        >
-                            ลบข้อมูล
-                        </Button>
-                    )}
-
+                {/* --- Footer (เพิ่ม rounded-b-2xl) --- */}
+                <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center rounded-b-2xl">
+                    <div>
+                        {isEditMode && (
+                            <Button danger type="text" onClick={onDelete} disabled={loading} icon={<DeleteOutlined />} className="hover:bg-red-50">
+                                ลบข้อมูล
+                            </Button>
+                        )}
+                    </div>
                     <div className="flex gap-3">
-                        <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
-                            {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
+                        <Button type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="px-6 rounded-lg shadow-lg shadow-blue-200">
+                            {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}
                         </Button>
-                        <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
+                        <Button onClick={() => { form.resetFields(); onClose?.(); }} disabled={loading} className="px-6 rounded-lg">
                             ยกเลิก
                         </Button>
                     </div>
                 </div>
             </Modal>
+
+            <style>{`
+                .custom-select-right .ant-select-selector {
+                    border-top-left-radius: 0 !important;
+                    border-bottom-left-radius: 0 !important;
+                    background-color: #f8fafc !important;
+                }
+            `}</style>
         </ConfigProvider>
     );
 }

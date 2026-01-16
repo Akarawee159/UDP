@@ -114,8 +114,8 @@ function Position() {
   const columnDefs = useMemo(() => [
     {
       headerName: 'ลำดับ',
-      width: 100,
-      maxWidth: 100,
+      width: 140,
+      maxWidth: 140,
       valueGetter: "node.rowIndex + 1",
       cellClass: "text-center flex items-center justify-center cursor-pointer",
       sortable: false,
@@ -129,7 +129,7 @@ function Position() {
     {
       headerName: 'รหัสตำแหน่ง',
       field: 'G_CODE',
-      width: 150,
+      width: 200,
       filter: true,
       cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
       filterParams: { buttons: ['reset'] },
@@ -138,7 +138,7 @@ function Position() {
     {
       headerName: 'ชื่อตำแหน่งงาน (ไทย)',
       field: 'G_NAME',
-      minWidth: 150,
+      minWidth: 140,
       flex: 1,
       filter: true,
       cellClass: "cursor-pointer",
@@ -148,7 +148,7 @@ function Position() {
     {
       headerName: 'อยู่ภายใต้แผนก',
       field: 'dept_name',
-      minWidth: 200,
+      minWidth: 400,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -158,7 +158,7 @@ function Position() {
     {
       headerName: 'รหัสแผนก',
       field: 'dept_code_ref',
-      width: 120,
+      width: 140,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -214,7 +214,7 @@ function Position() {
               onClick={handleCreate}
               className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
             >
-              เพิ่มตำแหน่ง
+              เพิ่มข้อมูลใหม่
             </Button>
           </div>
         </div>

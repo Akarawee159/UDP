@@ -114,8 +114,8 @@ function Department() {
   const columnDefs = useMemo(() => [
     {
       headerName: 'ลำดับ',
-      width: 80,
-      maxWidth: 80,
+      width: 140,
+      maxWidth: 140,
       valueGetter: "node.rowIndex + 1",
       cellClass: "text-center flex items-center justify-center cursor-pointer",
       sortable: false,
@@ -129,7 +129,7 @@ function Department() {
     {
       headerName: 'รหัสแผนก',
       field: 'G_CODE',
-      width: 120,
+      width: 200,
       filter: true,
       cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
       filterParams: { buttons: ['reset'] },
@@ -138,7 +138,7 @@ function Department() {
     {
       headerName: 'ชื่อแผนก',
       field: 'G_NAME',
-      minWidth: 150,
+      minWidth: 140,
       flex: 1,
       filter: true,
       cellClass: "cursor-pointer",
@@ -148,7 +148,7 @@ function Department() {
     {
       headerName: 'อยู่ภายใต้สาขา',
       field: 'branch_name',
-      minWidth: 200,
+      minWidth: 400,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -158,7 +158,7 @@ function Department() {
     {
       headerName: 'รหัสสาขา',
       field: 'branch_code',
-      width: 120,
+      width: 140,
       valueFormatter: (p) => p.value || '-',
       filter: true,
       cellClass: "cursor-pointer",
@@ -214,7 +214,7 @@ function Department() {
               onClick={handleCreate}
               className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
             >
-              เพิ่มแผนกใหม่
+              เพิ่มข้อมูลใหม่
             </Button>
           </div>
         </div>

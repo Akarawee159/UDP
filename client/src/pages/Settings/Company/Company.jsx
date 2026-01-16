@@ -109,8 +109,8 @@ function Company() {
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 80,
-            maxWidth: 80,
+            width: 140,
+            maxWidth: 140,
             valueGetter: "node.rowIndex + 1",
             cellClass: "text-center flex items-center justify-center cursor-pointer",
             sortable: false,
@@ -124,7 +124,7 @@ function Company() {
         {
             headerName: 'รหัสบริษัท',
             field: 'company_code',
-            width: 120,
+            width: 200,
             filter: true,
             cellClass: "cursor-pointer text-blue-600 font-semibold",
             headerComponentParams: { align: 'center' }
@@ -141,7 +141,16 @@ function Company() {
         {
             headerName: 'เลขผู้เสียภาษี',
             field: 'tax_no',
-            width: 140,
+            width: 200,
+            valueFormatter: (p) => p.value || '-',
+            filter: true,
+            cellClass: "cursor-pointer",
+            headerComponentParams: { align: 'center' }
+        },
+        {
+            headerName: 'ที่อยู่',
+            field: 'address_th',
+            width: 600,
             valueFormatter: (p) => p.value || '-',
             filter: true,
             cellClass: "cursor-pointer",
@@ -151,15 +160,6 @@ function Company() {
             headerName: 'เบอร์โทร',
             field: 'phone',
             width: 140,
-            valueFormatter: (p) => p.value || '-',
-            filter: true,
-            cellClass: "cursor-pointer",
-            headerComponentParams: { align: 'center' }
-        },
-        {
-            headerName: 'ที่อยู่',
-            field: 'address_th',
-            width: 300,
             valueFormatter: (p) => p.value || '-',
             filter: true,
             cellClass: "cursor-pointer",
@@ -212,7 +212,7 @@ function Company() {
                             onClick={handleCreate}
                             className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
-                            เพิ่มข้อมูล
+                            เพิ่มข้อมูลใหม่
                         </Button>
                     </div>
                 </div>

@@ -161,8 +161,8 @@ function Employees() {
   const columnDefs = useMemo(() => [
     {
       headerName: 'ลำดับ',
-      width: 80,
-      maxWidth: 80,
+      width: 140,
+      maxWidth: 140,
       valueGetter: "node.rowIndex + 1",
       cellClass: "text-center flex items-center justify-center",
       sortable: false,
@@ -175,7 +175,7 @@ function Employees() {
     {
       headerName: 'รหัสพนักงาน',
       field: 'employee_code',
-      width: 140,
+      width: 200,
       valueGetter: (p) => pick(p.data, ['employee_code', 'emp_code', 'employeeId']),
       lockVisible: true,
       filter: true,
@@ -193,14 +193,14 @@ function Employees() {
     {
       headerName: 'ตำแหน่ง',
       field: 'position',
-      width: 160,
+      width: 240,
       lockVisible: true,
       filter: 'agTextColumnFilter',
     },
     {
       headerName: 'แผนก',
       field: 'department',
-      width: 160,
+      width: 240,
       valueFormatter: (p) => p.value || '-',
       lockVisible: true,
       filter: 'agTextColumnFilter',
@@ -208,7 +208,7 @@ function Employees() {
     {
       headerName: 'สาขา',
       field: 'branch',
-      width: 160,
+      width: 240,
       lockVisible: true,
       filter: 'agTextColumnFilter',
     },

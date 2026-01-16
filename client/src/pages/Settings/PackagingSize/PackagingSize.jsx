@@ -101,7 +101,7 @@ function PackagingSize() {
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 120,
+            width: 140,
             valueGetter: "node.rowIndex + 1",
             cellClass: "text-center flex items-center justify-center cursor-pointer",
             pinned: 'left',
@@ -112,7 +112,7 @@ function PackagingSize() {
         {
             headerName: 'รหัส',
             field: 'G_CODE',
-            width: 120,
+            width: 200,
             filter: true,
             cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
             pinned: 'left',
@@ -134,21 +134,21 @@ function PackagingSize() {
             children: [
                 {
                     headerName: 'กว้าง',
-                    width: 160,
+                    width: 200,
                     valueGetter: p => valUnit(p.data.G_WIDTH, p.data.G_WIDTH_UNIT),
                     headerComponentParams: { align: 'center' },
                     cellClass: "text-center flex items-center justify-center cursor-pointer"
                 },
                 {
                     headerName: 'ยาว',
-                    width: 160,
+                    width: 200,
                     valueGetter: p => valUnit(p.data.G_LENGTH, p.data.G_LENGTH_UNIT),
                     headerComponentParams: { align: 'center' },
                     cellClass: "text-center flex items-center justify-center cursor-pointer"
                 },
                 {
                     headerName: 'สูง',
-                    width: 160,
+                    width: 200,
                     valueGetter: p => valUnit(p.data.G_HEIGHT, p.data.G_HEIGHT_UNIT),
                     headerComponentParams: { align: 'center' },
                     cellClass: "text-center flex items-center justify-center cursor-pointer"
@@ -162,14 +162,14 @@ function PackagingSize() {
             children: [
                 {
                     headerName: 'ความจุ',
-                    width: 160,
+                    width: 200,
                     valueGetter: p => valUnit(p.data.G_CAPACITY, p.data.G_CAPACITY_UNIT),
                     headerComponentParams: { align: 'center' },
                     cellClass: "text-center flex items-center justify-center cursor-pointer"
                 },
                 {
                     headerName: 'น้ำหนัก',
-                    width: 160,
+                    width: 200,
                     valueGetter: p => valUnit(p.data.G_WEIGHT, p.data.G_WEIGHT_UNIT),
                     headerComponentParams: { align: 'center' },
                     cellClass: "text-center flex items-center justify-center cursor-pointer"
@@ -215,7 +215,7 @@ function PackagingSize() {
                             onClick={handleCreate}
                             className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
-                            เพิ่มข้อมูล
+                            เพิ่มข้อมูลใหม่
                         </Button>
                     </div>
                 </div>

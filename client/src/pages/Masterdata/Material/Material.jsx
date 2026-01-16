@@ -103,13 +103,34 @@ function Material() {
             width: 140,
             valueGetter: "node.rowIndex + 1",
             cellClass: "text-center",
-            pinned: 'left'
+            pinned: 'left',
+            headerComponentParams: { align: 'center' }
+        },
+        {
+            headerName: 'สถานะ',
+            field: 'is_status',
+            width: 140,
+            cellClass: "text-center",
+            headerComponentParams: { align: 'center' },
+            cellRenderer: (params) => {
+                const isActive = Number(params.value) === 1;
+
+                return (
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${isActive
+                        ? 'bg-green-100 text-green-700 border-green-200'
+                        : 'bg-red-50 text-red-600 border-red-200'
+                        }`}>
+                        {isActive ? 'พร้อมใช้งาน' : 'ปิดการใช้งาน'}
+                    </span>
+                );
+            }
         },
         {
             headerName: 'รูปภาพ',
             field: 'material_image',
             width: 140,
             cellClass: "flex items-center justify-center py-1",
+            headerComponentParams: { align: 'center' },
             cellRenderer: (params) => {
                 // ถ้าไม่มีรูป หรือรูปเป็นค่าว่าง ให้แสดง No Img
                 if (!params.value) {
@@ -133,43 +154,26 @@ function Material() {
             width: 140,
             filter: true,
             cellClass: "font-mono font-bold text-blue-700 cursor-pointer",
-            pinned: 'left'
+            pinned: 'left',
+            headerComponentParams: { align: 'center' }
         },
-        { headerName: 'ชื่อวัสดุ', field: 'material_name', minWidth: 180, filter: true },
-        { headerName: 'ประเภท', field: 'material_type', width: 140 },
-        { headerName: 'ผู้ผลิต', field: 'supplier_name', width: 140 },
-        { headerName: 'แบรนด์', field: 'material_brand', width: 140 },
-        { headerName: 'สี', field: 'material_color', width: 140 },
-        { headerName: 'รุ่น', field: 'material_model', width: 140 },
-        { headerName: 'คุณสมบัติ', field: 'material_feature', width: 140 },
-        { headerName: 'สกุลเงิน', field: 'currency', width: 140, cellClass: "text-center" },
-        { headerName: 'จน./หน่วยหลัก', field: 'quantity_mainunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right" },
-        { headerName: 'หน่วยหลัก', field: 'mainunit_name', width: 140 },
-        { headerName: 'จน./หน่วยย่อย', field: 'quantity_subunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right" },
-        { headerName: 'หน่วยย่อย', field: 'subunit_name', width: 140 },
-        { headerName: 'ปริมาณสั่งซื้อขั้นต่ำ', field: 'minimum_order', width: 200, cellClass: "text-right" },
-        { headerName: 'ปริมาณต่ำสุด', field: 'minstock', width: 160, cellClass: "text-right text-orange-600" },
-        { headerName: 'ปริมาณสูงสุด', field: 'maxstock', width: 160, cellClass: "text-right text-green-600" },
-        {
-            headerName: 'สถานะ',
-            field: 'is_status',
-            width: 140,
-            cellClass: "text-center",
-            cellRenderer: (params) => {
-                // 1 = เปิดการใช้งาน, 2 = ปิดการใช้งาน
-                // ✅ แก้ไข: แปลงเป็น Number ก่อนเปรียบเทียบ เพื่อรองรับทั้ง "1" และ 1
-                const isActive = Number(params.value) === 1;
-
-                return (
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${isActive
-                        ? 'bg-green-100 text-green-700 border-green-200'
-                        : 'bg-red-50 text-red-600 border-red-200'
-                        }`}>
-                        {isActive ? 'เปิดการใช้งาน' : 'ปิดการใช้งาน'}
-                    </span>
-                );
-            }
-        }
+        { headerName: 'ชื่อวัสดุ', field: 'material_name', minWidth: 180, filter: true, headerComponentParams: { align: 'center' } },
+        { headerName: 'ประเภท', field: 'material_type', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'ผู้ผลิต', field: 'supplier_name', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'แบรนด์', field: 'material_brand', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'สี', field: 'material_color', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'รุ่น', field: 'material_model', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'คุณสมบัติ', field: 'material_feature', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'แหล่งที่มา', field: 'material_source', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'ใช้สำหรับงาน', field: 'material_usedfor', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'สกุลเงิน', field: 'currency', width: 140, cellClass: "text-center", headerComponentParams: { align: 'center' } },
+        { headerName: 'จน./หน่วยหลัก', field: 'quantity_mainunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right", headerComponentParams: { align: 'center' } },
+        { headerName: 'หน่วยหลัก', field: 'mainunit_name', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'จน./หน่วยย่อย', field: 'quantity_subunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right", headerComponentParams: { align: 'center' } },
+        { headerName: 'หน่วยย่อย', field: 'subunit_name', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'ปริมาณสั่งซื้อขั้นต่ำ', field: 'minimum_order', width: 200, cellClass: "text-right", headerComponentParams: { align: 'center' } },
+        { headerName: 'ปริมาณต่ำสุด', field: 'minstock', width: 160, cellClass: "text-right text-orange-600", headerComponentParams: { align: 'center' } },
+        { headerName: 'ปริมาณสูงสุด', field: 'maxstock', width: 160, cellClass: "text-right text-green-600", headerComponentParams: { align: 'center' } }
     ], []);
 
     // Logic กรองข้อมูล

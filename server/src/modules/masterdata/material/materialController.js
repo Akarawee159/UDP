@@ -5,8 +5,9 @@ const model = require('./materialModel');
 const fs = require('fs');
 const path = require('path');
 
-// ✅ ระบุ Path ให้ตรงกับที่กำหนดใน Route (path.join(__dirname, '../../../img/material'))
 const uploadDir = path.join(__dirname, '../../../../img/material');
+
+// ... (functions deleteFile, parsePayload, ensureRequired เหมือนเดิม ไม่ต้องแก้) ...
 
 /** Helper: ลบไฟล์ออกจาก Server */
 function deleteFile(filename) {
@@ -24,6 +25,7 @@ function deleteFile(filename) {
 
 /** helper: trim และ validate payload */
 function parsePayload(body, file) {
+  // ... (code เดิมใน parsePayload) ...
   // สถานะ: 1=เปิด, 2=ปิด
   let status = 2;
   if (body.is_status === 'true' || body.is_status === true || body.is_status === '1' || body.is_status === 1) {
@@ -33,6 +35,8 @@ function parsePayload(body, file) {
   const data = {
     material_code: String(body.material_code || '').trim(),
     material_name: String(body.material_name || '').trim(),
+    material_source: String(body.material_source || '').trim(),
+    material_usedfor: String(body.material_usedfor || '').trim(),
     material_type: String(body.material_type || '').trim(),
     supplier_name: String(body.supplier_name || '').trim(),
     material_brand: String(body.material_brand || '').trim(),
@@ -53,10 +57,8 @@ function parsePayload(body, file) {
   if (file) {
     data.material_image = file.filename;
   } else if (body.material_image === '') {
-    // กรณีส่งค่าว่างมา แปลว่าต้องการลบรูปออก
     data.material_image = '';
   } else if (body.material_image) {
-    // กรณีส่งชื่อเดิมมา (ไม่แก้ไขรูป)
     data.material_image = String(body.material_image).trim();
   } else {
     data.material_image = '';
@@ -65,6 +67,7 @@ function parsePayload(body, file) {
   return data;
 }
 
+// ... (function ensureRequired, getAll, getById, getOptions, checkCode เหมือนเดิม) ...
 function ensureRequired({ material_code, material_name }) {
   const missing = [];
   if (!material_code) missing.push('กรุณาพิมพ์รหัส');
@@ -113,14 +116,19 @@ async function checkCode(req, res, next) {
   } catch (err) { next(err); }
 }
 
+
+/* --- จุดที่ต้องแก้ไขคือ create และ update --- */
+
 async function create(req, res, next) {
   try {
     const payload = parsePayload(req.body, req.file);
     ensureRequired(payload);
 
+    // ✅ แก้ไข: เพิ่มเฉพาะคนสร้าง (created_by) ไม่ต้องใส่ updated_by
+    payload.created_by = req.user.employee_id;
+
     const dup = await model.checkCodeDuplicate(payload.material_code, null);
     if (dup) {
-      // ถ้า Duplicate และมีการอัปโหลดรูปมาแล้ว ต้องลบรูปทิ้งด้วย เพราะ Save ไม่ผ่าน
       if (req.file) deleteFile(req.file.filename);
       const err = new Error('รหัส (material_code) ซ้ำในระบบ');
       err.status = 409;
@@ -134,7 +142,7 @@ async function create(req, res, next) {
 
     res.status(201).json({ success: true, data: row, message: 'เพิ่มข้อมูลสำเร็จ' });
   } catch (err) {
-    if (req.file) deleteFile(req.file.filename); // ลบรูปถ้า Error
+    if (req.file) deleteFile(req.file.filename);
     next(err);
   }
 }
@@ -153,16 +161,15 @@ async function update(req, res, next) {
     const payload = parsePayload(req.body, req.file);
     ensureRequired(payload);
 
-    // ✅ Logic การลบรูปเดิม
-    // 1. ถ้ามีการอัปโหลดไฟล์ใหม่ (req.file) และมีรูปเดิม -> ลบรูปเดิม
-    // 2. ถ้าไม่มีไฟล์ใหม่ แต่ payload.material_image เป็นค่าว่าง (สั่งลบรูป) และมีรูปเดิม -> ลบรูปเดิม
+    // ✅ แก้ไข: ระบุคนแก้ไขล่าสุด (updated_by) เฉพาะตอน Update
+    payload.updated_by = req.user.employee_id;
+
+    // Logic ลบรูปเดิม
     if (exist.material_image) {
       if (req.file || (payload.material_image === '' && !req.file)) {
         deleteFile(exist.material_image);
       }
     }
-
-    // กรณีไม่ได้ส่งอะไรมาเกี่ยวกับรูปเลย ให้ใช้รูปเดิม
     if (!req.file && payload.material_image !== '' && exist.material_image && !payload.material_image) {
       payload.material_image = exist.material_image;
     }
@@ -193,6 +200,7 @@ async function update(req, res, next) {
   }
 }
 
+// ... (function remove และ module.exports เหมือนเดิม) ...
 async function remove(req, res, next) {
   try {
     const material_id = Number(req.params.material_id);

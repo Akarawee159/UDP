@@ -1,19 +1,19 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Modal, Form, Input, App, Button, ConfigProvider, Spin } from 'antd';
+import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Typography } from 'antd';
 import {
-    IdcardOutlined,
-    TagOutlined,
-    PlusCircleOutlined,
-    EditOutlined,
-    SaveOutlined,
-    DeleteOutlined // ✅ เพิ่ม Icon
+    IdcardOutlined, TagOutlined, PlusCircleOutlined, EditOutlined,
+    SaveOutlined, DeleteOutlined, NumberOutlined,
+    CalculatorOutlined, BuildOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
-// ✅ รับ prop onDelete เพิ่ม
+const { Title, Text } = Typography;
+
 function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
+
+    // ตรวจสอบโหมด
     const isEditMode = !!record?.G_ID;
 
     const [loading, setLoading] = useState(false);
@@ -23,6 +23,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
 
     const timerRef = useRef(null);
 
+    // ดึงข้อมูล (Edit Mode)
     const fetchDetail = useCallback(async (id) => {
         try {
             setFetching(true);
@@ -60,31 +61,30 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }
     }, [open, isEditMode, record, form, fetchDetail]);
 
-    // Validation เช็ค Code ซ้ำ
+    // Validation Check Code
     const validateCode = (_rule, value) => new Promise((resolve, reject) => {
+        clearTimeout(timerRef.current);
         const code = (value || '').trim();
-        if (!code) return resolve();
-        if (isEditMode && code === originalCode) return resolve();
+        if (!code || (isEditMode && code === originalCode)) {
+            setCheckingCode(false);
+            return resolve();
+        }
 
-        if (timerRef.current) clearTimeout(timerRef.current);
         setCheckingCode(true);
-
         timerRef.current = setTimeout(async () => {
             try {
-                const res = await api.get('/settings/countingunit/check-code', {
-                    params: { code, excludeId: isEditMode ? record.G_ID : undefined }
-                });
+                let url = `/settings/countingunit/check-code?code=${encodeURIComponent(code)}`;
+                if (isEditMode) url += `&excludeId=${record.G_ID}`;
+                const res = await api.get(url);
                 setCheckingCode(false);
-                if (res.data?.exists) {
-                    reject(new Error('รหัสหน่วยนับนี้มีอยู่ในระบบแล้ว'));
-                } else {
-                    resolve();
-                }
+                if (res?.data?.exists) reject('รหัสหน่วยนับนี้มีแล้วในระบบ');
+                else resolve();
             } catch (err) {
                 setCheckingCode(false);
-                reject(new Error('ไม่สามารถตรวจสอบรหัสซ้ำได้'));
+                console.error(err);
+                resolve();
             }
-        }, 600);
+        }, 500);
     });
 
     const handleOk = async () => {
@@ -121,75 +121,142 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const handleCancel = () => { form.resetFields(); onClose?.(); };
 
     return (
-        <ConfigProvider theme={{ token: { colorPrimary: '#2563eb', borderRadius: 8 } }}>
+        <ConfigProvider
+            theme={{
+                token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: "'Prompt', 'Inter', sans-serif" },
+                components: {
+                    Input: { controlHeight: 40 },
+                    Button: { controlHeight: 40 }
+                }
+            }}
+        >
             <Modal
                 open={open}
                 title={null}
                 onCancel={handleCancel}
                 footer={null}
-                width={480}
+                width={850} // ขยายความกว้างสำหรับ Split Layout
                 closable={false}
                 centered
-                // ✅ ป้องกันคลิกปิด
                 maskClosable={false}
                 destroyOnClose
-                styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
+                styles={{ content: { padding: 0, borderRadius: '20px', overflow: 'hidden' } }}
             >
-                {/* Header */}
-                <div className="bg-slate-200 px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-slate-800">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 text-xl">
+                {/* --- Header --- */}
+                <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50">
+                    <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-cyan-50 text-cyan-600'}`}>
                             {isEditMode ? <EditOutlined /> : <PlusCircleOutlined />}
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold m-0 leading-tight">
-                                {isEditMode ? 'แก้ไขข้อมูลหน่วยนับ' : 'เพิ่มข้อมูลหน่วยนับ'}
-                            </h3>
-                            <span className="text-xs text-slate-700">
-                                {isEditMode ? 'ปรับปรุงรายละเอียดหน่วยนับเดิม' : 'สร้างหน่วยนับใหม่ในระบบ'}
-                            </span>
+                            <Title level={4} style={{ margin: 0, fontWeight: 700 }} className="text-slate-800">
+                                {isEditMode ? 'แก้ไขข้อมูลหน่วยนับ' : 'เพิ่มหน่วยนับใหม่'}
+                            </Title>
+                            <Text className="text-slate-500 text-sm font-light">
+                                {isEditMode ? 'Unit Information Update' : 'Create New Counting Unit'}
+                            </Text>
                         </div>
                     </div>
-                    <button onClick={handleCancel} disabled={loading} className="text-slate-400 hover:text-slate-700 transition-colors text-3xl">&times;</button>
+                    <Button type="text" onClick={handleCancel} className="text-slate-400 hover:text-slate-600 rounded-full w-10 h-10 flex items-center justify-center hover:bg-slate-100">
+                        <span className="text-2xl font-light">&times;</span>
+                    </Button>
                 </div>
 
                 <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
-                    <div className="p-8">
-                        <Form form={form} layout="vertical" autoComplete="off" className="space-y-2">
-                            <Form.Item label={<span className="font-semibold text-gray-700">รหัสหน่วยนับ</span>} name="G_CODE" rules={[{ required: true, message: 'กรุณาระบุรหัสหน่วยนับ' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined}>
-                                {/* ✅ ปรับเป็น h-9 */}
-                                <Input prefix={<IdcardOutlined className="text-gray-400" />} placeholder="เช่น UNIT01" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
-                            </Form.Item>
-                            <Form.Item label={<span className="font-semibold text-gray-700">ชื่อหน่วยนับ</span>} name="G_NAME" rules={[{ required: true, message: 'กรุณาระบุชื่อหน่วยนับ' }]}>
-                                {/* ✅ ปรับเป็น h-9 */}
-                                <Input prefix={<TagOutlined className="text-gray-400" />} placeholder="ระบุชื่อหน่วยนับ" className="h-9 rounded-lg border-gray-200 focus:border-blue-500 hover:border-blue-400  focus:bg-white transition-all" allowClear />
-                            </Form.Item>
-                        </Form>
-                    </div>
+                    <Form form={form} layout="vertical" autoComplete="off">
+
+                        {/* --- Split Layout --- */}
+                        <div className="flex flex-col md:flex-row h-auto md:h-[400px]">
+
+                            {/* LEFT SIDE: Identity (Code) */}
+                            <div className="w-full md:w-[300px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0">
+                                <div className="text-center mb-8 mt-4">
+                                    <div className="w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-400 mb-4 shadow-sm group hover:border-cyan-300 transition-colors cursor-default">
+                                        <NumberOutlined style={{ fontSize: '48px' }} className="group-hover:text-cyan-500 transition-colors" />
+                                        <span className="text-xs mt-3 font-medium tracking-wide uppercase text-slate-400 group-hover:text-cyan-500">Unit Code</span>
+                                    </div>
+                                    <div className="text-slate-500 font-medium text-sm">ข้อมูลหลักหน่วยนับ</div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                                        <Form.Item
+                                            label={<span className="text-slate-600 font-medium">รหัสหน่วยนับ <span className="text-red-500">*</span></span>}
+                                            name="G_CODE"
+                                            rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]}
+                                            hasFeedback
+                                            validateStatus={checkingCode ? 'validating' : undefined}
+                                            className="mb-0"
+                                        >
+                                            <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="เช่น UNIT-01" className="font-mono bg-slate-50" maxLength={20} />
+                                        </Form.Item>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* RIGHT SIDE: Details (Name) */}
+                            <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-white">
+
+                                {/* Section 1: General Info */}
+                                <div className="mb-8">
+                                    <div className="flex items-center gap-3 mb-5">
+                                        <div className="p-2 bg-cyan-50 text-cyan-600 rounded-lg"><BuildOutlined /></div>
+                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-widest">General Information</h3>
+                                        <div className="flex-1 h-px bg-slate-100 ml-2"></div>
+                                    </div>
+
+                                    <Form.Item
+                                        label="ชื่อหน่วยนับ (Unit Name)"
+                                        name="G_NAME"
+                                        rules={[{ required: true, message: 'กรุณาระบุชื่อหน่วยนับ' }]}
+                                    >
+                                        <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="เช่น ชิ้น, กล่อง, พาเลท" />
+                                    </Form.Item>
+
+                                    {/* Info Box */}
+                                    <div className="bg-cyan-50/50 rounded-lg p-4 flex gap-3 items-start mt-6">
+                                        <CalculatorOutlined className="text-cyan-500 mt-1" />
+                                        <div className="text-xs text-cyan-700/80 leading-relaxed">
+                                            หน่วยนับใช้สำหรับการจัดการสต็อกและการเบิกจ่าย ควรระบุหน่วยให้ชัดเจนเพื่อป้องกันความสับสนในการใช้งาน
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Form>
                 </Spin>
 
-                {/* Footer - ปรับ Layout */}
-                <div className={` px-6 py-4 border-t border-gray-100 flex ${isEditMode ? 'justify-between' : 'justify-end'} items-center gap-3`}>
-
-                    {/* ปุ่มลบ (แสดงเฉพาะโหมดแก้ไข) */}
-                    {isEditMode && (
-                        <Button
-                            danger
-                            type="text"
-                            onClick={onDelete}
-                            disabled={loading}
-                            icon={<DeleteOutlined />}
-                            className="hover:bg-red-50 text-red-500"
-                        >
-                            ลบข้อมูล
-                        </Button>
-                    )}
-
+                {/* --- Footer --- */}
+                <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center z-50 rounded-b-2xl">
+                    <div>
+                        {isEditMode && (
+                            <Button
+                                danger
+                                type="text"
+                                onClick={onDelete}
+                                disabled={loading}
+                                icon={<DeleteOutlined />}
+                                className="hover:bg-red-50 text-red-500 font-medium"
+                            >
+                                ลบข้อมูล
+                            </Button>
+                        )}
+                    </div>
                     <div className="flex gap-3">
-                        <Button key="submit" type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="h-10 px-6 rounded-lg bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-200 font-semibold">
-                            {isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึกข้อมูล'}
+                        <Button
+                            type="primary"
+                            loading={loading}
+                            onClick={handleOk}
+                            icon={<SaveOutlined />}
+                            className="px-6 rounded-lg shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-500 font-medium"
+                        >
+                            {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}
                         </Button>
-                        <Button key="back" onClick={handleCancel} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white">
+                        <Button
+                            onClick={handleCancel}
+                            disabled={loading}
+                            className="px-6 rounded-lg border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300"
+                        >
                             ยกเลิก
                         </Button>
                     </div>

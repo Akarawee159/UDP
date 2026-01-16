@@ -99,8 +99,8 @@ function Location() {
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 100,
-            maxWidth: 100,
+            width: 140,
+            maxWidth: 140,
             valueGetter: "node.rowIndex + 1",
             cellClass: "text-center flex items-center justify-center cursor-pointer",
             sortable: false,
@@ -113,7 +113,7 @@ function Location() {
         {
             headerName: 'รหัสโลเคชั่น',
             field: 'G_CODE',
-            width: 150,
+            width: 300,
             filter: true,
             cellClass: "pl-2 flex items-center font-mono font-semibold text-blue-700 cursor-pointer",
             filterParams: { buttons: ['reset'] },
@@ -169,7 +169,7 @@ function Location() {
                             onClick={handleCreate}
                             className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
-                            เพิ่มโลเคชั่น
+                            เพิ่มข้อมูลใหม่
                         </Button>
                     </div>
                 </div>

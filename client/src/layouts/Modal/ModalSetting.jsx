@@ -180,7 +180,7 @@ export default function ModalSetting({ open, onClose, onChanged, tabKey = "profi
             children: (
                 <div className="animate-fadeIn">
                     {/* ... (ส่วน Header Profile/Signature เหมือนเดิม) ... */}
-                    <div className="relative h-32 rounded-t-2xl bg-gradient-to-r from-blue-500 to-indigo-400 mb-20 shadow-inner">
+                    <div className="relative h-32 rounded-t-2xl bg-gradient-to-r from-red-700 to-red-400 mb-20 shadow-inner">
                         <div className="absolute -bottom-16 left-8 flex items-end">
                             <div className="relative group">
                                 <div className="p-1 bg-white rounded-full">
@@ -295,8 +295,8 @@ export default function ModalSetting({ open, onClose, onChanged, tabKey = "profi
     return (
         <Modal open={open} onCancel={onClose} title={null} footer={null} width={600} centered className="custom-modal-setting" closable={false} styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' }, body: { padding: 0 } }} maskClosable={false}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
-                <div className="flex items-center gap-3 text-blue-800"><div className="p-2 bg-blue-50 rounded-lg text-blue-600"><SettingOutlined className="text-xl" /></div><span className="text-lg font-bold">ตั้งค่าบัญชีผู้ใช้</span></div>
-                <Button type="text" shape="circle" onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100">✕</Button>
+                <div className="flex items-center gap-3 text-slate-900"><div className="p-2 bg-blue-50 rounded-lg text-slate-600"><SettingOutlined className="text-xl" /></div><span className="text-lg font-bold">ตั้งค่าบัญชีผู้ใช้</span></div>
+                <Button type="text" shape="circle" onClick={onClose} className="text-gray-400 hover:text-gray-600 hover:bg-slate-200">✕</Button>
             </div>
             <div className="p-6 bg-white min-h-[500px]">
                 <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} tabBarStyle={{ marginBottom: 24 }} type="card" className="custom-tabs-blue" />
