@@ -31,11 +31,11 @@ const DataTable = ({
       color: #000000 !important;
       font-weight: 600;
     }
-    /* 2. Cell & Borders */
+    /* 2. Cell & Borders (ตรงนี้คือสาเหตุที่สีไม่เปลี่ยน เพราะมี !important) */
     .ag-theme-alpine .ag-cell,
     .ag-theme-alpine .ag-header-cell {
       border-right: 1px solid #cbd5e1 !important;
-      color: #000000 !important;
+      color: #000000 !important; 
       display: flex;
       align-items: center;
     }
@@ -68,14 +68,39 @@ const DataTable = ({
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
     }
-    /* 7. แก้ไข CSS สำหรับจัดกึ่งกลาง Header Group (เพิ่ม width และ flex) */
+    /* 7. แก้ไข CSS สำหรับจัดกึ่งกลาง Header Group */
     .ag-theme-alpine .header-group-center .ag-header-group-cell-label {
       display: flex !important;
       justify-content: center !important;
       align-items: center !important;
-      width: 100% !important; /* บังคับให้ container ขยายเต็มความกว้างของ Group */
+      width: 100% !important;
       flex: 1 !important;
     }
+
+    /* 8. (เพิ่มใหม่) Header Group สีแดง */
+    .ag-theme-alpine .header-group-red {
+        background-color: #ef4444 !important; /* red-500 */
+        border-bottom: 1px solid #dc2626 !important;
+    }
+    
+    /* เปลี่ยนสีตัวอักษรใน Group Header เป็นสีขาว */
+    .ag-theme-alpine .header-group-red .ag-header-group-cell-label,
+    .ag-theme-alpine .header-group-red span {
+        color: #ffffff !important;
+        font-weight: bold !important;
+    }
+    
+    /* เปลี่ยนสี icon (ลูกศรย่อ/ขยาย) เป็นสีขาวถ้ามี */
+    .ag-theme-alpine .header-group-red .ag-header-icon {
+        color: #ffffff !important;
+    }
+    
+    /* 9. (เพิ่มใหม่) Custom Cell Colors Override */
+    /* ต้องระบุเจาะจงและใช้ !important เพื่อชนะ color: #000000 ด้านบน */
+    .ag-theme-alpine .cell-blue-bold { color: #2563eb !important; font-weight: bold !important; }
+    .ag-theme-alpine .cell-green-bold { color: #16a34a !important; font-weight: bold !important; }
+    .ag-theme-alpine .cell-orange-bold { color: #f97316 !important; font-weight: bold !important; }
+    .ag-theme-alpine .cell-red-bold { color: #dc2626 !important; font-weight: bold !important; }
   `;
 
   const defaultColDef = useMemo(() => ({

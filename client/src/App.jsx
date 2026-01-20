@@ -21,8 +21,9 @@ import UserManagement from "./pages/Management/UserManagement/UserManagement";
 import Employees from "./pages/Masterdata/Employees/Employees";
 import Material from "./pages/Masterdata/Material/Material";
 
-// ระบบขึ้นทะเบียนกล่อง
-import RegisterBox from "./pages/Registration/RegisterBox/RegisterBox";
+// ระบบขึ้นทะเบียนทรัพย์สิน
+import RegisterAsset from "./pages/Registration/RegisterAsset/RegisterAsset";
+import AssetList from "./pages/Registration/RegisterAsset/Page/AssetList";
 
 // ตั้งค่าเริ่มต้น
 import Branch from "./pages/Settings/Branch/Branch";
@@ -202,11 +203,22 @@ export default function App() {
 
           {/* รายงาน main=50 */}
           <Route
-            path="/registration/register-box"
+            path="/registration/register-asset"
             element={
               <ProtectedRoute mainId="50" subId="501">
                 <AdminLayout>
-                  <RegisterBox />
+                  <RegisterAsset />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/registration/register-asset/create"
+            element={
+              <ProtectedRoute mainId="50" subId="501">
+                <AdminLayout>
+                  <AssetList />
                 </AdminLayout>
               </ProtectedRoute>
             }
@@ -214,7 +226,7 @@ export default function App() {
 
           {/* รายงาน main=60 */}
           <Route
-            path="/registration/register-box"
+            path="/registration/register-asset"
             element={
               <ProtectedRoute mainId="60" subId="601">
                 <AdminLayout>

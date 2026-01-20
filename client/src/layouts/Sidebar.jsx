@@ -68,11 +68,11 @@ export const menuItems = [
   },
   {
     id: "50",
-    label: "ระบบขึ้นทะเบียนกล่อง",
+    label: "การจัดการทรัพย์สิน",
     icon: <DropboxOutlined />,
     type: "dropdown",
     children: [
-      { id: "501", label: "ขึ้นทะเบียนกล่อง", path: "/registration/register-box" },
+      { id: "501", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
     ]
   },
   {

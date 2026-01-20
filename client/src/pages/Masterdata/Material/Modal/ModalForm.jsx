@@ -3,8 +3,9 @@ import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Row, Col, InputN
 import {
     IdcardOutlined, TagOutlined, PlusCircleOutlined, EditOutlined, SaveOutlined,
     DeleteOutlined, ShopOutlined, BgColorsOutlined, BarcodeOutlined,
-    NumberOutlined, DollarOutlined, PlusOutlined, FileImageOutlined,
-    CheckCircleOutlined, StopOutlined, CloudUploadOutlined
+    NumberOutlined, DollarOutlined, ColumnWidthOutlined, FileImageOutlined,
+    CheckCircleOutlined, StopOutlined, CloudUploadOutlined, ExpandAltOutlined,
+    ColumnHeightOutlined, GatewayOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
@@ -37,15 +38,25 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
     const [fileList, setFileList] = useState([]);
+    const [packagingOptions, setPackagingOptions] = useState([]); // ✅ เพิ่ม State เก็บข้อมูล Packaging ทั้งก้อน
 
     const timerRef = useRef(null);
 
     const fetchOptions = useCallback(async () => {
         try {
             const res = await api.get('/masterdata/material/options');
-            const { units, currencies } = res.data?.data || {};
+            const { units, currencies, packagings } = res.data?.data || {}; // ✅ รับ packagings
+
             if (units) setUnitOptions(units.map(u => ({ label: u.name, value: u.name })));
             if (currencies) setCurrencyOptions(currencies.map(c => ({ label: c.name, value: c.name })));
+
+            // ✅ เก็บข้อมูล Packaging พร้อม object เต็มๆ ไว้ใช้ตอน select
+            if (packagings) setPackagingOptions(packagings.map(p => ({
+                label: p.G_NAME,
+                value: p.G_ID,
+                fullData: p // เก็บข้อมูลดิบไว้ map ลง form
+            })));
+
         } catch (error) { console.error("Fetch options error", error); }
     }, []);
 
@@ -102,6 +113,52 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             }
         }
     }, [open, isEditMode, record, form, fetchDetail, fetchOptions]);
+
+    // ✅ ฟังก์ชันเมื่อเลือก Packaging ให้ Auto-fill ข้อมูล
+    const handlePackagingChange = (value, option) => {
+        if (option && option.fullData) {
+            const p = option.fullData;
+            form.setFieldsValue({
+                // Mapping จาก tb_packaging -> materials
+                material_width: p.G_WIDTH,
+                material_width_unit: p.G_WIDTH_UNIT,
+                material_length: p.G_LENGTH,
+                material_length_unit: p.G_LENGTH_UNIT,
+                material_height: p.G_HEIGHT,
+                material_height_unit: p.G_HEIGHT_UNIT,
+                material_capacity: p.G_CAPACITY,
+                material_capacity_unit: p.G_CAPACITY_UNIT,
+                material_weight: p.G_WEIGHT,
+                material_weight_unit: p.G_WEIGHT_UNIT,
+            });
+        }
+    };
+
+    // Component ย่อยสำหรับ Input ขนาด (ใช้ซ้ำได้)
+    const DimensionInput = ({ label, name, unitName, icon, placeholder }) => (
+        <Form.Item label={label} className="mb-0">
+            <div className="flex">
+                <Form.Item name={name} noStyle>
+                    <InputNumber
+                        prefix={icon}
+                        placeholder={placeholder}
+                        className="!rounded-r-none flex-1 border-r-0 w-full"
+                        min={0}
+                        precision={2} // หรือ 4 ตามต้องการ
+                    />
+                </Form.Item>
+                <Form.Item name={unitName} noStyle>
+                    <Select
+                        options={unitOptions}
+                        placeholder="หน่วย"
+                        style={{ width: 100 }}
+                        allowClear
+                        className="!rounded-l-none bg-gray-50"
+                    />
+                </Form.Item>
+            </div>
+        </Form.Item>
+    );
 
     const validateCode = (_rule, value) => new Promise((resolve, reject) => {
         const code = (value || '').trim();
@@ -370,6 +427,54 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </Col>
                                     </Row>
+                                </div>
+
+                                <div className="mb-8">
+                                    <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                            <ExpandAltOutlined className="text-purple-600" />
+                                            <h3 className="text-base font-bold text-slate-800 m-0">ขนาดและบรรจุภัณฑ์ (Dimension Specs)</h3>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50 p-5 rounded-xl border border-gray-100">
+                                        <Row gutter={[16, 16]}>
+                                            {/* เลือก Packaging Template */}
+                                            <Col span={24}>
+                                                <Form.Item label="เลือกจากบรรจุภัณฑ์ต้นแบบ (Optional)" className="mb-2">
+                                                    <Select
+                                                        options={packagingOptions}
+                                                        placeholder="-- เลือกเพื่อดึงข้อมูลขนาดอัตโนมัติ --"
+                                                        onChange={handlePackagingChange}
+                                                        allowClear
+                                                        showSearch
+                                                        optionFilterProp="label"
+                                                    />
+                                                </Form.Item>
+                                            </Col>
+
+                                            <Col span={24}><div className="h-px bg-gray-200 mb-2"></div></Col>
+
+                                            {/* ช่องกรอกขนาด */}
+                                            <Col span={8}>
+                                                <DimensionInput label="ความกว้าง" name="material_width" unitName="material_width_unit" icon={<ColumnWidthOutlined className="text-slate-400" />} placeholder="0.00" />
+                                            </Col>
+                                            <Col span={8}>
+                                                <DimensionInput label="ความยาว" name="material_length" unitName="material_length_unit" icon={<ColumnHeightOutlined className="rotate-90 text-slate-400" />} placeholder="0.00" />
+                                            </Col>
+                                            <Col span={8}>
+                                                <DimensionInput label="ความสูง" name="material_height" unitName="material_height_unit" icon={<ColumnHeightOutlined className="text-slate-400" />} placeholder="0.00" />
+                                            </Col>
+
+                                            {/* ความจุและน้ำหนัก */}
+                                            <Col span={12}>
+                                                <DimensionInput label="ความจุ (Capacity)" name="material_capacity" unitName="material_capacity_unit" icon={<GatewayOutlined className="text-slate-400" />} placeholder="0.00" />
+                                            </Col>
+                                            <Col span={12}>
+                                                <DimensionInput label="น้ำหนัก (Weight)" name="material_weight" unitName="material_weight_unit" icon={<span className="text-slate-400 text-xs font-bold">W</span>} placeholder="0.00" />
+                                            </Col>
+                                        </Row>
+                                    </div>
                                 </div>
 
                                 {/* Section 2: คลังสินค้าและหน่วยนับ */}

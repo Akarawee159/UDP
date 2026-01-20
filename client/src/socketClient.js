@@ -59,6 +59,7 @@ export function connectWithStoredToken() {
             'area',
             'packaging',
             'material',
+            'registerasset',
         ];
 
         standardEntities.forEach(entity => {

@@ -89,6 +89,38 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }, 600);
     });
 
+    // --- ✨ LOGIC การสร้างชื่ออัตโนมัติ ---
+    const handleValuesChange = (changedValues, allValues) => {
+        const triggers = ['G_WIDTH', 'G_LENGTH', 'G_HEIGHT', 'G_CAPACITY', 'G_WEIGHT'];
+        const shouldUpdate = Object.keys(changedValues).some(key => triggers.includes(key));
+
+        if (shouldUpdate) {
+            const cleanVal = (val) => {
+                if (val === undefined || val === null || val === '') return 0;
+                return parseFloat(val);
+            };
+
+            const w = cleanVal(allValues.G_WIDTH);
+            const l = cleanVal(allValues.G_LENGTH);
+            const h = cleanVal(allValues.G_HEIGHT);
+
+            let generatedName = `ขนาด ${w}x${l}x${h}`;
+
+            const hasCap = allValues.G_CAPACITY !== undefined && allValues.G_CAPACITY !== null;
+            const hasWeight = allValues.G_WEIGHT !== undefined && allValues.G_WEIGHT !== null;
+
+            if (hasCap || hasWeight) {
+                const cVal = cleanVal(allValues.G_CAPACITY);
+                const wVal = cleanVal(allValues.G_WEIGHT);
+                generatedName += ` | ${cVal}/${wVal}`;
+            }
+
+            form.setFieldsValue({
+                G_NAME: generatedName
+            });
+        }
+    };
+
     const handleOk = async () => {
         try {
             const raw = await form.validateFields();
@@ -122,6 +154,8 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     };
 
     // --- Components ---
+    // ✅ 1. แก้ไข SpecInput: เพิ่ม rules required ในช่องเลือกหน่วย
+    // ✅ แก้ไข SpecInput: ลบ status prop ที่เขียนทับไว้ออก เพื่อให้ Form.Item ส่ง error state ได้ถูกต้อง
     const SpecInput = ({ label, fieldName, unitName, placeholder, icon }) => (
         <div className="mb-4">
             <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
@@ -133,22 +167,44 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                         placeholder={placeholder}
                         className="!rounded-r-none flex-1 border-r-0"
                         min={0}
-                        precision={2}
+                        precision={4}
                     />
                 </Form.Item>
-                <Form.Item name={unitName} noStyle>
+
+                <Form.Item
+                    name={unitName}
+                    noStyle
+                    dependencies={[fieldName]} // เช็คค่าใหม่ทุกครั้งที่ช่องตัวเลขเปลี่ยน
+                    rules={[
+                        ({ getFieldValue }) => ({
+                            validator(_, value) {
+                                // 1. ดึงค่าจากช่องตัวเลข
+                                const numberValue = getFieldValue(fieldName);
+
+                                // 2. เช็คว่ามีค่าตัวเลขหรือไม่
+                                const hasNumber = numberValue !== undefined && numberValue !== null && numberValue !== '';
+
+                                // 3. เงื่อนไข: "ถ้ามีตัวเลข แต่ไม่มีหน่วย" -> แจ้ง Error
+                                if (hasNumber && !value) {
+                                    return Promise.reject(new Error('กรุณาเลือกหน่วย'));
+                                }
+
+                                return Promise.resolve();
+                            },
+                        }),
+                    ]}
+                >
                     <Select
                         options={unitOptions}
                         placeholder="หน่วย"
-                        style={{ width: 90 }}
+                        style={{ width: 140 }}
                         className="custom-select-right"
                         showSearch
                         allowClear
-                        // ✅ แก้ไข: ให้ Dropdown ขยายความกว้างตามเนื้อหา ไม่ถูกจำกัดแค่ 90px
                         popupMatchSelectWidth={false}
-                        dropdownStyle={{ minWidth: 120 }}
-                        // ✅ แก้ไข: ป้องกันการถูก Modal บัง (Render ไปที่ Body)
+                        dropdownStyle={{ minWidth: 140 }}
                         getPopupContainer={(trigger) => document.body}
+                    // ❌ ลบบรรทัดนี้ออกครับ: status={form.getFieldError(unitName).length > 0 ? 'error' : ''}
                     />
                 </Form.Item>
             </div>
@@ -177,10 +233,8 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 centered
                 maskClosable={false}
                 destroyOnClose
-                // ✅ เอา overflow: hidden ออก เพื่อให้ Dropdown ไม่ถูกตัดถ้ามันยาวทะลุ Modal
                 styles={{ content: { padding: 0, borderRadius: '20px' } }}
             >
-                {/* --- Header (เพิ่ม rounded-t-2xl เพื่อให้มุมบนยังโค้งอยู่) --- */}
                 <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50 rounded-t-2xl">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
@@ -188,10 +242,10 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                         </div>
                         <div>
                             <Title level={4} style={{ margin: 0, fontWeight: 700 }} className="text-slate-800">
-                                {isEditMode ? 'แก้ไขบรรจุภัณฑ์' : 'เพิ่มบรรจุภัณฑ์'}
+                                {isEditMode ? 'แก้ไขขนาดบรรจุภัณฑ์' : 'เพิ่มขนาดบรรจุภัณฑ์ใหม่'}
                             </Title>
                             <Text className="text-slate-500 text-sm">
-                                {isEditMode ? 'Packaging Settings' : 'Create New Packaging'}
+                                {isEditMode ? 'ข้อมูลขนาดบรรจุภัณฑ์' : 'สร้างขนาดบรรจุภัณฑ์ใหม่'}
                             </Text>
                         </div>
                     </div>
@@ -201,11 +255,14 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 </div>
 
                 <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
-                    <Form form={form} layout="vertical" autoComplete="off">
-                        {/* ✅ เพิ่ม rounded-b-2xl ที่ container หลักแทน */}
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        autoComplete="off"
+                        onValuesChange={handleValuesChange}
+                    >
                         <div className="flex flex-col md:flex-row h-[60vh] md:h-[500px]">
 
-                            {/* --- LEFT: Identity --- */}
                             <div className="w-full md:w-[320px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0 overflow-y-auto">
                                 <div className="text-center mb-6">
                                     <div className="w-32 h-32 bg-white rounded-xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-300 mb-4">
@@ -217,44 +274,39 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
 
                                 <div className="space-y-4">
                                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                                        <Form.Item label="รหัส (Code)" name="G_CODE" rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined} className="mb-4">
+                                        <Form.Item label="รหัสขนาดบรรจุภัณฑ์" name="G_CODE" rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]} hasFeedback validateStatus={checkingCode ? 'validating' : undefined} className="mb-4">
                                             <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="Ex. BOX-A4" className="font-mono" maxLength={20} />
                                         </Form.Item>
-                                        <Form.Item label="ชื่อบรรจุภัณฑ์" name="G_NAME" rules={[{ required: true, message: 'ระบุชื่อ' }]} className="mb-0">
-                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ชื่อเรียก" />
+                                        <Form.Item label="ชื่อขนาดบรรจุภัณฑ์" name="G_NAME" rules={[{ required: true, message: 'ระบุชื่อ' }]} className="mb-0">
+                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ชื่อเรียก (สร้างอัตโนมัติ)" />
                                         </Form.Item>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* --- RIGHT: Specifications --- */}
                             <div className="flex-1 p-6 overflow-y-auto custom-scrollbar bg-white">
 
                                 {/* Section 1: Dimensions */}
                                 <div className="mb-8">
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="p-1.5 bg-blue-100 text-blue-600 rounded-lg"><ExpandAltOutlined /></div>
-                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">Dimension Specs</h3>
+                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">ข้อมูลจำเพาะด้านขนาด</h3>
                                         <div className="flex-1 h-px bg-gray-100 ml-2"></div>
                                     </div>
 
                                     <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
-                                        <Row gutter={16}>
-                                            <Col span={8}>
+                                        {/* ✅ 2. ปรับ Layout: เปลี่ยน Col span เป็น 24 เพื่อให้กว้างเต็มบรรทัด */}
+                                        <Row gutter={[16, 16]}> {/* เพิ่ม gutter แนวตั้ง */}
+                                            <Col span={24}>
                                                 <SpecInput label="ความกว้าง" fieldName="G_WIDTH" unitName="G_WIDTH_UNIT" placeholder="0.00" icon={<ColumnWidthOutlined />} />
                                             </Col>
-                                            <Col span={8}>
+                                            <Col span={24}>
                                                 <SpecInput label="ความยาว" fieldName="G_LENGTH" unitName="G_LENGTH_UNIT" placeholder="0.00" icon={<ColumnHeightOutlined className="rotate-90" />} />
                                             </Col>
-                                            <Col span={8}>
+                                            <Col span={24}>
                                                 <SpecInput label="ความสูง" fieldName="G_HEIGHT" unitName="G_HEIGHT_UNIT" placeholder="0.00" icon={<ColumnHeightOutlined />} />
                                             </Col>
                                         </Row>
-                                        <div className="text-xs text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
-                                            <div className="w-16 h-px bg-slate-200"></div>
-                                            <span>กว้าง x ยาว x สูง</span>
-                                            <div className="w-16 h-px bg-slate-200"></div>
-                                        </div>
                                     </div>
                                 </div>
 
@@ -262,17 +314,18 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 <div>
                                     <div className="flex items-center gap-2 mb-4">
                                         <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><DeploymentUnitOutlined /></div>
-                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">Capacity & Weight</h3>
+                                        <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-wide">ความจุและน้ำหนัก</h3>
                                         <div className="flex-1 h-px bg-gray-100 ml-2"></div>
                                     </div>
 
                                     <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
-                                        <Row gutter={16}>
-                                            <Col span={12}>
-                                                <SpecInput label="ความจุ (Capacity)" fieldName="G_CAPACITY" unitName="G_CAPACITY_UNIT" placeholder="0.00" icon={<GatewayOutlined />} />
+                                        {/* Capacity & Weight ปรับเป็น span 24 ด้วยก็ได้ถ้าอยากให้กว้าง หรือจะคงไว้ 12 ถ้าข้อมูลไม่ยาวมาก (ในที่นี้ผมปรับเป็น 24 ให้เหมือนกันเพื่อความสวยงาม) */}
+                                        <Row gutter={[16, 16]}>
+                                            <Col span={24}>
+                                                <SpecInput label="ความจุ" fieldName="G_CAPACITY" unitName="G_CAPACITY_UNIT" placeholder="0.00" icon={<GatewayOutlined />} />
                                             </Col>
-                                            <Col span={12}>
-                                                <SpecInput label="น้ำหนัก (Weight)" fieldName="G_WEIGHT" unitName="G_WEIGHT_UNIT" placeholder="0.00" icon={<span className="font-bold">W</span>} />
+                                            <Col span={24}>
+                                                <SpecInput label="น้ำหนัก" fieldName="G_WEIGHT" unitName="G_WEIGHT_UNIT" placeholder="0.00" icon={<span className="font-bold">W</span>} />
                                             </Col>
                                         </Row>
                                     </div>
@@ -283,7 +336,6 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                     </Form>
                 </Spin>
 
-                {/* --- Footer (เพิ่ม rounded-b-2xl) --- */}
                 <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center rounded-b-2xl">
                     <div>
                         {isEditMode && (
@@ -308,6 +360,11 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                     border-top-left-radius: 0 !important;
                     border-bottom-left-radius: 0 !important;
                     background-color: #f8fafc !important;
+                }
+                /* เพิ่มสีแดงตอน error ให้ Select ที่ไม่มี style */
+                .custom-select-right.ant-select-status-error .ant-select-selector {
+                    border-color: #ff4d4f !important;
+                    background-color: #fff2f0 !important;
                 }
             `}</style>
         </ConfigProvider>

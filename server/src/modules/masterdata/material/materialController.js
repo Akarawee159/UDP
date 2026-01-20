@@ -25,33 +25,46 @@ function deleteFile(filename) {
 
 /** helper: trim และ validate payload */
 function parsePayload(body, file) {
-  // ... (code เดิมใน parsePayload) ...
-  // สถานะ: 1=เปิด, 2=ปิด
+  // ... (logic status เดิม) ...
   let status = 2;
   if (body.is_status === 'true' || body.is_status === true || body.is_status === '1' || body.is_status === 1) {
     status = 1;
   }
 
+  // Helper สำหรับแปลงตัวเลข (ถ้าว่างให้เป็น null หรือ 0 ตามต้องการ)
+  const parseNum = (val) => (val === '' || val === null || val === undefined) ? null : Number(val);
+  const parseStr = (val) => String(val || '').trim();
+
   const data = {
-    material_code: String(body.material_code || '').trim(),
-    material_name: String(body.material_name || '').trim(),
-    material_source: String(body.material_source || '').trim(),
-    material_usedfor: String(body.material_usedfor || '').trim(),
-    material_type: String(body.material_type || '').trim(),
-    supplier_name: String(body.supplier_name || '').trim(),
-    material_brand: String(body.material_brand || '').trim(),
-    material_color: String(body.material_color || '').trim(),
-    material_model: String(body.material_model || '').trim(),
-    material_feature: String(body.material_feature || '').trim(),
+    material_code: parseStr(body.material_code),
+    material_name: parseStr(body.material_name),
+    material_source: parseStr(body.material_source),
+    material_usedfor: parseStr(body.material_usedfor),
+    material_type: parseStr(body.material_type),
+    supplier_name: parseStr(body.supplier_name),
+    material_brand: parseStr(body.material_brand),
+    material_color: parseStr(body.material_color),
+    material_model: parseStr(body.material_model),
+    material_feature: parseStr(body.material_feature),
     currency: String(body.currency || 'THB').trim(),
     quantity_mainunit: Number(body.quantity_mainunit) || 0,
-    mainunit_name: String(body.mainunit_name || '').trim(),
+    mainunit_name: parseStr(body.mainunit_name),
     quantity_subunit: Number(body.quantity_subunit) || 0,
-    subunit_name: String(body.subunit_name || '').trim(),
+    subunit_name: parseStr(body.subunit_name),
     minimum_order: Number(body.minimum_order) || 0,
     minstock: Number(body.minstock) || 0,
     maxstock: Number(body.maxstock) || 0,
-    is_status: status
+    is_status: status,
+    material_width: parseNum(body.material_width),
+    material_width_unit: parseStr(body.material_width_unit),
+    material_length: parseNum(body.material_length),
+    material_length_unit: parseStr(body.material_length_unit),
+    material_height: parseNum(body.material_height),
+    material_height_unit: parseStr(body.material_height_unit),
+    material_capacity: parseNum(body.material_capacity),
+    material_capacity_unit: parseStr(body.material_capacity_unit),
+    material_weight: parseNum(body.material_weight),
+    material_weight_unit: parseStr(body.material_weight_unit),
   };
 
   if (file) {

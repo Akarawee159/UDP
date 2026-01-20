@@ -108,19 +108,21 @@ function Material() {
         },
         {
             headerName: 'สถานะ',
-            field: 'is_status',
+            field: 'status_name', // เปลี่ยน field หลักเป็นชื่อสถานะ (Optional)
             width: 140,
             cellClass: "text-center",
             headerComponentParams: { align: 'center' },
             cellRenderer: (params) => {
-                const isActive = Number(params.value) === 1;
+                // ดึงค่าจากที่ Join มา (ถ้าไม่มีข้อมูล ให้ใช้ค่า Default)
+                const statusName = params.data.status_name || 'ไม่ระบุ';
+
+                // ดึง Class สีจาก DB
+                // ถ้าใน DB เป็น null ให้ใส่สีเทาเป็น Default
+                const statusClass = params.data.status_class || 'bg-gray-100 text-gray-500 border-gray-200';
 
                 return (
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${isActive
-                        ? 'bg-green-100 text-green-700 border-green-200'
-                        : 'bg-red-50 text-red-600 border-red-200'
-                        }`}>
-                        {isActive ? 'พร้อมใช้งาน' : 'ปิดการใช้งาน'}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}`}>
+                        {statusName}
                     </span>
                 );
             }

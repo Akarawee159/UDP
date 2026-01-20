@@ -26,6 +26,8 @@ const relativesRoutes = require("./src/modules/masterdata/relatives/relativesRou
 const locationRoutes = require("./src/modules/masterdata/location/locationRoutes");
 const materialRoutes = require("./src/modules/masterdata/material/materialRoutes");
 
+const registerassetRoutes = require("./src/modules/registration/registerasset/registerassetRoutes");
+
 const branchRoutes = require("./src/modules/settings/branch/branchRoutes");
 const companyRoutes = require("./src/modules/settings/company/companyRoutes");
 const countingunitRoutes = require("./src/modules/settings/countingunit/countingunitRoutes");
@@ -103,7 +105,7 @@ app.use("/api/masterdata/material", auth, permit({ mainId: "40", subId: "402" })
  * Registration (main=50)
  * =========================
  */
-
+app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "501" }), registerassetRoutes);
 
 /**
  * =========================
