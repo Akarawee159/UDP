@@ -119,7 +119,7 @@ app.use("/api/report/training", auth, permit({ mainId: "60", subId: "602" }), re
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));
 app.use("/img/signature", express.static(path.join(__dirname, "src/img/signature")));
 app.use("/img/employee", express.static(path.join(__dirname, "src/img/employee")));
-app.use("/img/material", express.static(path.join(__dirname, "img/material")));
+app.use("/img/material", express.static(path.join(__dirname, "src/img/material")));
 
 // Health & root
 app.get("/", (_req, res) => res.send("UDP API is running"));

@@ -51,7 +51,7 @@ const upload = multer({ storage: storage });
 
 // --- Routes ---
 router.get('/', auth, controller.getAll);
-router.get('/options', auth, controller.getOptions); // Endpoint สำหรับ Dropdown
+router.get('/options', auth, controller.getOptions);
 router.get('/check-code', auth, controller.checkCode);
 router.get('/:material_id', auth, controller.getById);
 

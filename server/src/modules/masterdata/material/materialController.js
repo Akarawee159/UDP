@@ -5,7 +5,7 @@ const model = require('./materialModel');
 const fs = require('fs');
 const path = require('path');
 
-const uploadDir = path.join(__dirname, '../../../../img/material');
+const uploadDir = path.join(__dirname, '../../../img/material');
 
 // ... (functions deleteFile, parsePayload, ensureRequired เหมือนเดิม ไม่ต้องแก้) ...
 

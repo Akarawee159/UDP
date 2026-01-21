@@ -1,384 +1,695 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-    Form, Input, Button, DatePicker, Select, InputNumber,
-    Row, Col, Card, Upload, Image, Typography, Divider, App, Modal
+    Form, Input, Button, Select, InputNumber,
+    Row, Col, Card, Image, Typography, Divider, App, Grid, Badge
 } from 'antd';
 import {
     SaveOutlined, DeleteOutlined,
-    SearchOutlined, PrinterOutlined, FileImageOutlined,
-    QrcodeOutlined, ArrowLeftOutlined, CloseOutlined
+    SearchOutlined, PrinterOutlined,
+    QrcodeOutlined, ArrowLeftOutlined, CloseOutlined,
+    BarcodeOutlined, FileTextOutlined,
+    UserOutlined, NumberOutlined,
+    BgColorsOutlined, ExpandAltOutlined, InboxOutlined,
+    PictureOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-
-// Import Components
+import api from "../../../../api";
+import { ThaiDateInput } from '../../../../components/form/ThaiDateInput';
 import DataTable from '../../../../components/aggrid/DataTable';
-import ModalAssetList from './ModalAssetList'; // ✅ Import Modal
+import ModalAssetList from './ModalAssetList';
+
+// Import สำหรับการพิมพ์
+import { QRCodeSVG } from 'qrcode.react';
+import { useReactToPrint } from 'react-to-print';
 
 const { Title, Text } = Typography;
-const { Dragger } = Upload;
 
 function AssetList() {
+    const screens = Grid.useBreakpoint();
+    const isMd = !!screens.md;
+
+    const containerStyle = useMemo(() => ({
+        margin: isMd ? '-8px' : '0',
+        padding: isMd ? '16px' : '12px',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+    }), [isMd]);
+
     const navigate = useNavigate();
-    const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
+    const { message, modal } = App.useApp?.() || { message: { success: console.log, error: console.error }, modal: {} };
     const [form] = Form.useForm();
 
     // State
-    const [fileList, setFileList] = useState([]);
-    const [previewOpen, setPreviewOpen] = useState(false);
-    const [previewImage, setPreviewImage] = useState('');
     const [tableData, setTableData] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-
-    // ✅ State สำหรับเปิด Modal เลือกสินค้า
+    const [displayedImage, setDisplayedImage] = useState(null);
+    const [unitOptions, setUnitOptions] = useState([]);
     const [isModalListOpen, setIsModalListOpen] = useState(false);
+    const [lastSavedLot, setLastSavedLot] = useState(null);
 
-    // --- Mock Data Options ---
-    const unitOptions = [
-        { label: 'ซม.', value: 'cm' },
-        { label: 'มม.', value: 'mm' },
-        { label: 'นิ้ว', value: 'in' },
-        { label: 'กก.', value: 'kg' },
-        { label: 'ลิตร', value: 'l' },
-    ];
+    // State สำหรับ Selection และ Printing
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [printList, setPrintList] = useState([]); // เก็บ Array ของข้อมูลที่จะ Print
+    const printRef = useRef();
 
-    // --- Handlers ---
+    // --- Print Logic ---
+    const handlePrintProcess = useReactToPrint({
+        contentRef: printRef, // ใช้ contentRef สำหรับ react-to-print v7+
+        onAfterPrint: () => {
+            setPrintList([]); // Clear หลังจากพิมพ์เสร็จ
+        }
+    });
+
+    // 1. ฟังก์ชันพิมพ์รายตัว (จากปุ่มในตาราง)
+    const handleIndividualPrint = async (row) => {
+        try {
+            // เรียก API อัปเดตสถานะ +1
+            const res = await api.patch(`/registration/registerasset/print/${row.asset_code}`);
+
+            if (res.data?.success) {
+                // อัปเดตตัวเลขในตารางทันที
+                const updatedStatus = res.data.print_status;
+                setTableData(prev => prev.map(item =>
+                    item.asset_code === row.asset_code ? { ...item, print_status: updatedStatus } : item
+                ));
+
+                // สั่งพิมพ์รายการเดียว
+                setPrintList([row]);
+                setTimeout(() => handlePrintProcess(), 100);
+            }
+        } catch (err) {
+            console.error(err);
+            message.error("ไม่สามารถอัปเดตสถานะการพิมพ์ได้");
+        }
+    };
+
+    // 2. ฟังก์ชันพิมพ์หลายรายการ (จากปุ่มด้านบน)
+    const handleBulkPrint = async () => {
+        if (selectedRows.length === 0) {
+            message.warning("กรุณาเลือกรายการที่ต้องการพิมพ์");
+            return;
+        }
+
+        try {
+            // อัปเดตสถานะทุกตัวที่เลือก (Loop update)
+            // หมายเหตุ: ในทางปฏิบัติถ้าจำนวนเยอะควรทำ Bulk API endpoint แยก แต่ทำ Loop เพื่อความง่ายตาม Flow นี้
+            const updatePromises = selectedRows.map(row =>
+                api.patch(`/registration/registerasset/print/${row.asset_code}`)
+            );
+
+            await Promise.all(updatePromises);
+
+            // Update หน้าจอให้ User เห็นว่าปริ้นแล้ว (สมมติว่า +1 ทุกตัวที่เลือก)
+            setTableData(prev => prev.map(item => {
+                const isSelected = selectedRows.find(s => s.asset_code === item.asset_code);
+                if (isSelected) {
+                    // Logic ง่ายๆ คือบวก 1 หรือจะดึงค่าจริงจาก API response ก็ได้
+                    return { ...item, print_status: (parseInt(item.print_status) || 0) + 1 };
+                }
+                return item;
+            }));
+
+            // ส่งข้อมูลที่เลือกไปที่ Component พิมพ์
+            setPrintList(selectedRows);
+            setTimeout(() => handlePrintProcess(), 100);
+
+        } catch (err) {
+            console.error(err);
+            message.error("เกิดข้อผิดพลาดในการเตรียมพิมพ์หมู่");
+        }
+    };
+
+    // --- Fetch Options ---
+    useEffect(() => {
+        const fetchOptions = async () => {
+            try {
+                const res = await api.get('/masterdata/material/options');
+                const data = res.data?.data || {};
+                if (data.units) {
+                    const opts = data.units.map(u => ({ label: u.name, value: u.name }));
+                    setUnitOptions(opts);
+                }
+            } catch (err) {
+                console.error("Error fetching options:", err);
+            }
+        };
+        fetchOptions();
+        form.setFieldsValue({ asset_lot: 'Auto Generate' });
+    }, [form]);
+
+    const handleMaterialSelect = (material) => {
+        form.setFieldsValue({
+            asset_code: material.material_code,
+            asset_detail: material.material_name,
+            asset_type: material.material_type,
+            asset_width: material.material_width,
+            asset_width_unit: material.material_width_unit,
+            asset_length: material.material_length,
+            asset_length_unit: material.material_length_unit,
+            asset_height: material.material_height,
+            asset_height_unit: material.material_height_unit,
+            asset_capacity: material.material_capacity,
+            asset_capacity_unit: material.material_capacity_unit,
+            asset_weight: material.material_weight,
+            asset_weight_unit: material.material_weight_unit,
+        });
+
+        if (material.material_image) {
+            const url = `${import.meta.env.VITE_API_PATH.replace('/api', '')}/img/material/${material.material_image}`;
+            setDisplayedImage(url);
+        } else {
+            setDisplayedImage(null);
+        }
+        message.success(`เลือกรายการ: ${material.material_code} เรียบร้อย`);
+    };
+
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
-            const qty = values.quantity || 1;
+            const payload = {
+                ...values,
+                asset_date: values.asset_date ? dayjs(values.asset_date).format('YYYY-MM-DD') : null,
+                asset_img: displayedImage ? displayedImage.split('/').pop() : ''
+            };
 
-            const newRows = Array.from({ length: qty }).map((_, index) => ({
-                id: Date.now() + index,
-                label: `LABEL-${Math.floor(Math.random() * 10000)}`,
-                print_status: 'รอพิมพ์',
-                active_status: 'ใช้งาน',
-                asset_status: 'ปกติ',
-                asset_code: values.asset_code,
-                lot_no: values.lot_no,
-                asset_detail: values.asset_detail,
-                asset_type: values.asset_type,
-                location: values.location,
-                part_code: `PART-${values.asset_code}`,
-                label_code: `LB-${Date.now()}-${index}`,
-                doc_no: values.doc_no,
-                reg_date: values.reg_date ? dayjs(values.reg_date).format('DD/MM/YYYY') : '-',
-                possessor: values.possessor
-            }));
+            const res = await api.post('/registration/registerasset', payload);
 
-            setTableData(prev => [...prev, ...newRows]);
-            message.success(`สร้างรายการสำเร็จ ${qty} รายการ`);
+            if (res.data?.success) {
+                const newRows = res.data.data;
+                const createdLot = res.data.lot;
+
+                // ✅ แก้ไข: ให้แสดงเฉพาะรายการที่สร้างล่าสุดเท่านั้น (Replace ไม่ใช่ Append)
+                setTableData(newRows);
+
+                setLastSavedLot(createdLot);
+                form.setFieldValue('asset_lot', createdLot);
+
+                message.success(res.data.message || 'บันทึกข้อมูลสำเร็จ');
+            }
+
         } catch (error) {
-            console.error('Validation Failed:', error);
+            console.error('Save Failed:', error);
+            if (error?.errorFields) {
+                message.error('กรุณากรอกข้อมูลให้ครบถ้วน');
+            } else {
+                message.error('เกิดข้อผิดพลาดในการบันทึก: ' + (error?.response?.data?.message || error.message));
+            }
         }
     };
 
     const handleClearAll = () => {
-        form.resetFields();
-        setFileList([]);
-        setTableData([]);
-        message.info('ล้างรายการทั้งหมดเรียบร้อย');
-    };
-
-    const handlePreview = async (file) => {
-        if (!file.url && !file.preview) {
-            file.preview = await getBase64(file.originFileObj);
+        if (!lastSavedLot) {
+            doClearForm();
+            return;
         }
-        setPreviewImage(file.url || file.preview);
-        setPreviewOpen(true);
+
+        modal.confirm({
+            title: 'ยืนยันการลบ',
+            content: `คุณต้องการลบรายการล่าสุด Lot: ${lastSavedLot} ใช่หรือไม่?`,
+            okText: 'ยืนยันลบ',
+            okType: 'danger',
+            cancelText: 'ยกเลิก',
+            onOk: async () => {
+                try {
+                    const res = await api.delete(`/registration/registerasset/${lastSavedLot}`);
+                    if (res.data?.success) {
+                        message.success(`ลบรายการ Lot ${lastSavedLot} เรียบร้อยแล้ว`);
+                        setTableData([]);
+                        setLastSavedLot(null);
+                        doClearForm();
+                    }
+                } catch (err) {
+                    message.error('ไม่สามารถลบข้อมูลได้: ' + (err?.response?.data?.message || err.message));
+                }
+            }
+        });
     };
 
-    const handleChange = ({ fileList: newFileList }) => setFileList(newFileList);
+    const doClearForm = () => {
+        form.resetFields();
+        form.setFieldValue('asset_lot', 'Auto Generate');
+        setDisplayedImage(null);
+        message.info('ล้างแบบฟอร์มเรียบร้อย');
+    };
 
     // --- Column Definitions ---
     const columnDefs = useMemo(() => [
         { headerName: '', checkboxSelection: true, headerCheckboxSelection: true, width: 50, pinned: 'left', lockVisible: true },
         {
-            headerName: 'Label', field: 'label', width: 120,
+            headerName: 'Label', field: 'label_register', width: 120, pinned: 'left',
             cellRenderer: (params) => (
-                <div className="flex items-center gap-2">
-                    <QrcodeOutlined className="text-blue-600" />
-                    <span>{params.value}</span>
-                </div>
+                <Button
+                    type="dashed"
+                    size="small"
+                    icon={<div className="flex items-center gap-1"><QrcodeOutlined /><PrinterOutlined /></div>}
+                    className="flex items-center justify-center w-full text-blue-600 border-blue-200 hover:border-blue-500 hover:text-blue-500 bg-blue-50"
+                    onClick={() => handleIndividualPrint(params.data)}
+                >
+                    Print
+                </Button>
             )
         },
-        { headerName: 'ลำดับ', valueGetter: "node.rowIndex + 1", width: 80, cellClass: "text-center" },
-        { headerName: 'สถานะปริ้น', field: 'print_status', width: 120, cellClass: params => params.value === 'พิมพ์แล้ว' ? 'text-green-600 font-bold' : 'text-orange-500' },
-        { headerName: 'สถานะใช้งาน', field: 'active_status', width: 120 },
-        { headerName: 'สถานะทรัพย์สิน', field: 'asset_status', width: 140 },
-        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 150 },
-        { headerName: 'Lot No', field: 'lot_no', width: 120 },
+        { headerName: 'ลำดับ', valueGetter: "node.rowIndex + 1", width: 140, cellClass: "text-center" },
+        {
+            headerName: 'สถานะปริ้น', field: 'print_status', width: 150,
+            cellRenderer: (params) => {
+                const val = parseInt(params.value) || 0;
+                if (val === 0) return <span className="text-orange-500 font-medium">ยังไม่ปริ้น</span>;
+                if (val === 1) return <span className="text-green-600 font-bold">ปริ้นแล้ว</span>;
+                return <span className="text-blue-600 font-bold">ปริ้นครั้งที่ {val}</span>;
+            }
+        },
+        {
+            headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
+            cellRenderer: (params) => {
+                // Dynamic Status: ชื่อจาก asset_status_name, สีจาก asset_status_color (Tailwind class)
+                const name = params.data.asset_status_name || params.value;
+                const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+                return (
+                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                        {name}
+                    </div>
+                );
+            }
+        },
+        {
+            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
+            cellRenderer: (params) => {
+                // Dynamic Status
+                const name = params.data.is_status_name || params.value;
+                const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+                return (
+                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                        {name}
+                    </div>
+                );
+            }
+        },
+        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 180 },
+        { headerName: 'Lot No', field: 'asset_lot', width: 150 },
         { headerName: 'รายละเอียดทรัพย์สิน', field: 'asset_detail', width: 200 },
-        { headerName: 'ประเภททรัพย์สิน', field: 'asset_type', width: 150 },
-        { headerName: 'ที่อยู่ทรัพย์สิน', field: 'location', width: 200 },
-        { headerName: 'Part Code', field: 'part_code', width: 150 },
-        { headerName: 'Label Code', field: 'label_code', width: 150 },
+        { headerName: 'ประเภททรัพย์สิน', field: 'asset_type', width: 180 },
+        { headerName: 'ที่อยู่ทรัพย์สิน', field: 'asset_location', width: 150 },
+        { headerName: 'Part Code', field: 'partCode', width: 150 },
+        { headerName: 'Part Name', field: 'partName', width: 150 },
+        { headerName: 'Label Code', field: 'label_register', width: 150 },
         { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
-        { headerName: 'วันที่ขึ้นทะเบียน', field: 'reg_date', width: 150 },
-        { headerName: 'ผู้ครอบครอง', field: 'possessor', width: 150 },
+        { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
+        { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
     ], []);
 
     const filteredRows = useMemo(() => {
         if (!searchTerm) return tableData;
         const lower = searchTerm.toLowerCase();
         return tableData.filter(r =>
-            String(r.asset_code).toLowerCase().includes(lower) ||
-            String(r.asset_detail).toLowerCase().includes(lower) ||
-            String(r.label).toLowerCase().includes(lower)
+            String(r.asset_code || '').toLowerCase().includes(lower) ||
+            String(r.asset_detail || '').toLowerCase().includes(lower) ||
+            String(r.partName || '').toLowerCase().includes(lower)
         );
     }, [tableData, searchTerm]);
 
     return (
-        <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
+        <div style={containerStyle} className="bg-slate-50 relative">
 
-            {/* --- Header Bar --- */}
-            <div className="bg-white px-6 py-3 border-b border-gray-200 flex items-center justify-between flex-none">
+            {/* --- Header Bar (Sticky Top) --- */}
+            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 z-20 shadow-sm backdrop-blur-md bg-white/90">
                 <div className="flex items-center gap-4">
                     <Button
                         icon={<ArrowLeftOutlined />}
                         onClick={() => navigate(-1)}
-                        className="rounded-full border-none shadow-sm text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                        shape="circle"
+                        className="border-gray-200 text-slate-500 hover:text-blue-600 hover:border-blue-600"
                     />
                     <div>
-                        <Title level={4} style={{ margin: 0 }} className="text-slate-800">
-                            รายการทรัพย์สิน (Asset List)
+                        <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2">
+                            <span className="bg-blue-600 w-2 h-6 rounded-r-md block"></span>
+                            ลงทะเบียนทรัพย์สิน
                         </Title>
-                        <Text className="text-slate-500 text-sm">สร้างและจัดการรายการทรัพย์สินใหม่</Text>
+                        <Text className="text-slate-500 text-xs ml-4">ระบบจัดการและสร้างรายการทรัพย์สินใหม่ (Asset Registration)</Text>
                     </div>
                 </div>
-                {/* ✅ เพิ่มปุ่มปิด X ทางขวา */}
                 <Button
                     type="text"
-                    icon={<CloseOutlined style={{ fontSize: '18px' }} />}
+                    danger
+                    icon={<CloseOutlined />}
                     onClick={() => navigate(-1)}
-                    className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full w-10 h-10 flex items-center justify-center"
-                />
+                    className="hover:bg-red-50 rounded-full"
+                >
+                    ปิดหน้าต่าง
+                </Button>
             </div>
 
             {/* --- Main Content --- */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="p-4 space-y-4">
 
                 {/* === SECTION 1: Form === */}
-                <Card className="shadow-sm border-gray-200 rounded-xl" styles={{ body: { padding: '24px' } }}>
-                    <Form form={form} layout="vertical" initialValues={{ quantity: 1 }}>
-                        <Row gutter={32}>
-
-                            {/* --- Left Column: General Info --- */}
-                            <Col xs={24} md={8} className="border-r border-gray-100">
-                                <div className="mb-4">
-                                    <h3 className="text-base font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                                        <div className="w-1 h-5 bg-blue-600 rounded-full"></div>
-                                        ข้อมูลทั่วไป
-                                    </h3>
-
-                                    <Form.Item label="รหัสสินค้า (Asset Code)" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสสินค้า' }]}>
-                                        <Input
-                                            placeholder="ระบุรหัสสินค้า"
-                                            addonAfter={
-                                                // ✅ ปุ่มเลือกสินค้าเปิด Modal
-                                                <Button
-                                                    type="text"
-                                                    size="small"
-                                                    icon={<SearchOutlined />}
-                                                    className="text-blue-600 hover:text-blue-700 font-medium"
-                                                    onClick={() => setIsModalListOpen(true)}
-                                                >
-                                                    เลือกสินค้า
-                                                </Button>
-                                            }
-                                        />
-                                    </Form.Item>
-
-                                    {/* ... Inputs อื่นๆ คงเดิม ... */}
-                                    <Form.Item label="ชื่อสินค้า (Asset Name)" name="asset_detail" rules={[{ required: true }]}>
-                                        <Input placeholder="ระบุชื่อสินค้า" />
-                                    </Form.Item>
-                                    <Row gutter={12}>
-                                        <Col span={12}><Form.Item label="เลขที่เอกสาร" name="doc_no"><Input placeholder="Ex. DOC-001" /></Form.Item></Col>
-                                        <Col span={12}><Form.Item label="วันที่ซื้อ" name="reg_date"><DatePicker className="w-full" format="DD/MM/YYYY" placeholder="เลือกวันที่" /></Form.Item></Col>
-                                    </Row>
-                                    <Row gutter={12}>
-                                        <Col span={12}><Form.Item label="Lot No." name="lot_no"><Input placeholder="Ex. LOT-2024" /></Form.Item></Col>
-                                        <Col span={12}><Form.Item label="ประเภททรัพย์สิน" name="asset_type"><Select placeholder="เลือกประเภท" options={[{ label: 'A', value: 'A' }, { label: 'B', value: 'B' }]} /></Form.Item></Col>
-                                    </Row>
-                                    <Form.Item label="ผู้ครอบครอง" name="possessor"><Input placeholder="ระบุชื่อผู้ครอบครอง" /></Form.Item>
-                                    <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="location"><Input.TextArea rows={2} placeholder="ระบุสถานที่" /></Form.Item>
+                <Form form={form} layout="vertical">
+                    <Card
+                        className="shadow-sm border-gray-200 rounded-xl overflow-hidden"
+                        styles={{ body: { padding: 0 } }}
+                    >
+                        <Row>
+                            {/* --- Col 1: ข้อมูลทั่วไป --- */}
+                            <Col xs={24} lg={8} className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 bg-white">
+                                <div className="mb-5 flex items-center gap-2 text-slate-700">
+                                    <FileTextOutlined className="text-blue-500 text-lg" />
+                                    <span className="font-semibold text-base">ข้อมูลทั่วไป</span>
                                 </div>
-                            </Col>
 
-                            {/* --- Center Column: Specs --- */}
-                            <Col xs={24} md={8} className="border-r border-gray-100 px-6">
-                                <div className="mb-4">
-                                    <h3 className="text-base font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                                        <div className="w-1 h-5 bg-orange-500 rounded-full"></div>
-                                        จำนวนและขนาด
-                                    </h3>
-                                    <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-6">
-                                        <Form.Item label="จำนวนที่ต้องการสร้าง (Pcs)" name="quantity" className="mb-0" rules={[{ required: true }]}>
-                                            <InputNumber min={1} className="w-full" size="large" placeholder="ระบุจำนวน" />
+                                <Form.Item label="รหัสทรัพย์สิน" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสทรัพย์สิน' }]}>
+                                    <Input
+                                        size="large"
+                                        prefix={<BarcodeOutlined className="text-slate-400 mr-1" />}
+                                        placeholder="Scan / ระบุรหัส"
+                                        readOnly
+                                        addonAfter={
+                                            <Button
+                                                type="text"
+                                                size="small"
+                                                icon={<SearchOutlined />}
+                                                className="text-blue-600 hover:text-blue-700 font-medium"
+                                                onClick={() => setIsModalListOpen(true)}
+                                            >
+                                                เลือกทรัพย์สิน
+                                            </Button>
+                                        }
+                                        className="rounded-lg"
+                                    />
+                                </Form.Item>
+
+                                <Form.Item label="ชื่อทรัพย์สิน" name="asset_detail" rules={[{ required: true, message: 'ระบุชื่อทรัพย์สิน' }]}>
+                                    <Input size="large" prefix={<FileTextOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อทรัพย์สิน" className="rounded-lg" />
+                                </Form.Item>
+
+                                <Row gutter={12}>
+                                    <Col span={12}>
+                                        <Form.Item label="ประเภท" name="asset_type">
+                                            <Input prefix={<BgColorsOutlined className="text-slate-400" />} placeholder="ประเภท" />
                                         </Form.Item>
-                                    </div>
-                                    <Divider orientation="left" className="text-slate-400 !text-xs">ขนาดสินค้า (Dimension)</Divider>
-                                    <SpecInput label="ความกว้าง" name="width" unitName="width_unit" unitOptions={unitOptions} />
-                                    <SpecInput label="ความยาว" name="length" unitName="length_unit" unitOptions={unitOptions} />
-                                    <SpecInput label="ความสูง" name="height" unitName="height_unit" unitOptions={unitOptions} />
-                                    <Divider orientation="left" className="text-slate-400 !text-xs">ความจุและน้ำหนัก</Divider>
-                                    <SpecInput label="ความจุ" name="capacity" unitName="capacity_unit" unitOptions={unitOptions} />
-                                    <SpecInput label="น้ำหนัก" name="weight" unitName="weight_unit" unitOptions={unitOptions} />
-                                </div>
+                                    </Col>
+                                    <Col span={12}>
+                                        <Form.Item label="วันที่ซื้อ" name="asset_date">
+                                            <ThaiDateInput placeholder="เลือกวันที่" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+
+                                <Row gutter={12}>
+                                    <Col span={12}>
+                                        <Form.Item label="เลขที่เอกสาร" name="docID">
+                                            <Input prefix={<NumberOutlined className="text-slate-400" />} placeholder="DOC-XXX" />
+                                        </Form.Item>
+                                    </Col>
+                                    <Col span={12}>
+                                        <Form.Item label="หมายเลขล็อต" name="asset_lot">
+                                            <Input prefix={<InboxOutlined className="text-slate-400" />} className="bg-gray-50 text-gray-500" readOnly placeholder="Auto Generate" />
+                                        </Form.Item>
+                                    </Col>
+                                </Row>
+
+                                <Form.Item label="ผู้ครอบครอง" name="asset_holder">
+                                    <Input prefix={<UserOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อผู้ครอบครอง" />
+                                </Form.Item>
+
+                                <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="asset_location" className="mb-0">
+                                    <Input.TextArea
+                                        rows={2}
+                                        placeholder="ระบุสถานที่ติดตั้ง"
+                                        className="rounded-lg"
+                                    />
+                                </Form.Item>
                             </Col>
 
-                            {/* --- Right Column: Image & Actions --- */}
-                            <Col xs={24} md={8} className="pl-4 flex flex-col justify-between h-full">
-                                <div>
-                                    <h3 className="text-base font-semibold text-slate-700 mb-4 flex items-center gap-2">
-                                        <div className="w-1 h-5 bg-purple-500 rounded-full"></div>
-                                        รูปภาพและบันทึก
-                                    </h3>
-                                    <Form.Item name="image">
-                                        <Dragger
-                                            fileList={fileList}
-                                            onPreview={handlePreview}
-                                            onChange={handleChange}
-                                            beforeUpload={() => false}
-                                            listType="picture-card"
-                                            className="bg-slate-50 border-dashed border-2 border-slate-300 rounded-xl hover:border-blue-400 transition-colors"
-                                            height={180}
-                                            maxCount={1}
-                                        >
-                                            <p className="ant-upload-drag-icon text-slate-400"><FileImageOutlined style={{ fontSize: 32 }} /></p>
-                                            <p className="ant-upload-text text-sm text-slate-600">คลิกหรือลากไฟล์มาวางที่นี่</p>
-                                            <p className="ant-upload-hint text-xs text-slate-400">รองรับไฟล์ JPG, PNG</p>
-                                        </Dragger>
-                                    </Form.Item>
+                            {/* --- Col 2: Specs & QTY --- */}
+                            <Col xs={24} lg={8} className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 bg-slate-50/30">
+                                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg mb-8 relative overflow-hidden group transition-all hover:shadow-blue-300">
+                                    <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+                                    <div className="absolute bottom-[-20px] left-[-20px] w-20 h-20 bg-white/10 rounded-full blur-lg"></div>
+
+                                    <div className="text-center relative z-10">
+                                        <div className="text-blue-100 text-sm font-medium mb-2 uppercase tracking-wide flex justify-center items-center gap-2">
+                                            <NumberOutlined /> จำนวนที่ต้องการขึ้นทะเบียน (QTY)
+                                        </div>
+                                        <Form.Item name="quantity" className="mb-0" rules={[{ required: true, message: 'กรุณาระบุจำนวน' }]}>
+                                            <InputNumber
+                                                min={1}
+                                                max={9999}
+                                                maxLength={4}
+                                                precision={0}
+                                                placeholder="0"
+                                                bordered={false}
+                                                className="w-full text-center input-qty-highlight"
+                                                style={{
+                                                    fontSize: '48px',
+                                                    fontWeight: 'bold',
+                                                    color: 'white',
+                                                    background: 'transparent'
+                                                }}
+                                                controls={true}
+                                                onKeyPress={(event) => {
+                                                    if (!/[0-9]/.test(event.key)) {
+                                                        event.preventDefault();
+                                                    }
+                                                }}
+                                            />
+                                        </Form.Item>
+                                        <div className="h-px bg-white/20 w-1/2 mx-auto my-2"></div>
+                                        <div className="text-xs text-blue-200">ระบุจำนวนที่ต้องการ Generate Label</div>
+                                    </div>
                                 </div>
 
-                                {/* ✅ ปุ่มบันทึกและลบ: ปรับ Style และจัดให้อยู่บรรทัดเดียวกัน */}
-                                <div className="flex gap-3 mt-8">
+                                <div className="mb-4">
+                                    <div className="flex items-center gap-2 text-slate-700 mb-4">
+                                        <ExpandAltOutlined className="text-orange-500 text-lg" />
+                                        <span className="font-semibold text-base">ขนาดและน้ำหนัก</span>
+                                    </div>
+
+                                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                                        <SpecInput label="ความกว้าง" name="asset_width" unitName="asset_width_unit" unitOptions={unitOptions} />
+                                        <SpecInput label="ความยาว" name="asset_length" unitName="asset_length_unit" unitOptions={unitOptions} />
+                                        <SpecInput label="ความสูง" name="asset_height" unitName="asset_height_unit" unitOptions={unitOptions} />
+                                        <Divider className="my-2 border-gray-100" />
+                                        <SpecInput label="ความจุ" name="asset_capacity" unitName="asset_capacity_unit" unitOptions={unitOptions} />
+                                        <SpecInput label="น้ำหนัก" name="asset_weight" unitName="asset_weight_unit" unitOptions={unitOptions} />
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-center gap-1 mt-1">
                                     <Button
                                         type="primary"
                                         icon={<SaveOutlined />}
-                                        size="large"
-                                        className="flex-1 bg-blue-600 hover:bg-blue-500 border-none h-10 rounded-lg font-medium shadow-md"
                                         onClick={handleSave}
+                                        className="bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-200 px-6 h-9 rounded-lg font-semibold border-none"
                                     >
-                                        บันทึก
+                                        บันทึกสร้างรายการ
                                     </Button>
+
+                                    <div className="h-6 w-px bg-gray-200 mx-2"></div>
+
                                     <Button
+                                        type="primary"
                                         danger
                                         icon={<DeleteOutlined />}
-                                        size="large"
-                                        className="flex-1 h-10 rounded-lg font-medium border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm"
                                         onClick={handleClearAll}
+                                        className="shadow-md shadow-red-200 px-6 h-9 rounded-lg font-semibold"
                                     >
-                                        ลบทั้งหมด
+                                        ลบรายการทั้งหมด
                                     </Button>
                                 </div>
                             </Col>
+
+                            {/* --- Col 3: Image --- */}
+                            <Col xs={24} lg={8} className="p-6 bg-white flex flex-col h-full">
+                                <div className="mb-4 flex items-center gap-2 text-slate-700">
+                                    <PictureOutlined className="text-purple-500 text-lg" />
+                                    <span className="font-semibold text-base">รูปภาพสินค้า</span>
+                                </div>
+
+                                <div className="flex-1 flex flex-col">
+                                    <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner group hover:border-blue-400 transition-colors">
+                                        {displayedImage ? (
+                                            <>
+                                                <Image
+                                                    src={displayedImage}
+                                                    className="object-contain w-full h-full"
+                                                    style={{ maxHeight: '100%', maxWidth: '100%' }}
+                                                    alt="Asset Image"
+                                                />
+                                                <div className="absolute top-3 right-3">
+                                                    <Badge status="processing" text={<span className="bg-white/90 px-2 py-0.5 rounded text-xs font-bold shadow-sm text-green-600">PREVIEW</span>} />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="text-center p-6">
+                                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition-transform">
+                                                    <PictureOutlined className="text-3xl text-slate-300 group-hover:text-blue-400 transition-colors" />
+                                                </div>
+                                                <Text className="text-slate-400 block">ไม่มีรูปภาพแสดง</Text>
+                                                <Text className="text-slate-300 text-xs">(รูปภาพจะปรากฏเมื่อเลือกสินค้า)</Text>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                                        <div className="flex items-start gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
+                                                <InboxOutlined />
+                                            </div>
+                                            <div>
+                                                <Text strong className="text-slate-700 block text-sm">หมายเหตุ</Text>
+                                                <Text className="text-slate-500 text-xs">
+                                                    ข้อมูลขนาดและรูปภาพจะถูกดึงมาอัตโนมัติเมื่อทำการเลือกรายการสินค้า (Master Data)
+                                                </Text>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Col>
                         </Row>
-                    </Form>
-                </Card>
+                    </Card>
+                </Form>
 
                 {/* === SECTION 2: Table === */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[500px]">
-                    {/* Table Header */}
-                    <div className="px-5 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-
-                        {/* ✅ ย้าย Search & Print มาทางซ้าย และใช้ Style เหมือนหน้า RegisterAsset */}
-                        <div className="flex items-center gap-4 flex-1">
-                            <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                                <Input
-                                    prefix={<SearchOutlined className="text-gray-400" />}
-                                    placeholder="ค้นหา รหัส, รายละเอียด..."
-                                    value={searchTerm}
-                                    onChange={e => setSearchTerm(e.target.value)}
-                                    allowClear
-                                    bordered={false}
-                                    className="w-64 bg-transparent"
-                                />
-                                <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                                <Button
-                                    type="primary"
-                                    icon={<PrinterOutlined />}
-                                    className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                                >
-                                    พิมพ์สติ๊กเกอร์
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Count Label */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-slate-500 text-sm">รายการทั้งหมด:</span>
-                            <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">
-                                {tableData.length}
-                            </span>
+                <Card className="shadow-sm border-gray-200 rounded-xl" styles={{ body: { padding: 0 } }}>
+                    <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-t-xl">
+                        <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
+                            <Input
+                                prefix={<SearchOutlined className="text-gray-400" />}
+                                placeholder="ค้นหา รหัส, รายละเอียด..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                allowClear
+                                bordered={false}
+                                className="w-64 bg-transparent"
+                            />
+                            <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
+                            {/* ปุ่มพิมพ์สติ๊กเกอร์ (Bulk Print) */}
+                            <Button
+                                type="primary"
+                                icon={<PrinterOutlined />}
+                                onClick={handleBulkPrint}
+                                className="bg-emerald-600 hover:bg-emerald-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                            >
+                                พิมพ์สติ๊กเกอร์ ({selectedRows.length})
+                            </Button>
                         </div>
                     </div>
 
-                    {/* Table Body */}
-                    <div className="flex-1 overflow-hidden">
+                    <div style={{ height: 600 }} className="w-full">
                         <DataTable
                             rowData={filteredRows}
                             columnDefs={columnDefs}
                             loading={false}
                             rowSelection="multiple"
                             suppressRowClickSelection={true}
+                            onSelectionChanged={(params) => {
+                                setSelectedRows(params.api.getSelectedRows());
+                            }}
                         />
                     </div>
-                </div>
+                </Card>
 
             </div>
 
-            {/* Image Preview Modal */}
-            {previewImage && (
-                <Image
-                    wrapperStyle={{ display: 'none' }}
-                    preview={{
-                        visible: previewOpen,
-                        onVisibleChange: (visible) => setPreviewOpen(visible),
-                        afterOpenChange: (visible) => !visible && setPreviewImage(''),
-                    }}
-                    src={previewImage}
-                />
-            )}
-
-            {/* ✅ Modal สำหรับเลือกสินค้า (Placeholder Component) */}
-            <Modal
-                title="เลือกรายการสินค้า"
+            {/* Modal */}
+            <ModalAssetList
                 open={isModalListOpen}
-                onCancel={() => setIsModalListOpen(false)}
-                footer={null}
-                width={800}
-                centered
-            >
-                <ModalAssetList />
-            </Modal>
+                onClose={() => setIsModalListOpen(false)}
+                onSelect={handleMaterialSelect}
+            />
+
+            {/* --- Hidden Print Component --- */}
+            <div style={{ display: 'none' }}>
+                <div ref={printRef}>
+                    {/* Loop แสดงรายการที่เลือกพิมพ์ทั้งหมด */}
+                    {printList.map((item, index) => (
+                        <div key={index} style={{
+                            width: '5.5cm',
+                            height: '3.5cm',
+                            padding: '0.2cm',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            border: '1px solid #ddd', // Border บางๆ สำหรับดูขอบเขต (Printer จริงอาจไม่ต้อง)
+                            overflow: 'hidden',
+                            pageBreakAfter: 'always', // บังคับขึ้นหน้าใหม่สำหรับสติ๊กเกอร์แผ่นถัดไป
+                            fontFamily: 'sans-serif'
+                        }}>
+                            <div style={{ flex: 1, overflow: 'hidden', fontSize: '10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>รหัสทรัพย์สิน : {item.asset_code}</div>
+                                <div>Lot No: {item.asset_lot}</div>
+                            </div>
+                            <div style={{ marginLeft: '5px' }}>
+                                <QRCodeSVG
+                                    value={item.label_register}
+                                    size={80} // ปรับขนาดตามความเหมาะสมกับพื้นที่ 3.5cm
+                                    level={"M"}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* CSS Override for InputNumber QTY */}
+            <style jsx global>{`
+                .input-qty-highlight input {
+                    text-align: center !important;
+                    color: white !important;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+                .input-qty-highlight .ant-input-number-handler-wrap {
+                    opacity: 0.5;
+                    background: rgba(255,255,255,0.1);
+                }
+                .input-qty-highlight:hover .ant-input-number-handler-wrap {
+                    opacity: 1;
+                }
+                .input-qty-highlight .ant-input-number-handler-up,
+                .input-qty-highlight .ant-input-number-handler-down {
+                    border-left: 1px solid rgba(255,255,255,0.2);
+                }
+                .input-qty-highlight .anticon {
+                    color: white;
+                }
+            `}</style>
         </div>
     );
 }
 
-// Helpers
+// Helper Component for Specs
 const SpecInput = ({ label, name, unitName, unitOptions }) => (
-    <div className="mb-3">
-        <div className="text-xs text-slate-500 mb-1">{label}</div>
-        <div className="flex">
+    <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="text-slate-500 w-24 flex-shrink-0">{label}</div>
+        <div className="flex flex-1 shadow-sm rounded-md overflow-hidden border border-gray-200 focus-within:border-blue-400 transition-colors">
             <Form.Item name={name} noStyle>
-                <InputNumber placeholder="0.00" className="flex-1 !rounded-r-none border-r-0" min={0} precision={2} />
+                <InputNumber
+                    placeholder="0.00"
+                    className="flex-1 border-0 shadow-none !rounded-none focus:shadow-none"
+                    min={0}
+                    precision={2}
+                    onKeyPress={(event) => {
+                        if (!/[0-9.]/.test(event.key)) {
+                            event.preventDefault();
+                        }
+                    }}
+                />
             </Form.Item>
+            <div className="w-px bg-gray-200"></div>
             <Form.Item name={unitName} noStyle>
-                <Select placeholder="หน่วย" style={{ width: 80 }} options={unitOptions} className="!rounded-l-none bg-slate-50" />
+                <Select
+                    placeholder="หน่วย"
+                    style={{ width: 160 }}
+                    options={unitOptions}
+                    bordered={false}
+                    className="bg-slate-50 text-xs"
+                />
             </Form.Item>
         </div>
     </div>
 );
-
-const getBase64 = (file) =>
-    new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = (error) => reject(error);
-    });
 
 export default AssetList;
