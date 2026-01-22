@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Form, Input, Button, Checkbox, Empty, ConfigProvider, Row, Col, Card, Divider } from "antd";
+import { Modal, Form, Input, Button, Checkbox, Empty, ConfigProvider, Switch, Tooltip } from "antd"; // ✅ เพิ่ม Switch, Tooltip
 import {
     FolderOpenOutlined,
     PlusCircleOutlined,
@@ -7,7 +7,8 @@ import {
     AppstoreOutlined,
     CheckSquareOutlined,
     FileTextOutlined,
-    ToolOutlined // ✅ เพิ่มไอคอน
+    ToolOutlined,
+    UnlockOutlined
 } from '@ant-design/icons';
 import { ACTION_MASTER } from "../ActionConstants"; // ✅ Import Master Data
 
@@ -97,7 +98,8 @@ const ModalCreate = ({ open, onCancel, onSubmit, mains = [], subs = [], takenNam
                 groupName: values.groupName.trim(),
                 mainIds: (values.mainIds || []).map(String),
                 subIds: (values.subIds || []).map(String),
-                actionPermissions: values.actionPermissions || [] // ✅ ส่งค่า actionPermissions ไปด้วย
+                actionPermissions: values.actionPermissions || [],
+                privilege_access: values.privilege_access ? 'Allow' : 'Normal'
             };
             onSubmit?.(payload);
             form.resetFields();
@@ -149,20 +151,47 @@ const ModalCreate = ({ open, onCancel, onSubmit, mains = [], subs = [], takenNam
                 </div>
 
                 <div className="p-6">
-                    {/* ✅ เพิ่ม initialValues: actionPermissions */}
-                    <Form form={form} layout="vertical" preserve={false} initialValues={{ groupName: "", mainIds: [], subIds: [], actionPermissions: [] }}>
+                    <Form form={form} layout="vertical" preserve={false}
+                        initialValues={{
+                            groupName: "",
+                            mainIds: [],
+                            subIds: [],
+                            actionPermissions: [],
+                            privilege_access: false
+                        }}
+                    >
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <Form.Item
+                                    name="groupName"
+                                    label={<span className="font-semibold text-gray-700">ชื่อกลุ่มสิทธิ</span>}
+                                    rules={[
+                                        { required: true, message: "กรุณาระบุชื่อกลุ่มสิทธิ" },
+                                        { validator: (_, value) => (value && takenSet.has(value.trim().toLowerCase())) ? Promise.reject(new Error("ชื่อนี้มีอยู่แล้ว")) : Promise.resolve() }
+                                    ]}
+                                >
+                                    <Input prefix={<AppstoreOutlined className="text-gray-400" />} placeholder="เช่น HR Manager" className="h-10 rounded-lg bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 hover:border-blue-400 transition-all" />
+                                </Form.Item>
+                            </div>
+                            <div>
+                                <Form.Item
+                                    name="privilege_access"
+                                    label={
+                                        <span className="font-semibold text-gray-700 flex items-center gap-1">
+                                            สิทธิพิเศษ <Tooltip title="เข้าใช้งานได้โดยไม่สนสถานะ"><UnlockOutlined className="text-gray-400" /></Tooltip>
+                                        </span>
+                                    }
+                                    valuePropName="checked"
+                                >
+                                    <Switch
+                                        checkedChildren="Allow"
+                                        unCheckedChildren="Normal"
+                                        className="bg-gray-300"
+                                    />
+                                </Form.Item>
+                            </div>
+                        </div>
 
-                        {/* Group Name */}
-                        <Form.Item
-                            name="groupName"
-                            label={<span className="font-semibold text-gray-700">ชื่อกลุ่มสิทธิ</span>}
-                            rules={[
-                                { required: true, message: "กรุณาระบุชื่อกลุ่มสิทธิ" },
-                                { validator: (_, value) => (value && takenSet.has(value.trim().toLowerCase())) ? Promise.reject(new Error("ชื่อนี้มีอยู่แล้ว")) : Promise.resolve() }
-                            ]}
-                        >
-                            <Input prefix={<AppstoreOutlined className="text-gray-400" />} placeholder="เช่น HR Manager" className="h-10 rounded-lg bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 hover:border-blue-400 transition-all" />
-                        </Form.Item>
 
                         <div className="flex flex-col md:flex-row gap-6 mt-4">
                             {/* Left Column: Menu Permissions (เหมือนเดิม) */}

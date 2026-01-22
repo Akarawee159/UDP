@@ -2,12 +2,15 @@
 
 export const ACTION_MASTER = [
     {
-        module: 'สร้างข้อมูลพนักงาน',
-        key: 'trainings',
+        module: 'จัดการผู้ใช้งาน',
+        key: '201',
         options: [
-            { label: 'สร้างได้', value: 'trainings:create' },
-            { label: 'แก้ไขได้', value: 'trainings:update' },
-            { label: 'ลบได้', value: 'trainings:delete' }
+            { label: 'เพิ่มผู้ใช้งาน', value: '201:create' },
+            { label: 'เคลียร์สถานะ', value: '201:clear' },
+            { label: 'ระงับการใช้งาน', value: '201:ban' },
+            { label: 'กำหนดกลุ่มสิทธิ', value: '201:update' },
+            { label: 'รีเซ็ตรหัสผ่าน', value: '201:reset' },
+            { label: 'ลบผู้ใช้งาน', value: '201:delete' },
         ]
     },
     {

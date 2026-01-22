@@ -86,11 +86,16 @@ exports.login = async (req, res) => {
       return res.status(401).json({ code: 'BAD_CREDENTIALS', message: 'Invalid username or password' });
     }
 
+    // 1. Bypass แบบเดิม (Hardcode Admin ID 1)
     const isAdminBypass =
       Number(user.employee_id) === 1 &&
       String(user.username || '').trim().toLowerCase() === 'admin';
 
-    if (!isAdminBypass) {
+    // 2. ✅ Bypass แบบใหม่ (จาก Permission Group)
+    const isPrivilegeBypass = user.privilege_access === 'Allow';
+
+    // ✅ ถ้าเข้าเงื่อนไขใดเงื่อนไขหนึ่ง ให้ข้ามการตรวจ Status
+    if (!isAdminBypass && !isPrivilegeBypass) {
       const s = Number(user.is_status ?? user.status);
       const allowedStatuses = [1, 6];
       if (s === 2) return res.status(403).json({ code: 'USER_BUSY', message: 'ผู้ใช้นี้กำลังใช้งานอยู่' });

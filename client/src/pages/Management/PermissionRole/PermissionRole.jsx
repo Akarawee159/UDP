@@ -71,6 +71,7 @@ export default function PermissionRole() {
     mainIds: Array.isArray(r?.mainIds) ? r.mainIds.map(String) : [],
     subIds: Array.isArray(r?.subIds) ? r.subIds.map(String) : [],
     actionPermissions: Array.isArray(r?.actionPermissions) ? r.actionPermissions : [],
+    privilege_access: r?.privilege_access || 'Normal',
     is_status: Number(r?.is_status ?? 0),
   });
 

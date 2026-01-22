@@ -48,6 +48,7 @@ function AssetList() {
     const [unitOptions, setUnitOptions] = useState([]);
     const [isModalListOpen, setIsModalListOpen] = useState(false);
     const [lastSavedLot, setLastSavedLot] = useState(null);
+    const [isPrinting, setIsPrinting] = useState(false);
 
     // State สำหรับ Selection และ Printing
     const [selectedRows, setSelectedRows] = useState([]);
@@ -56,32 +57,37 @@ function AssetList() {
 
     // --- Print Logic ---
     const handlePrintProcess = useReactToPrint({
-        contentRef: printRef, // ใช้ contentRef สำหรับ react-to-print v7+
+        contentRef: printRef,
         onAfterPrint: () => {
             setPrintList([]); // Clear หลังจากพิมพ์เสร็จ
+            setIsPrinting(false); // <--- 3. หยุด Loading เมื่อพิมพ์เสร็จ/ยกเลิก
+        },
+        onPrintError: () => {
+            setIsPrinting(false); // <--- 4. หยุด Loading หากมี Error ตอนเรียก Print
         }
     });
 
     // 1. ฟังก์ชันพิมพ์รายตัว (จากปุ่มในตาราง)
     const handleIndividualPrint = async (row) => {
+        setIsPrinting(true); // <--- 1. เริ่ม Loading
         try {
-            // เรียก API อัปเดตสถานะ +1
             const res = await api.patch(`/registration/registerasset/print/${row.asset_code}`);
 
             if (res.data?.success) {
-                // อัปเดตตัวเลขในตารางทันที
                 const updatedStatus = res.data.print_status;
                 setTableData(prev => prev.map(item =>
                     item.asset_code === row.asset_code ? { ...item, print_status: updatedStatus } : item
                 ));
 
-                // สั่งพิมพ์รายการเดียว
                 setPrintList([row]);
                 setTimeout(() => handlePrintProcess(), 100);
+            } else {
+                setIsPrinting(false); // หยุดถ้า API ไม่ Success แต่ไม่เข้า catch
             }
         } catch (err) {
             console.error(err);
             message.error("ไม่สามารถอัปเดตสถานะการพิมพ์ได้");
+            setIsPrinting(false); // <--- 2. หยุด Loading ถ้า Error
         }
     };
 
@@ -92,6 +98,7 @@ function AssetList() {
             return;
         }
 
+        setIsPrinting(true); // <--- 1. เริ่ม Loading
         try {
             // อัปเดตสถานะทุกตัวที่เลือก (Loop update)
             // หมายเหตุ: ในทางปฏิบัติถ้าจำนวนเยอะควรทำ Bulk API endpoint แยก แต่ทำ Loop เพื่อความง่ายตาม Flow นี้
@@ -118,6 +125,7 @@ function AssetList() {
         } catch (err) {
             console.error(err);
             message.error("เกิดข้อผิดพลาดในการเตรียมพิมพ์หมู่");
+            setIsPrinting(false); // <--- 2. หยุด Loading ถ้า Error
         }
     };
 
@@ -206,12 +214,27 @@ function AssetList() {
         }
 
         modal.confirm({
-            title: 'ยืนยันการลบ',
-            content: `คุณต้องการลบรายการล่าสุด Lot: ${lastSavedLot} ใช่หรือไม่?`,
-            okText: 'ยืนยันลบ',
-            okType: 'danger',
-            cancelText: 'ยกเลิก',
-            onOk: async () => {
+            title: `ยืนยันการลบ Lot: ${lastSavedLot}`,
+            content: `คุณต้องการลบรายการล่าสุด ใช่หรือไม่?`,
+
+            // --- ส่วนที่แก้ไข: สลับข้อความและสไตล์ ---
+            // ให้ปุ่มทางซ้าย (เดิมคือ Cancel) แสดงข้อความ "ยืนยันลบ" และเป็นสีแดง
+            cancelText: 'ยืนยันลบ',
+            cancelButtonProps: {
+                type: 'primary',
+                danger: true
+            },
+
+            // ให้ปุ่มทางขวา (เดิมคือ OK) แสดงข้อความ "ยกเลิก" และเป็นปุ่มธรรมดา
+            okText: 'ยกเลิก',
+            okType: 'default',
+            okButtonProps: {
+                danger: false
+            },
+            // -------------------------------------
+
+            // ย้าย Logic การลบมาไว้ที่ onCancel แทน (เพราะตอนนี้ปุ่มลบคือปุ่มทางซ้าย)
+            onCancel: async () => {
                 try {
                     const res = await api.delete(`/registration/registerasset/${lastSavedLot}`);
                     if (res.data?.success) {
@@ -222,8 +245,13 @@ function AssetList() {
                     }
                 } catch (err) {
                     message.error('ไม่สามารถลบข้อมูลได้: ' + (err?.response?.data?.message || err.message));
+                    // ต้อง throw error เพื่อให้ Modal รู้ว่า process ไม่สำเร็จ (หยุด loading ถ้ามี)
+                    throw err;
                 }
-            }
+            },
+
+            // ปุ่ม OK (ทางขวา) กลายเป็นปุ่มยกเลิก ไม่ต้องทำอะไร (Modal จะปิดเอง)
+            onOk: () => { }
         });
     };
 
@@ -243,11 +271,15 @@ function AssetList() {
                 <Button
                     type="dashed"
                     size="small"
-                    icon={<div className="flex items-center gap-1"><QrcodeOutlined /><PrinterOutlined /></div>}
+                    // เพิ่ม loading ตรงนี้
+                    loading={isPrinting}
+                    // เพิ่ม disabled เพื่อกันกดซ้ำ
+                    disabled={isPrinting}
+                    icon={!isPrinting && <div className="flex items-center gap-1"><QrcodeOutlined /><PrinterOutlined /></div>}
                     className="flex items-center justify-center w-full text-blue-600 border-blue-200 hover:border-blue-500 hover:text-blue-500 bg-blue-50"
                     onClick={() => handleIndividualPrint(params.data)}
                 >
-                    Print
+                    {isPrinting ? 'รอ...' : 'Print'}
                 </Button>
             )
         },
@@ -298,7 +330,7 @@ function AssetList() {
         { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
         { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
-    ], []);
+    ], [isPrinting]);
 
     const filteredRows = useMemo(() => {
         if (!searchTerm) return tableData;
@@ -569,6 +601,8 @@ function AssetList() {
                                 type="primary"
                                 icon={<PrinterOutlined />}
                                 onClick={handleBulkPrint}
+                                loading={isPrinting} // <--- ใส่ตรงนี้
+                                disabled={isPrinting || selectedRows.length === 0} // กันกดซ้ำ
                                 className="bg-emerald-600 hover:bg-emerald-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                             >
                                 พิมพ์สติ๊กเกอร์ ({selectedRows.length})

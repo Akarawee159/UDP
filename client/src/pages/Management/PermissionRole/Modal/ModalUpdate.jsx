@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Form, Input, Button, Checkbox, Alert, Empty, ConfigProvider } from "antd";
+import { Modal, Form, Input, Button, Checkbox, Alert, Empty, ConfigProvider, Switch, Tooltip } from "antd";
 import {
   FolderOpenOutlined, EditOutlined, SearchOutlined, AppstoreOutlined,
   CheckSquareOutlined, FileTextOutlined, DeleteOutlined, SaveOutlined, StopOutlined,
-  ToolOutlined // ✅ เพิ่มไอคอน
+  ToolOutlined, UnlockOutlined
 } from "@ant-design/icons";
-import { ACTION_MASTER } from "../ActionConstants"; // ✅ Import
+import { ACTION_MASTER } from "../ActionConstants";
 
-// ... (Constants ADMIN_ID, etc. เหมือนเดิม) ...
 const ADMIN_ID = 1;
 const ADMIN_NAME = "administrator";
 const REQ_MAIN = "20";
@@ -17,7 +16,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
   const [form] = Form.useForm();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ... (Logic menuTree, filteredMenuTree, isAdmin, allowedSubIdsInit เหมือนเดิม) ...
   const menuTree = useMemo(() => {
     return mains.map((main) => ({
       ...main,
@@ -48,26 +46,34 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
     });
   }, [record, subs]);
 
+  // ✅ 1. เตรียมค่าเริ่มต้นของ Form ไว้ในตัวแปรเดียว
+  const formInitialValues = useMemo(() => {
+    if (!record) return {};
+    return {
+      groupName: record.groupName || "",
+      mainIds: (record.mainIds || []).map(String),
+      subIds: allowedSubIdsInit,
+      actionPermissions: record.actionPermissions || [],
+      // แปลงค่า privilege_access เป็น Boolean
+      privilege_access: String(record.privilege_access || '') === 'Allow'
+    };
+  }, [record, allowedSubIdsInit]);
 
-  // ✅ เพิ่ม initialization สำหรับ actionPermissions
+  // ✅ 2. useEffect ทำหน้าที่ update ค่าเมื่อเปิด Modal (ตัด resetFields ที่ไม่จำเป็นออก)
   useEffect(() => {
     if (open && record) {
-      form.setFieldsValue({
-        groupName: record.groupName || "",
-        mainIds: (record.mainIds || []).map(String),
-        subIds: allowedSubIdsInit,
-        actionPermissions: record.actionPermissions || [] // ✅ ดึงค่าเดิม
-      });
-    } else {
+      // ยัดค่าลง Form ทันที (ไม่ต้อง reset ก่อน เพราะ setFieldsValue จะทับค่าเดิมอยู่แล้ว)
+      form.setFieldsValue(formInitialValues);
+    } else if (!open) {
+      // เมื่อปิด Modal ค่อยเคลียร์ค่า
       form.resetFields();
       setSearchTerm("");
     }
-  }, [open, record, allowedSubIdsInit, form]);
+  }, [open, record, formInitialValues, form]);
 
   const selectedMainIds = Form.useWatch("mainIds", form) || [];
   const selectedSubIds = Form.useWatch("subIds", form) || [];
 
-  // ... (Duplicate check logic, Toggle handlers, SelectAll logic เหมือนเดิม) ...
   const originalNorm = (record?.groupName || "").trim().toLowerCase();
   const takenSet = useMemo(() => new Set((takenNames || []).map((s) => String(s).trim().toLowerCase())), [takenNames]);
   const nameVal = Form.useWatch("groupName", form) || "";
@@ -75,7 +81,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
   const isDup = !isAdmin && !!curNorm && curNorm !== originalNorm && takenSet.has(curNorm);
 
   const handleMainToggle = (mainId, childIds, isChecked) => {
-    // (Copy Logic เดิมมาใส่)
     const mainSet = new Set(selectedMainIds.map(String));
     const subSet = new Set(selectedSubIds.map(String));
     if (isChecked) {
@@ -90,7 +95,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
   };
 
   const handleSubToggle = (parentId, subId, isChecked) => {
-    // (Copy Logic เดิมมาใส่)
     const mainSet = new Set(selectedMainIds.map(String));
     const subSet = new Set(selectedSubIds.map(String));
     if (isChecked) { subSet.add(subId); mainSet.add(parentId); }
@@ -111,7 +115,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
   };
 
   const handleSelectAll = (isChecked) => {
-    // (Copy Logic เดิมมาใส่)
     if (isChecked) {
       const allMainIds = mains.map((m) => m.id);
       const allSubIds = subs.map((s) => s.id);
@@ -128,7 +131,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
   const allSubsSelected = selectedSubIds.length > 0 && selectedSubIds.length === subs.length;
   const isIndeterminateAll = selectedSubIds.length > 0 && !allSubsSelected;
 
-  // ✅ Update Handle OK
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
@@ -136,7 +138,8 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
         groupName: values.groupName.trim(),
         mainIds: (values.mainIds || []).map(String),
         subIds: (values.subIds || []).map(String),
-        actionPermissions: values.actionPermissions || [] // ✅ ส่งค่า actionPermissions กลับไป
+        actionPermissions: values.actionPermissions || [],
+        privilege_access: values.privilege_access ? 'Allow' : 'Normal'
       };
       if (isAdmin) {
         if (!payload.mainIds.includes(REQ_MAIN)) payload.mainIds.push(REQ_MAIN);
@@ -158,13 +161,12 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
         onCancel={handleCancel}
         maskClosable={false}
         destroyOnClose
-        width={900} // ✅ ปรับความกว้าง
+        width={900}
         centered
         footer={null}
         className="custom-modal-update"
         styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
       >
-        {/* Header */}
         <div className="bg-gray-200 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3 text-gray-800">
             <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 text-xl"><EditOutlined /></div>
@@ -178,15 +180,41 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
         <div className="p-6">
           {isAdmin && (<Alert message="กลุ่ม Administrator" description="กลุ่มสิทธิ์นี้ถูกป้องกันโดยระบบ..." type="info" showIcon className="mb-6 border-blue-100 bg-blue-50 text-blue-800" icon={<StopOutlined className="text-blue-500" />} />)}
 
-          {/* ✅ เพิ่ม initialValues: actionPermissions */}
-          <Form key={record?.id || "update"} form={form} layout="vertical" preserve={false} initialValues={{ groupName: record?.groupName || "", mainIds: (record?.mainIds || []).map(String), subIds: allowedSubIdsInit, actionPermissions: record?.actionPermissions || [] }}>
+          {/* ✅ 3. ใส่ initialValues กลับเข้ามา เพื่อให้ Form มีค่าทันทีตอน Mount */}
+          <Form
+            form={form}
+            layout="vertical"
+            preserve={false}
+            initialValues={formInitialValues}
+          >
 
-            <Form.Item name="groupName" label={<span className="font-semibold text-gray-700">ชื่อกลุ่มสิทธิ</span>} rules={isAdmin ? [{ required: true }] : [{ required: true }, () => ({ validator(_, value) { /* dup check */ return Promise.resolve(); } })]} validateStatus={!isAdmin && isDup ? "error" : undefined} help={!isAdmin && isDup ? "ชื่อกลุ่มนี้มีแล้วในระบบ" : undefined}>
-              <Input prefix={<AppstoreOutlined className="text-gray-400" />} disabled={isAdmin} className={`h-10 rounded-lg bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 hover:border-blue-400 transition-all ${isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} />
-            </Form.Item>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Form.Item name="groupName" label={<span className="font-semibold text-gray-700">ชื่อกลุ่มสิทธิ</span>} rules={isAdmin ? [{ required: true }] : [{ required: true }, () => ({ validator(_, value) { /* dup check */ return Promise.resolve(); } })]} validateStatus={!isAdmin && isDup ? "error" : undefined} help={!isAdmin && isDup ? "ชื่อกลุ่มนี้มีแล้วในระบบ" : undefined}>
+                  <Input prefix={<AppstoreOutlined className="text-gray-400" />} disabled={isAdmin} className={`h-10 rounded-lg bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 hover:border-blue-400 transition-all ${isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} />
+                </Form.Item>
+              </div>
+              <div>
+                <Form.Item
+                  name="privilege_access"
+                  label={
+                    <span className="font-semibold text-gray-700 flex items-center gap-1">
+                      สิทธิพิเศษ <Tooltip title="เข้าใช้งานได้โดยไม่สนสถานะ"><UnlockOutlined className="text-gray-400" /></Tooltip>
+                    </span>
+                  }
+                  valuePropName="checked"
+                >
+                  <Switch
+                    checkedChildren="Allow"
+                    unCheckedChildren="Normal"
+                    disabled={isAdmin}
+                  />
+                </Form.Item>
+              </div>
+            </div>
 
             <div className="flex flex-col md:flex-row gap-6 mt-6">
-              {/* Left Column: Menu (Copy Code from Create or Existing Update) */}
+              {/* Left Column: Menu */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-3"><label className="font-semibold text-gray-700 flex items-center gap-2"><CheckSquareOutlined className="text-blue-500" /> แก้ไขสิทธิ์เข้าถึงเมนู</label></div>
                 <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col h-[400px] bg-white shadow-sm">
@@ -237,7 +265,7 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
                 </div>
               </div>
 
-              {/* ✅ Right Column: Action Permissions (ส่วนที่เพิ่มใหม่) */}
+              {/* Right Column: Action Permissions */}
               <div className="flex-1 md:max-w-[350px]">
                 <div className="flex items-center justify-between mb-3">
                   <label className="font-semibold text-gray-700 flex items-center gap-2">
@@ -275,7 +303,6 @@ const ModalUpdate = ({ open, record, onCancel, onSubmit, onDelete, mains = [], s
           </Form>
         </div>
 
-        {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-between items-center gap-3">
           <div>{!isAdmin && onDelete && (<Button danger onClick={() => onDelete?.()} icon={<DeleteOutlined />} className="border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300">ลบกลุ่มสิทธิ</Button>)}</div>
           <div className="flex gap-3">

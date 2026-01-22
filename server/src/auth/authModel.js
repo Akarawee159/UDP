@@ -4,7 +4,13 @@ const db = require('../config/database');
 
 /** หา user ตาม username */
 const findUserByUsername = async (username) => {
-  const [rows] = await db.query('SELECT * FROM employees WHERE username = ?', [username]);
+  const sql = `
+    SELECT e.*, pg.privilege_access
+    FROM employees e
+    LEFT JOIN permission_group pg ON TRIM(LOWER(pg.group_name)) = TRIM(LOWER(e.permission_role))
+    WHERE e.username = ?
+  `;
+  const [rows] = await db.query(sql, [username]);
   return rows;
 };
 

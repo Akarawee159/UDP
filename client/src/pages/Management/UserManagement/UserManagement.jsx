@@ -11,6 +11,7 @@ import ModalGroup from "./Modal/ModalGroup";
 import ModalReset from "./Modal/ModalReset";
 import ModalCreate from "./Modal/ModalCreate";
 import ModalDelete from "./Modal/ModalDelete";
+import { usePermission } from '../../../hooks/usePermission';
 
 const { Text } = Typography;
 
@@ -39,6 +40,7 @@ const UserManagement = () => {
     const [openReset, setOpenReset] = useState(false);
     const [openCreate, setOpenCreate] = useState(false);
     const [openDelete, setOpenDelete] = useState(false);
+    const { canUse } = usePermission();
 
     // --- Logic เดิม ---
     const openDeleteModal = (record) => {
@@ -254,7 +256,6 @@ const UserManagement = () => {
         const v = Number(record.is_status);
         const isProtected = String(record.employee_id) === PROTECTED_EMP_ID;
 
-        // ✅ Status 4 (Pending) & 5 (Processing): ลืมรหัสผ่าน (ส้มสลับเทา)
         if (v === 4 || v === 5) {
             return (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border animate-blink-warning">
@@ -263,7 +264,6 @@ const UserManagement = () => {
             );
         }
 
-        // ✅ Status 6: รีเซ็ทแล้ว (น้ำเงิน) -> เปลี่ยนจากเขียวเป็นน้ำเงินตามธีม
         if (v === 6) {
             return (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-600 text-xs font-medium">
@@ -279,7 +279,6 @@ const UserManagement = () => {
         );
 
         if (v === 2) {
-            // เปลี่ยน status ออนไลน์เป็นสีน้ำเงิน
             const node = (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-medium shadow-sm">
                     <span className="relative flex h-2 w-2">
@@ -289,9 +288,14 @@ const UserManagement = () => {
                     ออนไลน์
                 </div>
             );
-            return isProtected ? (
-                <Tooltip title="ไม่อนุญาต">{node}</Tooltip>
-            ) : (
+
+            // เงื่อนไข: Protected ID หรือ ไม่มีสิทธิ์เคลียร์
+            if (isProtected) return <Tooltip title="ไม่อนุญาต">{node}</Tooltip>;
+
+            // ✅ Check Permission: 201:clear
+            if (!canUse('201:clear')) return <Tooltip title="ไม่มีสิทธิ์เคลียร์สถานะ">{node}</Tooltip>;
+
+            return (
                 <Popconfirm
                     title="เคลียร์สถานะออนไลน์?"
                     description="บังคับออกจากระบบ และตั้งสถานะเป็นออฟไลน์"
@@ -405,13 +409,18 @@ const UserManagement = () => {
         {
             title: 'ระงับ',
             key: 'ban',
-            width: 100, // ปรับ width เผื่อปุ่มรับทราบ
+            width: 100,
             align: 'center',
             render: (_v, r) => {
+                // 1. เช็คสิทธิ์ก่อน
+                const hasBanPermission = canUse('201:ban');
                 const isProtected = String(r.employee_id) === PROTECTED_EMP_ID;
 
-                // ✅ Status 4: แสดงปุ่ม "รับทราบ"
+                // ✅ Status 4: ปุ่ม "รับทราบ"
                 if (r.is_status === 4) {
+                    // ถ้ามีสิทธิ์ -> โชว์ปุ่ม, ถ้าไม่มี -> โชว์ขีด หรือ ข้อความ
+                    if (!hasBanPermission) return <span className="text-gray-300">-</span>;
+
                     return (
                         <Button
                             type="primary"
@@ -424,7 +433,7 @@ const UserManagement = () => {
                     );
                 }
 
-                // ✅ Status 5 & 6: แสดงข้อความ "รับเรื่องแล้ว"
+                // ✅ Status 5 & 6: ข้อความ "รับเรื่องแล้ว" (แสดงได้ทุกคน หรือจะซ่อนก็ได้)
                 if (r.is_status === 5) {
                     return (
                         <span className="text-xs text-gray-400 font-medium">
@@ -433,16 +442,27 @@ const UserManagement = () => {
                     );
                 }
 
-                // ปกติ: Switch
+                // ✅ ปกติ: Switch
                 return (
                     <ConfigProvider theme={{ components: { Switch: { colorPrimary: '#ef4444', colorPrimaryHover: '#dc2626' } } }}>
-                        <Tooltip title={isProtected ? 'ไม่อนุญาต' : (r.is_status === 3 ? 'ปลดแบน' : 'ระงับการใช้งาน')}>
-                            <span onClick={(e) => isProtected && e.stopPropagation()} className={isProtected ? 'opacity-50 cursor-not-allowed' : ''}>
+                        <Tooltip
+                            // ปรับ Tooltip: ถ้าไม่มีสิทธิ์ ให้บอกว่า "ไม่มีสิทธิ์"
+                            title={
+                                !hasBanPermission ? 'คุณไม่มีสิทธิ์จัดการส่วนนี้' :
+                                    isProtected ? 'ไม่อนุญาต' :
+                                        (r.is_status === 3 ? 'ปลดแบน' : 'ระงับการใช้งาน')
+                            }
+                        >
+                            <span
+                                onClick={(e) => (isProtected || !hasBanPermission) && e.stopPropagation()}
+                                className={(isProtected || !hasBanPermission) ? 'opacity-50 cursor-not-allowed' : ''}
+                            >
                                 <Switch
                                     size="small"
                                     checked={r.is_status === 3}
                                     onChange={(checked) => handleToggleBan(r, checked)}
-                                    disabled={isProtected}
+                                    // 🔒 เพิ่มเงื่อนไข disabled ตรงนี้
+                                    disabled={isProtected || !hasBanPermission}
                                 />
                             </span>
                         </Tooltip>
@@ -458,13 +478,14 @@ const UserManagement = () => {
             render: (_, record) => {
                 const isProtected = String(record.employee_id) === PROTECTED_EMP_ID;
 
-                // ✅ Status 4: ซ่อน Menu (Action ว่างเปล่า)
                 if (record.is_status === 4) {
                     return null;
                 }
 
-                // ✅ Status 5: ปุ่ม "รีเซ็ต" (เปิด ModalReset)
                 if (record.is_status === 5) {
+                    // ✅ Check Permission: 201:reset
+                    if (!canUse('201:reset')) return null;
+
                     return (
                         <Tooltip title="ดำเนินการรีเซ็ตรหัสผ่าน">
                             <Button
@@ -479,27 +500,41 @@ const UserManagement = () => {
                     );
                 }
 
-                // ✅ Status 6: ไอคอน CheckCircle สีน้ำเงิน (เปลี่ยนจากเขียว)
                 if (record.is_status === 6) {
                     return <CheckCircleOutlined className="text-lg text-blue-500" />;
                 }
 
-                // ปกติ: Dropdown Menu
-                const menuItems = [
-                    { key: 'assign', label: 'กำหนดกลุ่มสิทธิ', icon: <TeamOutlined />, onClick: () => openAssign(record), disabled: isProtected },
-                    { key: 'reset', label: 'รีเซ็ตรหัสผ่าน', icon: <KeyOutlined />, onClick: () => openResetModal(record), disabled: isProtected },
-                    { type: 'divider' },
-                    { key: 'delete', label: 'ลบผู้ใช้งาน', icon: <DeleteOutlined />, onClick: () => openDeleteModal(record), disabled: isProtected, danger: true },
-                ];
+                // ✅ สร้าง Menu Items ตามสิทธิ์
+                const menuItems = [];
+
+                // 1. กำหนดกลุ่มสิทธิ (201:update)
+                if (canUse('201:update')) {
+                    menuItems.push({ key: 'assign', label: 'กำหนดกลุ่มสิทธิ', icon: <TeamOutlined />, onClick: () => openAssign(record), disabled: isProtected });
+                }
+
+                // 2. รีเซ็ตรหัสผ่าน (201:reset)
+                if (canUse('201:reset')) {
+                    menuItems.push({ key: 'reset', label: 'รีเซ็ตรหัสผ่าน', icon: <KeyOutlined />, onClick: () => openResetModal(record), disabled: isProtected });
+                }
+
+                // 3. ลบผู้ใช้งาน (201:delete)
+                if (canUse('201:delete')) {
+                    // ใส่ divider ถ้ามีเมนูก่อนหน้า
+                    if (menuItems.length > 0) menuItems.push({ type: 'divider' });
+                    menuItems.push({ key: 'delete', label: 'ลบผู้ใช้งาน', icon: <DeleteOutlined />, onClick: () => openDeleteModal(record), disabled: isProtected, danger: true });
+                }
+
+                // ถ้าไม่มีสิทธิ์อะไรเลย ให้ซ่อน
+                if (menuItems.length === 0) return null;
+
                 return (
                     <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
-                        {/* เปลี่ยน Hover ของปุ่ม action เป็นสีน้ำเงิน */}
                         <Button type="text" shape="circle" icon={<MoreOutlined className="text-gray-400 text-lg" />} className="hover:bg-blue-50 hover:text-blue-600" />
                     </Dropdown>
                 );
             },
         },
-    ], [page, containerStyle, rows]);
+    ], [page, containerStyle, rows, canUse]);
 
     return (
         <ConfigProvider
@@ -549,14 +584,16 @@ const UserManagement = () => {
                             className="w-full md:w-64 bg-transparent"
                         />
                         {/* เปลี่ยนปุ่มหลักเป็นสีน้ำเงิน */}
-                        <Button
-                            type="primary"
-                            icon={<PlusOutlined />}
-                            onClick={() => setOpenCreate(true)}
-                            className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium"
-                        >
-                            เพิ่มผู้ใช้งาน
-                        </Button>
+                        {canUse('201:create') && (
+                            <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={() => setOpenCreate(true)}
+                                className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium"
+                            >
+                                เพิ่มผู้ใช้งาน
+                            </Button>
+                        )}
                     </div>
                 </div>
 

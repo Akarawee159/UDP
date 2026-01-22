@@ -8,6 +8,7 @@ const rowToDTO = (r) => (!r ? null : ({
   mainIds: parseJSON(r.main_menu),
   subIds: parseJSON(r.sub_menu),
   actionPermissions: parseJSON(r.action_permission),
+  privilege_access: r.privilege_access || 'Normal',
   is_status: Number(r.is_status ?? 0)
 }));
 
@@ -39,7 +40,7 @@ async function getAll(_req, res) {
 async function create(req, res) {
   try {
     const io = req.app.get('io');
-    const { groupName, mainIds = [], subIds = [], actionPermissions = [] } = req.body || {};
+    const { groupName, mainIds = [], subIds = [], actionPermissions = [], privilege_access } = req.body || {};
     const name = String(groupName || '').trim();
     if (!name || !Array.isArray(mainIds))
       return res.status(400).json({ success: false, message: 'ข้อมูลไม่ครบ' });
@@ -48,14 +49,17 @@ async function create(req, res) {
       return res.status(409).json({ success: false, message: 'ชื่อนี้มีอยู่แล้ว' });
     }
 
-    const id = await model.create({ groupName: name, mainIds, subIds, actionPermissions });
-    // ดึงแถวล่าสุดเพื่อให้มี is_status ครบ
+    const id = await model.create({
+      groupName: name,
+      mainIds,
+      subIds,
+      actionPermissions,
+      privilege_access: privilege_access === 'Allow' ? 'Allow' : 'Normal'
+    });
+
     const row = await model.getById(id);
     const dto = rowToDTO(row);
-
-    // 🎯 realtime
     io?.emit('permission:upsert', dto);
-
     return res.status(201).json({ success: true, message: 'created', data: dto });
   } catch (err) {
     console.error('Failed to create permission:', err);
@@ -68,7 +72,7 @@ async function update(req, res) {
   try {
     const io = req.app.get('io');
     const id = Number(req.params.id);
-    const { groupName, mainIds = [], subIds = [], actionPermissions = [] } = req.body || {};
+    const { groupName, mainIds = [], subIds = [], actionPermissions = [], privilege_access } = req.body || {};
     const name = String(groupName || '').trim();
     if (!id || !name || !Array.isArray(mainIds))
       return res.status(400).json({ success: false, message: 'ข้อมูลไม่ครบ' });
@@ -99,8 +103,31 @@ async function update(req, res) {
       return res.status(409).json({ success: false, message: 'ชื่อนี้มีอยู่แล้ว' });
     }
 
-    const n = await model.updateById(id, { groupName: name, mainIds, subIds, actionPermissions });
+    // ✅ ตรวจสอบสถานะเดิมและใหม่
+    const oldAccess = current.privilege_access || 'Normal';
+    const newAccess = privilege_access === 'Allow' ? 'Allow' : 'Normal';
+
+    const n = await model.updateById(id, {
+      groupName: name,
+      mainIds,
+      subIds,
+      actionPermissions,
+      privilege_access: newAccess
+    });
     if (!n) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
+
+    // ✅ ถ้ามีการปิด Switch (Allow -> Normal) ให้ Reset สถานะพนักงานในกลุ่มและเตะออก
+    if (oldAccess === 'Allow' && newAccess === 'Normal') {
+      // ใช้ชื่อกลุ่มเดิม (current.group_name) ในการหาคน เพราะในจังหวะนี้ถ้าเปลี่ยนชื่อกลุ่ม คนอาจจะยังลิงก์กับชื่อเก่าอยู่
+      const affectedEmpIds = await model.revokeAndResetStatusByGroup(current.group_name);
+
+      affectedEmpIds.forEach(empId => {
+        // แจ้งเตือน Client ให้ logout
+        io?.to(`emp:${empId}`).emit('auth:revoke', { keep_status: false });
+        // แจ้งหน้าจอ Monitor ว่าสถานะเป็น 1 (Active)
+        io?.emit('user:status', { employee_id: empId, is_status: 1 });
+      });
+    }
 
     const row = await model.getById(id);
     const dto = rowToDTO(row);
@@ -115,7 +142,7 @@ async function update(req, res) {
   }
 }
 
-/** DELETE /permission/:id */
+// ... (ส่วนที่เหลือ remove, byGroup, myMenus, updateStatus เหมือนเดิม)
 async function remove(req, res) {
   try {
     const io = req.app.get('io');
@@ -125,7 +152,6 @@ async function remove(req, res) {
     const current = await model.getById(id);
     if (!current) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
 
-    // ✅ ห้ามลบ administrator
     if (isAdminRow(current)) {
       return res.status(403).json({ success: false, code: 'ADMIN_PROTECTED_DELETE', message: 'ห้ามลบกลุ่ม administrator' });
     }
@@ -133,7 +159,6 @@ async function remove(req, res) {
     const n = await model.deleteById(id);
     if (!n) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
 
-    // 🎯 realtime
     io?.emit('permission:delete', { id });
 
     return res.status(200).json({ success: true, message: 'deleted' });
@@ -180,7 +205,6 @@ async function updateStatus(req, res) {
     const n = await model.updateStatusById(id, status);
     if (!n) return res.status(404).json({ success: false, message: 'ไม่พบรายการ' });
 
-    // 🎯 realtime (เบาและชัดเจนเฉพาะสถานะ)
     io?.emit('permission:status', { id, is_status: status });
 
     return res.json({ success: true, message: 'updated', data: { id, is_status: status } });
