@@ -13,7 +13,7 @@ export default {
     // 2. (แนะนำ) หรือใช้ Pattern เพื่อรองรับสีอื่นๆ ในอนาคตโดยไม่ต้องแก้โค้ดใหม่
     // เช่น รองรับ bg-, text-, border- ของสีหลักๆ ทั้งหมด
     {
-      pattern: /(bg|text|border)-(slate|gray|red|orange|yellow|green|teal|blue|indigo|purple|pink)-(50|100|200|300|400|500|600|700|800|900)/,
+      pattern: /(bg|text|border)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|cyan|teal|sky|blue|indigo|violet|purple|fuchsia|rose|pink)-(50|100|200|300|400|500|600|700|800|900|950)/,
       variants: ['hover', 'focus'], // ถ้ารองรับ hover ด้วย
     },
   ],

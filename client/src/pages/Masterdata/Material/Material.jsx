@@ -166,6 +166,7 @@ function Material() {
         { headerName: 'สี', field: 'material_color', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'รุ่น', field: 'material_model', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'คุณสมบัติ', field: 'material_feature', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'รายละเอียด', field: 'material_remark', width: 200, headerComponentParams: { align: 'center' } },
         { headerName: 'แหล่งที่มา', field: 'material_source', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'ใช้สำหรับงาน', field: 'material_usedfor', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'สกุลเงิน', field: 'currency', width: 140, cellClass: "text-center", headerComponentParams: { align: 'center' } },
@@ -205,7 +206,7 @@ function Material() {
                             prefix={<SearchOutlined className="text-gray-400" />}
                             placeholder="ค้นหารหัส, ชื่อวัสดุ..."
                             allowClear
-                            bordered={false}
+                            variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />

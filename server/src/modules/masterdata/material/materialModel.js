@@ -10,13 +10,17 @@ async function getAll() {
   const sql = `
       SELECT 
         m.material_id, m.material_code, m.material_name, m.material_source, m.material_usedfor, m.material_type,
-        m.supplier_name, m.material_brand, m.material_color, m.material_model,
-        m.material_feature, m.material_image, m.currency,
+        m.supplier_name, m.material_brand, m.material_color, m.material_model, m.material_remark,
+        m.material_detail, m.material_feature, m.material_image, m.currency,
         m.quantity_mainunit, m.mainunit_name, m.quantity_subunit, m.subunit_name,
         m.minimum_order, m.minstock, m.maxstock, m.is_status,
         m.material_width, m.material_width_unit, m.material_length, m.material_length_unit,
         m.material_height, m.material_height_unit, m.material_capacity, m.material_capacity_unit,
         m.material_weight, m.material_weight_unit,
+        
+        -- ✅ [เพิ่ม] ดึงข้อมูล Drawing 1-6
+        m.drawing_001, m.drawing_002, m.drawing_003, m.drawing_004, m.drawing_005, m.drawing_006,
+
         -- ดึงค่าจากตาราง Status
         s.G_NAME as status_name,
         s.G_DESCRIPT as status_class
@@ -68,43 +72,46 @@ async function checkCodeDuplicate(material_code, excludeId = null) {
   return rows.length > 0;
 }
 
-/** เพิ่มข้อมูลใหม่ (เพิ่ม Field ขนาด) */
 async function create(data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-
     const [lastRows] = await conn.query('SELECT material_id FROM materials ORDER BY material_id DESC LIMIT 1 FOR UPDATE');
     const nextId = lastRows.length ? Number(lastRows[0].material_id) + 1 : 1;
 
+    // เพิ่ม fields drawing_001 - 006
     const sql = `
       INSERT INTO materials (
         material_id, material_code, material_name, material_source, material_usedfor, material_type,
-        supplier_name, material_brand, material_color, material_model,
-        material_feature, material_image, currency,
+        supplier_name, material_brand, material_color, material_model, material_remark,
+        material_detail, material_feature, material_image, currency,
         quantity_mainunit, mainunit_name, quantity_subunit, subunit_name,
         minimum_order, minstock, maxstock, is_status,
         created_by, created_at,
-        -- เพิ่ม Field ขนาด
         material_width, material_width_unit, material_length, material_length_unit,
         material_height, material_height_unit, material_capacity, material_capacity_unit,
-        material_weight, material_weight_unit
+        material_weight, material_weight_unit,
+        -- Drawings
+        drawing_001, drawing_002, drawing_003, drawing_004, drawing_005, drawing_006
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(),
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) -- เพิ่ม placeholder อีก 10 ตัว
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?, ?, ?, ?) -- เพิ่ม placeholder อีก 6 ตัว
     `;
 
     await conn.query(sql, [
       nextId, data.material_code, data.material_name, data.material_source, data.material_usedfor, data.material_type,
-      data.supplier_name, data.material_brand, data.material_color, data.material_model,
-      data.material_feature, data.material_image, data.currency,
+      data.supplier_name, data.material_brand, data.material_color, data.material_model, data.material_remark,
+      data.material_detail, data.material_feature, data.material_image, data.currency,
       data.quantity_mainunit, data.mainunit_name, data.quantity_subunit, data.subunit_name,
       data.minimum_order, data.minstock, data.maxstock, data.is_status,
       data.created_by,
-      // เพิ่ม Values
       data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
       data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
-      data.material_weight, data.material_weight_unit
+      data.material_weight, data.material_weight_unit,
+      // Drawing Values
+      data.drawing_001 || '', data.drawing_002 || '', data.drawing_003 || '',
+      data.drawing_004 || '', data.drawing_005 || '', data.drawing_006 || ''
     ]);
 
     await conn.commit();
@@ -117,36 +124,38 @@ async function create(data) {
   }
 }
 
-/** แก้ไขข้อมูล (เพิ่ม Field ขนาด) */
 async function update(material_id, data) {
   const sql = `
     UPDATE materials
     SET 
       material_code = ?, material_name = ?, material_source = ?, material_usedfor = ?, material_type = ?,
-      supplier_name = ?, material_brand = ?, material_color = ?, material_model = ?,
-      material_feature = ?, material_image = ?, currency = ?,
+      supplier_name = ?, material_brand = ?, material_color = ?, material_model = ?, material_remark = ?,
+      material_detail = ?, material_feature = ?, material_image = ?, currency = ?,
       quantity_mainunit = ?, mainunit_name = ?, quantity_subunit = ?, subunit_name = ?,
       minimum_order = ?, minstock = ?, maxstock = ?, is_status = ?,
       updated_by = ?, updated_at = NOW(),
-      -- เพิ่ม Field ขนาด
       material_width = ?, material_width_unit = ?, material_length = ?, material_length_unit = ?,
       material_height = ?, material_height_unit = ?, material_capacity = ?, material_capacity_unit = ?,
-      material_weight = ?, material_weight_unit = ?
+      material_weight = ?, material_weight_unit = ?,
+      -- Drawings
+      drawing_001 = ?, drawing_002 = ?, drawing_003 = ?, 
+      drawing_004 = ?, drawing_005 = ?, drawing_006 = ?
     WHERE material_id = ?
   `;
 
   const [result] = await db.query(sql, [
     data.material_code, data.material_name, data.material_source, data.material_usedfor, data.material_type,
-    data.supplier_name, data.material_brand, data.material_color, data.material_model,
-    data.material_feature, data.material_image, data.currency,
+    data.supplier_name, data.material_brand, data.material_color, data.material_model, data.material_remark,
+    data.material_detail, data.material_feature, data.material_image, data.currency,
     data.quantity_mainunit, data.mainunit_name, data.quantity_subunit, data.subunit_name,
     data.minimum_order, data.minstock, data.maxstock, data.is_status,
     data.updated_by,
-    // เพิ่ม Values
     data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
     data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
     data.material_weight, data.material_weight_unit,
-    // ID สุดท้าย
+    // Drawing Values
+    data.drawing_001 || '', data.drawing_002 || '', data.drawing_003 || '',
+    data.drawing_004 || '', data.drawing_005 || '', data.drawing_006 || '',
     material_id
   ]);
   return result.affectedRows > 0;
@@ -159,6 +168,51 @@ async function remove(material_id) {
   return result.affectedRows > 0;
 }
 
+/** * ✅ เพิ่ม/แก้ไข: อัปเดตรูปภาพใน tb_asset_lists 
+ * กรณีมีรูปเดิม -> เช็ค partCode และ asset_img ต้องตรงกัน
+ * กรณีไม่มีรูปเดิม -> เช็คแค่ partCode แล้วอัปเดตทั้งหมด
+ */
+async function updateAssetImage(material_code, old_image, new_image) {
+  // ต้องมี material_code เสมอ
+  if (!material_code) return;
+
+  let sql = `UPDATE tb_asset_lists SET asset_img = ? WHERE partCode = ?`;
+  const params = [new_image || '', material_code];
+
+  // ถ้ามีรูปเดิม ให้จำกัดวง update เฉพาะรายการที่ใช้รูปเดิมนั้น
+  if (old_image) {
+    sql += ` AND asset_img = ?`;
+    params.push(old_image);
+  }
+
+  // ถ้า old_image เป็น null/empty จะ update โดยอิงแค่ partCode
+  await db.query(sql, params);
+}
+
+/** * ✅ Update เฉพาะ Drawing
+ * targetColumn: 'asset_dmg_001' ... 'asset_dmg_006'
+ */
+async function updateAssetDrawing(material_code, targetColumn, old_image, new_image) {
+  if (!material_code) return;
+
+  // Whitelist column name เพื่อป้องกัน SQL Injection
+  const allowedCols = [
+    'asset_dmg_001', 'asset_dmg_002', 'asset_dmg_003',
+    'asset_dmg_004', 'asset_dmg_005', 'asset_dmg_006'
+  ];
+  if (!allowedCols.includes(targetColumn)) return;
+
+  let sql = `UPDATE tb_asset_lists SET ${targetColumn} = ? WHERE partCode = ?`;
+  const params = [new_image || '', material_code];
+
+  if (old_image) {
+    sql += ` AND ${targetColumn} = ?`;
+    params.push(old_image);
+  }
+
+  await db.query(sql, params);
+}
+
 module.exports = {
   getAll,
   getById,
@@ -167,4 +221,6 @@ module.exports = {
   create,
   update,
   remove,
+  updateAssetImage,
+  updateAssetDrawing,
 };

@@ -158,7 +158,7 @@ function Location() {
                             prefix={<SearchOutlined className="text-gray-400" />}
                             placeholder="ค้นหารหัส, ชื่อโลเคชั่น..."
                             allowClear
-                            bordered={false}
+                            variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />

@@ -5,33 +5,38 @@ const model = require('./materialModel');
 const fs = require('fs');
 const path = require('path');
 
-const uploadDir = path.join(__dirname, '../../../img/material');
+// กำหนด Path สำหรับรูปหลักและ Drawing
+const mainDir = path.join(__dirname, '../../../img/material');
+const drawingDir = path.join(__dirname, '../../../img/material/drawing');
 
-// ... (functions deleteFile, parsePayload, ensureRequired เหมือนเดิม ไม่ต้องแก้) ...
-
-/** Helper: ลบไฟล์ออกจาก Server */
-function deleteFile(filename) {
+/** Helper: ลบไฟล์ออกจาก Server 
+ * @param {string} filename - ชื่อไฟล์
+ * @param {boolean} isDrawing - ถ้าเป็น true จะลบจากโฟลเดอร์ drawing
+ */
+function deleteFile(filename, isDrawing = false) {
   if (!filename) return;
-  const filePath = path.join(uploadDir, filename);
+  const dir = isDrawing ? drawingDir : mainDir;
+  const filePath = path.join(dir, filename);
+
   fs.access(filePath, fs.constants.F_OK, (err) => {
     if (!err) {
       fs.unlink(filePath, (unlinkErr) => {
         if (unlinkErr) console.error(`Failed to delete file: ${filename}`, unlinkErr);
-        else console.log(`Deleted file: ${filename}`);
+        // else console.log(`Deleted file: ${filename}`);
       });
     }
   });
 }
 
-/** helper: trim และ validate payload */
-function parsePayload(body, file) {
-  // ... (logic status เดิม) ...
+/** Helper: trim และ validate payload 
+ * รองรับทั้ง req.body และ req.files (จาก upload.fields)
+ */
+function parsePayload(body, files) {
   let status = 2;
   if (body.is_status === 'true' || body.is_status === true || body.is_status === '1' || body.is_status === 1) {
     status = 1;
   }
 
-  // Helper สำหรับแปลงตัวเลข (ถ้าว่างให้เป็น null หรือ 0 ตามต้องการ)
   const parseNum = (val) => (val === '' || val === null || val === undefined) ? null : Number(val);
   const parseStr = (val) => String(val || '').trim();
 
@@ -45,6 +50,8 @@ function parsePayload(body, file) {
     material_brand: parseStr(body.material_brand),
     material_color: parseStr(body.material_color),
     material_model: parseStr(body.material_model),
+    material_remark: parseStr(body.material_remark),
+    material_detail: parseStr(body.material_detail),
     material_feature: parseStr(body.material_feature),
     currency: String(body.currency || 'THB').trim(),
     quantity_mainunit: Number(body.quantity_mainunit) || 0,
@@ -55,6 +62,8 @@ function parsePayload(body, file) {
     minstock: Number(body.minstock) || 0,
     maxstock: Number(body.maxstock) || 0,
     is_status: status,
+
+    // Dimension Fields
     material_width: parseNum(body.material_width),
     material_width_unit: parseStr(body.material_width_unit),
     material_length: parseNum(body.material_length),
@@ -67,20 +76,30 @@ function parsePayload(body, file) {
     material_weight_unit: parseStr(body.material_weight_unit),
   };
 
-  if (file) {
-    data.material_image = file.filename;
+  // --- จัดการ Main Image (key: 'image') ---
+  if (files && files['image'] && files['image'][0]) {
+    data.material_image = files['image'][0].filename; // อัปโหลดใหม่
   } else if (body.material_image === '') {
-    data.material_image = '';
-  } else if (body.material_image) {
-    data.material_image = String(body.material_image).trim();
+    data.material_image = ''; // สั่งลบ
   } else {
-    data.material_image = '';
+    data.material_image = body.material_image || ''; // ค่าเดิม (ถ้ามี)
+  }
+
+  // --- จัดการ Drawing Images (key: 'drawing_001'...'006') ---
+  for (let i = 1; i <= 6; i++) {
+    const key = `drawing_00${i}`;
+    if (files && files[key] && files[key][0]) {
+      data[key] = files[key][0].filename; // อัปโหลดใหม่
+    } else if (body[key] === '') {
+      data[key] = ''; // สั่งลบ
+    } else {
+      data[key] = body[key] || ''; // ค่าเดิม (ถ้ามี)
+    }
   }
 
   return data;
 }
 
-// ... (function ensureRequired, getAll, getById, getOptions, checkCode เหมือนเดิม) ...
 function ensureRequired({ material_code, material_name }) {
   const missing = [];
   if (!material_code) missing.push('กรุณาพิมพ์รหัส');
@@ -92,6 +111,7 @@ function ensureRequired({ material_code, material_name }) {
   }
 }
 
+// ... (Functions: getAll, getById, getOptions, checkCode keep unchanged) ...
 async function getAll(_req, res, next) {
   try {
     const rows = await model.getAll();
@@ -129,70 +149,80 @@ async function checkCode(req, res, next) {
   } catch (err) { next(err); }
 }
 
-
-/* --- จุดที่ต้องแก้ไขคือ create และ update --- */
-
+/* --- Create --- */
 async function create(req, res, next) {
   try {
-    const payload = parsePayload(req.body, req.file);
+    // ใช้ req.files แทน req.file เพราะรองรับ upload.fields
+    const payload = parsePayload(req.body, req.files);
     ensureRequired(payload);
 
-    // ✅ แก้ไข: เพิ่มเฉพาะคนสร้าง (created_by) ไม่ต้องใส่ updated_by
     payload.created_by = req.user.employee_id;
 
     const dup = await model.checkCodeDuplicate(payload.material_code, null);
     if (dup) {
-      if (req.file) deleteFile(req.file.filename);
-      const err = new Error('รหัส (material_code) ซ้ำในระบบ');
-      err.status = 409;
-      throw err;
+      throw new Error('รหัส (material_code) ซ้ำในระบบ'); // ไป catch เพื่อลบไฟล์
     }
 
     const newId = await model.create(payload);
     const row = await model.getById(newId);
+
     const io = req.app.get('io');
     if (io) io.emit('material:upsert', row);
 
     res.status(201).json({ success: true, data: row, message: 'เพิ่มข้อมูลสำเร็จ' });
   } catch (err) {
-    if (req.file) deleteFile(req.file.filename);
+    // Cleanup files if error
+    if (req.files) {
+      Object.values(req.files).flat().forEach(f => {
+        const isDrawing = f.fieldname.startsWith('drawing_');
+        deleteFile(f.filename, isDrawing);
+      });
+    }
+    if (err.message === 'รหัส (material_code) ซ้ำในระบบ') err.status = 409;
     next(err);
   }
 }
 
+/* --- Update --- */
 async function update(req, res, next) {
   try {
     const material_id = Number(req.params.material_id);
     const exist = await model.getById(material_id);
     if (!exist) {
-      if (req.file) deleteFile(req.file.filename);
       const err = new Error('ไม่พบข้อมูล');
       err.status = 404;
       throw err;
     }
 
-    const payload = parsePayload(req.body, req.file);
+    const payload = parsePayload(req.body, req.files);
     ensureRequired(payload);
-
-    // ✅ แก้ไข: ระบุคนแก้ไขล่าสุด (updated_by) เฉพาะตอน Update
     payload.updated_by = req.user.employee_id;
 
-    // Logic ลบรูปเดิม
-    if (exist.material_image) {
-      if (req.file || (payload.material_image === '' && !req.file)) {
-        deleteFile(exist.material_image);
-      }
-    }
-    if (!req.file && payload.material_image !== '' && exist.material_image && !payload.material_image) {
-      payload.material_image = exist.material_image;
+    // --- 1. จัดการลบไฟล์เดิมออกจาก Server ---
+
+    // 1.1 Main Image
+    if (exist.material_image && exist.material_image !== payload.material_image) {
+      // ถ้าชื่อไฟล์เปลี่ยน หรือ ถูกเซ็ตเป็นค่าว่าง -> ลบไฟล์เก่า
+      deleteFile(exist.material_image, false);
     }
 
-    const dup = await model.checkCodeDuplicate(payload.material_code, material_id);
-    if (dup) {
-      if (req.file) deleteFile(req.file.filename);
-      const err = new Error('รหัส (material_code) ซ้ำในระบบ');
-      err.status = 409;
-      throw err;
+    // 1.2 Drawing Images (1-6)
+    for (let i = 1; i <= 6; i++) {
+      const field = `drawing_00${i}`;
+      const oldImg = exist[field];
+      const newImg = payload[field];
+
+      if (oldImg && oldImg !== newImg) {
+        deleteFile(oldImg, true); // true = folder drawing
+      }
+    }
+
+    // Check Code Duplicate
+    if (payload.material_code !== exist.material_code) {
+      const dup = await model.checkCodeDuplicate(payload.material_code, material_id);
+      if (dup) {
+        throw new Error('รหัส (material_code) ซ้ำในระบบ');
+      }
     }
 
     const ok = await model.update(material_id, payload);
@@ -202,18 +232,52 @@ async function update(req, res, next) {
       throw err;
     }
 
+    // --- 2. Sync ไปยัง tb_asset_lists ---
+
+    // 2.1 Sync Main Image
+    if (exist.material_image !== payload.material_image) {
+      await model.updateAssetImage(
+        exist.material_code,
+        exist.material_image,
+        payload.material_image
+      );
+    }
+
+    // 2.2 Sync Drawing Images
+    for (let i = 1; i <= 6; i++) {
+      const field = `drawing_00${i}`;
+      const targetCol = `asset_dmg_00${i}`;
+
+      if (exist[field] !== payload[field]) {
+        // อัปเดต asset drawing ทีละคอลัมน์
+        await model.updateAssetDrawing(
+          exist.material_code,
+          targetCol,
+          exist[field],   // รูปเก่า
+          payload[field]  // รูปใหม่ (หรือค่าว่าง)
+        );
+      }
+    }
+
     const row = await model.getById(material_id);
     const io = req.app.get('io');
     if (io) io.emit('material:upsert', row);
 
     res.json({ success: true, data: row, message: 'อัปเดตข้อมูลสำเร็จ' });
   } catch (err) {
-    if (req.file) deleteFile(req.file.filename);
+    // Cleanup new files if error
+    if (req.files) {
+      Object.values(req.files).flat().forEach(f => {
+        const isDrawing = f.fieldname.startsWith('drawing_');
+        deleteFile(f.filename, isDrawing);
+      });
+    }
+    if (err.message === 'รหัส (material_code) ซ้ำในระบบ') err.status = 409;
     next(err);
   }
 }
 
-// ... (function remove และ module.exports เหมือนเดิม) ...
+/* --- Remove --- */
 async function remove(req, res, next) {
   try {
     const material_id = Number(req.params.material_id);
@@ -231,9 +295,24 @@ async function remove(req, res, next) {
       throw err;
     }
 
-    // ✅ ลบรูปไฟล์เมื่อข้อมูลถูกลบสำเร็จ
+    // --- Cleanup Files & Sync Asset Lists ---
+
+    // 1. Remove Main Image
     if (exist.material_image) {
-      deleteFile(exist.material_image);
+      deleteFile(exist.material_image, false);
+      // Sync ให้ Asset เป็นค่าว่าง
+      await model.updateAssetImage(exist.material_code, exist.material_image, '');
+    }
+
+    // 2. Remove Drawing Images
+    for (let i = 1; i <= 6; i++) {
+      const field = `drawing_00${i}`;
+      const img = exist[field];
+      if (img) {
+        deleteFile(img, true); // ลบไฟล์ Drawing
+        // Sync ให้ Asset column นี้เป็นค่าว่าง
+        await model.updateAssetDrawing(exist.material_code, `asset_dmg_00${i}`, img, '');
+      }
     }
 
     const io = req.app.get('io');

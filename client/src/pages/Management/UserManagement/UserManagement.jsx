@@ -579,7 +579,7 @@ const UserManagement = () => {
                             prefix={<SearchOutlined className="text-gray-400" />}
                             placeholder="ค้นหาชื่อ, ID, สาขา..."
                             allowClear
-                            bordered={false}
+                            variant="borderless"
                             onChange={(e) => setKeyword(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />

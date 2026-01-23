@@ -1,3 +1,4 @@
+// src/pages/Registration/RegisterAsset/Page/AssetList.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Form, Input, Button, Select, InputNumber,
@@ -50,6 +51,12 @@ function AssetList() {
     const [lastSavedLot, setLastSavedLot] = useState(null);
     const [isPrinting, setIsPrinting] = useState(false);
 
+    // state สำหรับเก็บข้อมูล drawing ชั่วคราวเมื่อเลือก Material
+    const [selectedDrawings, setSelectedDrawings] = useState({});
+
+    // State สำหรับล็อกฟอร์ม
+    const [isFormLocked, setIsFormLocked] = useState(false);
+
     // State สำหรับ Selection และ Printing
     const [selectedRows, setSelectedRows] = useState([]);
     const [printList, setPrintList] = useState([]); // เก็บ Array ของข้อมูลที่จะ Print
@@ -69,25 +76,35 @@ function AssetList() {
 
     // 1. ฟังก์ชันพิมพ์รายตัว (จากปุ่มในตาราง)
     const handleIndividualPrint = async (row) => {
-        setIsPrinting(true); // <--- 1. เริ่ม Loading
+        setIsPrinting(true);
         try {
             const res = await api.patch(`/registration/registerasset/print/${row.asset_code}`);
 
             if (res.data?.success) {
-                const updatedStatus = res.data.print_status;
+                // รับค่าที่ Backend ส่งกลับมา
+                const { print_status, is_status, is_status_name, is_status_color } = res.data;
+
                 setTableData(prev => prev.map(item =>
-                    item.asset_code === row.asset_code ? { ...item, print_status: updatedStatus } : item
+                    item.asset_code === row.asset_code
+                        ? {
+                            ...item,
+                            print_status,           // อัปเดตเลขจำนวนครั้ง
+                            is_status,              // อัปเดตรหัสสถานะ (21/22)
+                            is_status_name,         // อัปเดตชื่อสถานะ
+                            is_status_color         // อัปเดตสี
+                        }
+                        : item
                 ));
 
                 setPrintList([row]);
                 setTimeout(() => handlePrintProcess(), 100);
             } else {
-                setIsPrinting(false); // หยุดถ้า API ไม่ Success แต่ไม่เข้า catch
+                setIsPrinting(false);
             }
         } catch (err) {
             console.error(err);
             message.error("ไม่สามารถอัปเดตสถานะการพิมพ์ได้");
-            setIsPrinting(false); // <--- 2. หยุด Loading ถ้า Error
+            setIsPrinting(false);
         }
     };
 
@@ -98,34 +115,51 @@ function AssetList() {
             return;
         }
 
-        setIsPrinting(true); // <--- 1. เริ่ม Loading
+        setIsPrinting(true);
         try {
-            // อัปเดตสถานะทุกตัวที่เลือก (Loop update)
-            // หมายเหตุ: ในทางปฏิบัติถ้าจำนวนเยอะควรทำ Bulk API endpoint แยก แต่ทำ Loop เพื่อความง่ายตาม Flow นี้
+            // เรียก API (Backend จะเปลี่ยน is_status เป็น 21 หรือ 22 ให้เอง)
+            // และ map promise เพื่อรอผลลัพธ์ทั้งหมด
             const updatePromises = selectedRows.map(row =>
                 api.patch(`/registration/registerasset/print/${row.asset_code}`)
             );
 
-            await Promise.all(updatePromises);
+            // รอให้ Backend ทำงานเสร็จทุกตัว และรับค่าผลลัพธ์กลับมา
+            const responses = await Promise.all(updatePromises);
 
-            // Update หน้าจอให้ User เห็นว่าปริ้นแล้ว (สมมติว่า +1 ทุกตัวที่เลือก)
+            // สร้าง Map ของข้อมูลใหม่ โดยใช้ asset_code เป็น Key เพื่อให้ค้นหาง่าย
+            const updatesMap = {};
+            responses.forEach((res, index) => {
+                // เช็คว่า API สำเร็จหรือไม่
+                if (res.data?.success) {
+                    // ใช้ asset_code จาก selectedRows ตัวที่ index ตรงกัน (เพราะ Promise.all คืนค่าตามลำดับ)
+                    const assetCode = selectedRows[index].asset_code;
+                    updatesMap[assetCode] = res.data; // เก็บข้อมูลใหม่ที่ได้จาก Server (status, color, name)
+                }
+            });
+
+            // Update หน้าจอ Frontend ด้วยข้อมูลจริงจาก Server (Realtime & Dynamic)
             setTableData(prev => prev.map(item => {
-                const isSelected = selectedRows.find(s => s.asset_code === item.asset_code);
-                if (isSelected) {
-                    // Logic ง่ายๆ คือบวก 1 หรือจะดึงค่าจริงจาก API response ก็ได้
-                    return { ...item, print_status: (parseInt(item.print_status) || 0) + 1 };
+                // ถ้า item นี้มีการอัปเดต (อยู่ใน updatesMap) ให้ใช้ค่าใหม่
+                if (updatesMap[item.asset_code]) {
+                    const newData = updatesMap[item.asset_code];
+                    return {
+                        ...item,
+                        print_status: newData.print_status,           // จำนวนครั้งที่พิมพ์
+                        is_status: newData.is_status,                 // รหัสสถานะ (21/22)
+                        is_status_name: newData.is_status_name,       // ชื่อสถานะ (ดึงจาก Master Data)
+                        is_status_color: newData.is_status_color      // สีสถานะ (ดึงจาก Master Data)
+                    };
                 }
                 return item;
             }));
 
-            // ส่งข้อมูลที่เลือกไปที่ Component พิมพ์
             setPrintList(selectedRows);
             setTimeout(() => handlePrintProcess(), 100);
 
         } catch (err) {
             console.error(err);
             message.error("เกิดข้อผิดพลาดในการเตรียมพิมพ์หมู่");
-            setIsPrinting(false); // <--- 2. หยุด Loading ถ้า Error
+            setIsPrinting(false);
         }
     };
 
@@ -147,11 +181,13 @@ function AssetList() {
         form.setFieldsValue({ asset_lot: 'Auto Generate' });
     }, [form]);
 
+    // คัดลอก remark จาก Material ไปยัง asset_remark
     const handleMaterialSelect = (material) => {
         form.setFieldsValue({
             asset_code: material.material_code,
             asset_detail: material.material_name,
             asset_type: material.material_type,
+            asset_remark: material.material_remark,
             asset_width: material.material_width,
             asset_width_unit: material.material_width_unit,
             asset_length: material.material_length,
@@ -162,6 +198,15 @@ function AssetList() {
             asset_capacity_unit: material.material_capacity_unit,
             asset_weight: material.material_weight,
             asset_weight_unit: material.material_weight_unit,
+        });
+
+        setSelectedDrawings({
+            drawing_001: material.drawing_001 || '',
+            drawing_002: material.drawing_002 || '',
+            drawing_003: material.drawing_003 || '',
+            drawing_004: material.drawing_004 || '',
+            drawing_005: material.drawing_005 || '',
+            drawing_006: material.drawing_006 || '',
         });
 
         if (material.material_image) {
@@ -179,7 +224,8 @@ function AssetList() {
             const payload = {
                 ...values,
                 asset_date: values.asset_date ? dayjs(values.asset_date).format('YYYY-MM-DD') : null,
-                asset_img: displayedImage ? displayedImage.split('/').pop() : ''
+                asset_img: displayedImage ? displayedImage.split('/').pop() : '',
+                ...selectedDrawings
             };
 
             const res = await api.post('/registration/registerasset', payload);
@@ -193,7 +239,7 @@ function AssetList() {
 
                 setLastSavedLot(createdLot);
                 form.setFieldValue('asset_lot', createdLot);
-
+                setIsFormLocked(true);
                 message.success(res.data.message || 'บันทึกข้อมูลสำเร็จ');
             }
 
@@ -259,6 +305,8 @@ function AssetList() {
         form.resetFields();
         form.setFieldValue('asset_lot', 'Auto Generate');
         setDisplayedImage(null);
+        setSelectedDrawings({});
+        setIsFormLocked(false);
         message.info('ล้างแบบฟอร์มเรียบร้อย');
     };
 
@@ -283,7 +331,7 @@ function AssetList() {
                 </Button>
             )
         },
-        { headerName: 'ลำดับ', valueGetter: "node.rowIndex + 1", width: 140, cellClass: "text-center" },
+        { headerName: 'ลำดับ', valueGetter: "node.rowIndex + 1", width: 140, cellClass: "text-center", headerComponentParams: { align: 'center' } },
         {
             headerName: 'สถานะปริ้น', field: 'print_status', width: 150,
             cellRenderer: (params) => {
@@ -389,12 +437,15 @@ function AssetList() {
                                     <FileTextOutlined className="text-blue-500 text-lg" />
                                     <span className="font-semibold text-base">ข้อมูลทั่วไป</span>
                                 </div>
-
+                                <Form.Item name="asset_remark" hidden>
+                                    <Input />
+                                </Form.Item>
                                 <Form.Item label="รหัสทรัพย์สิน" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสทรัพย์สิน' }]}>
                                     <Input
                                         size="large"
                                         prefix={<BarcodeOutlined className="text-slate-400 mr-1" />}
                                         placeholder="Scan / ระบุรหัส"
+                                        disabled={isFormLocked}
                                         readOnly
                                         addonAfter={
                                             <Button
@@ -403,6 +454,7 @@ function AssetList() {
                                                 icon={<SearchOutlined />}
                                                 className="text-blue-600 hover:text-blue-700 font-medium"
                                                 onClick={() => setIsModalListOpen(true)}
+                                                disabled={isFormLocked}
                                             >
                                                 เลือกทรัพย์สิน
                                             </Button>
@@ -412,18 +464,18 @@ function AssetList() {
                                 </Form.Item>
 
                                 <Form.Item label="ชื่อทรัพย์สิน" name="asset_detail" rules={[{ required: true, message: 'ระบุชื่อทรัพย์สิน' }]}>
-                                    <Input size="large" prefix={<FileTextOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อทรัพย์สิน" className="rounded-lg" />
+                                    <Input size="large" prefix={<FileTextOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อทรัพย์สิน" className="rounded-lg" disabled={isFormLocked} />
                                 </Form.Item>
 
                                 <Row gutter={12}>
                                     <Col span={12}>
                                         <Form.Item label="ประเภท" name="asset_type">
-                                            <Input prefix={<BgColorsOutlined className="text-slate-400" />} placeholder="ประเภท" />
+                                            <Input prefix={<BgColorsOutlined className="text-slate-400" />} placeholder="ประเภท" disabled={isFormLocked} />
                                         </Form.Item>
                                     </Col>
                                     <Col span={12}>
                                         <Form.Item label="วันที่ซื้อ" name="asset_date">
-                                            <ThaiDateInput placeholder="เลือกวันที่" />
+                                            <ThaiDateInput placeholder="เลือกวันที่" disabled={isFormLocked} />
                                         </Form.Item>
                                     </Col>
                                 </Row>
@@ -431,18 +483,18 @@ function AssetList() {
                                 <Row gutter={12}>
                                     <Col span={12}>
                                         <Form.Item label="เลขที่เอกสาร" name="docID">
-                                            <Input prefix={<NumberOutlined className="text-slate-400" />} placeholder="DOC-XXX" />
+                                            <Input prefix={<NumberOutlined className="text-slate-400" />} placeholder="DOC-XXX" disabled={isFormLocked} />
                                         </Form.Item>
                                     </Col>
                                     <Col span={12}>
                                         <Form.Item label="หมายเลขล็อต" name="asset_lot">
-                                            <Input prefix={<InboxOutlined className="text-slate-400" />} className="bg-gray-50 text-gray-500" readOnly placeholder="Auto Generate" />
+                                            <Input prefix={<InboxOutlined className="text-slate-400" />} className="bg-gray-50 text-gray-500" readOnly placeholder="Auto Generate" disabled={isFormLocked} />
                                         </Form.Item>
                                     </Col>
                                 </Row>
 
                                 <Form.Item label="ผู้ครอบครอง" name="asset_holder">
-                                    <Input prefix={<UserOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อผู้ครอบครอง" />
+                                    <Input prefix={<UserOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อผู้ครอบครอง" disabled={isFormLocked} />
                                 </Form.Item>
 
                                 <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="asset_location" className="mb-0">
@@ -450,6 +502,7 @@ function AssetList() {
                                         rows={2}
                                         placeholder="ระบุสถานที่ติดตั้ง"
                                         className="rounded-lg"
+                                        disabled={isFormLocked}
                                     />
                                 </Form.Item>
                             </Col>
@@ -471,7 +524,7 @@ function AssetList() {
                                                 maxLength={4}
                                                 precision={0}
                                                 placeholder="0"
-                                                bordered={false}
+                                                variant="borderless"
                                                 className="w-full text-center input-qty-highlight"
                                                 style={{
                                                     fontSize: '48px',
@@ -485,6 +538,7 @@ function AssetList() {
                                                         event.preventDefault();
                                                     }
                                                 }}
+                                                disabled={isFormLocked}
                                             />
                                         </Form.Item>
                                         <div className="h-px bg-white/20 w-1/2 mx-auto my-2"></div>
@@ -499,12 +553,12 @@ function AssetList() {
                                     </div>
 
                                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                                        <SpecInput label="ความกว้าง" name="asset_width" unitName="asset_width_unit" unitOptions={unitOptions} />
-                                        <SpecInput label="ความยาว" name="asset_length" unitName="asset_length_unit" unitOptions={unitOptions} />
-                                        <SpecInput label="ความสูง" name="asset_height" unitName="asset_height_unit" unitOptions={unitOptions} />
+                                        <SpecInput label="ความกว้าง" name="asset_width" unitName="asset_width_unit" unitOptions={unitOptions} disabled={isFormLocked} />
+                                        <SpecInput label="ความยาว" name="asset_length" unitName="asset_length_unit" unitOptions={unitOptions} disabled={isFormLocked} />
+                                        <SpecInput label="ความสูง" name="asset_height" unitName="asset_height_unit" unitOptions={unitOptions} disabled={isFormLocked} />
                                         <Divider className="my-2 border-gray-100" />
-                                        <SpecInput label="ความจุ" name="asset_capacity" unitName="asset_capacity_unit" unitOptions={unitOptions} />
-                                        <SpecInput label="น้ำหนัก" name="asset_weight" unitName="asset_weight_unit" unitOptions={unitOptions} />
+                                        <SpecInput label="ความจุ" name="asset_capacity" unitName="asset_capacity_unit" unitOptions={unitOptions} disabled={isFormLocked} />
+                                        <SpecInput label="น้ำหนัก" name="asset_weight" unitName="asset_weight_unit" unitOptions={unitOptions} disabled={isFormLocked} />
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-center gap-1 mt-1">
@@ -512,6 +566,7 @@ function AssetList() {
                                         type="primary"
                                         icon={<SaveOutlined />}
                                         onClick={handleSave}
+                                        disabled={isFormLocked}
                                         className="bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-200 px-6 h-9 rounded-lg font-semibold border-none"
                                     >
                                         บันทึกสร้างรายการ
@@ -535,7 +590,7 @@ function AssetList() {
                             <Col xs={24} lg={8} className="p-6 bg-white flex flex-col h-full">
                                 <div className="mb-4 flex items-center gap-2 text-slate-700">
                                     <PictureOutlined className="text-purple-500 text-lg" />
-                                    <span className="font-semibold text-base">รูปภาพสินค้า</span>
+                                    <span className="font-semibold text-base">รูปภาพทรัพย์สิน</span>
                                 </div>
 
                                 <div className="flex-1 flex flex-col">
@@ -592,7 +647,7 @@ function AssetList() {
                                 value={searchTerm}
                                 onChange={e => setSearchTerm(e.target.value)}
                                 allowClear
-                                bordered={false}
+                                variant="borderless"
                                 className="w-64 bg-transparent"
                             />
                             <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
@@ -647,9 +702,9 @@ function AssetList() {
                             flexDirection: 'row',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            border: '1px solid #ddd', // Border บางๆ สำหรับดูขอบเขต (Printer จริงอาจไม่ต้อง)
+                            border: '1px solid #ddd',
                             overflow: 'hidden',
-                            pageBreakAfter: 'always', // บังคับขึ้นหน้าใหม่สำหรับสติ๊กเกอร์แผ่นถัดไป
+                            pageBreakAfter: 'always',
                             fontFamily: 'sans-serif'
                         }}>
                             <div style={{ flex: 1, overflow: 'hidden', fontSize: '10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -669,7 +724,8 @@ function AssetList() {
             </div>
 
             {/* CSS Override for InputNumber QTY */}
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{
+                __html: `
                 .input-qty-highlight input {
                     text-align: center !important;
                     color: white !important;
@@ -689,22 +745,23 @@ function AssetList() {
                 .input-qty-highlight .anticon {
                     color: white;
                 }
-            `}</style>
+            `}} />
         </div>
     );
 }
 
 // Helper Component for Specs
-const SpecInput = ({ label, name, unitName, unitOptions }) => (
+const SpecInput = ({ label, name, unitName, unitOptions, disabled }) => (
     <div className="flex items-center justify-between gap-2 text-sm">
         <div className="text-slate-500 w-24 flex-shrink-0">{label}</div>
-        <div className="flex flex-1 shadow-sm rounded-md overflow-hidden border border-gray-200 focus-within:border-blue-400 transition-colors">
+        <div className={`flex flex-1 shadow-sm rounded-md overflow-hidden border border-gray-200 transition-colors ${disabled ? 'bg-gray-100' : 'focus-within:border-blue-400'}`}>
             <Form.Item name={name} noStyle>
                 <InputNumber
                     placeholder="0.00"
                     className="flex-1 border-0 shadow-none !rounded-none focus:shadow-none"
                     min={0}
                     precision={2}
+                    disabled={disabled} // ตอนนี้จะใช้งานได้แล้ว
                     onKeyPress={(event) => {
                         if (!/[0-9.]/.test(event.key)) {
                             event.preventDefault();
@@ -718,8 +775,9 @@ const SpecInput = ({ label, name, unitName, unitOptions }) => (
                     placeholder="หน่วย"
                     style={{ width: 160 }}
                     options={unitOptions}
-                    bordered={false}
+                    variant="borderless"
                     className="bg-slate-50 text-xs"
+                    disabled={disabled} // ตอนนี้จะใช้งานได้แล้ว
                 />
             </Form.Item>
         </div>

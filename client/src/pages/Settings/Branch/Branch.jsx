@@ -213,7 +213,7 @@ function Branch() {
               prefix={<SearchOutlined className="text-gray-400" />}
               placeholder="ค้นหารหัส, ชื่อสาขา..."
               allowClear
-              bordered={false}
+              variant="borderless"
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full md:w-64 bg-transparent"
             />

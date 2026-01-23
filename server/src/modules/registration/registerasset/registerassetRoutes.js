@@ -7,8 +7,10 @@ const auth = require('../../../auth/middleware/authMiddleware');
 const controller = require('./registerassetController');
 
 router.get('/', auth, controller.getAll);
+router.get('/history/:assetCode', auth, controller.getHistory);
 router.post('/', auth, controller.create);
-router.patch('/print/:assetCode', auth, controller.updatePrintStatus); // Route สำหรับอัปเดตสถานะปริ้น
+router.patch('/print/:assetCode', auth, controller.updatePrintStatus);
+router.patch('/cancel', auth, controller.cancelBulk);
 router.delete('/:lot', auth, controller.deleteByLot);
 
 module.exports = router;

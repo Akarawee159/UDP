@@ -1,4 +1,3 @@
-// src/pages/Registration/RegisterAsset/RegisterAsset.jsx
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid } from 'antd';
 import {
@@ -12,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 
 function RegisterAsset() {
     const navigate = useNavigate();
-
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
@@ -26,11 +24,8 @@ function RegisterAsset() {
     }), [isMd]);
 
     const [loading, setLoading] = useState(false);
-    const [rows, setRows] = useState([]);
+    const [rows, setRows] = useState([]); // ข้อมูลดิบทั้งหมด
     const [searchTerm, setSearchTerm] = useState('');
-    const [modalFormOpen, setModalFormOpen] = useState(false);
-    const [currentRecord, setCurrentRecord] = useState(null);
-    const [openDelete, setOpenDelete] = useState(false);
 
     // Fetch API
     const fetchData = useCallback(async () => {
@@ -78,132 +73,148 @@ function RegisterAsset() {
     const handleCreate = () => {
         navigate('/registration/register-asset/create');
     };
-    const handleUpdate = (record) => { setCurrentRecord(record); setModalFormOpen(true); };
 
-    // ✅ เปิด Modal ลบ โดยไม่ปิด ModalAsset เพื่อให้ซ้อนกัน
-    const openDeleteModal = (record) => { setCurrentRecord(record); setOpenDelete(true); };
-
-    const refreshAfterSuccess = () => fetchData();
-    const handleDeleteSuccess = () => {
-        setOpenDelete(false);
-        setModalFormOpen(false); // ปิดฟอร์มด้วยเมื่อลบเสร็จ
-        fetchData();
-    };
-
-    // Helper render ค่า + หน่วย
-    const valUnit = (val, unit) => {
-        if (val === null || val === undefined || val === '') return '-';
-        const num = Number(val);
-        const formattedNum = num.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+    // เมื่อคลิกแถว ให้ไปหน้า Detail พร้อมส่ง partCode ไปด้วย
+    const handleRowClick = (record) => {
+        navigate('/registration/register-asset/detail', {
+            state: {
+                partCode: record.partCode,
+                partName: record.asset_detail
+            }
         });
-        return `${formattedNum} ${unit || ''}`;
     };
+
+    // Helper render ค่า
+    const valUnit = (val) => {
+        if (!val) return '-';
+        return Number(val).toLocaleString();
+    };
+
+    // --- Logic Grouping Data by PartCode ---
+    const groupedRows = useMemo(() => {
+        const groups = {};
+
+        rows.forEach(row => {
+            const key = row.partCode || 'UNKNOWN'; // Group ตาม partCode
+
+            if (!groups[key]) {
+                groups[key] = {
+                    partCode: row.partCode,
+                    asset_detail: row.partName || row.asset_detail, // ใช้ชื่อจาก partName หรือ detail ตัวแรก
+                    asset_type: row.asset_type,
+                    total: 0,
+                    // สร้างตัวนับสถานะ (สมมติ mapping คร่าวๆ คุณอาจต้องปรับ condition ตาม G_CODE จริง)
+                    count_normal: 0,
+                    count_repair: 0,
+                    count_broken: 0,
+                    count_use: 0
+                };
+            }
+
+            groups[key].total += 1;
+
+            // ตัวอย่าง Logic นับจำนวนตามสถานะ (ปรับแก้ Code ตาม Database จริง)
+            // สมมติ is_status: 20=ปกติ, 30=รอซ่อม, 40=เสีย
+            const status = String(row.is_status);
+            if (status === '20' || status === '21' || status === '22') groups[key].count_normal++;
+            else if (status === '30') groups[key].count_repair++;
+            else if (status === '40') groups[key].count_broken++;
+
+            // สมมติ asset_status: 10=ว่าง, 11=เบิกใช้
+            const useStatus = String(row.asset_status);
+            if (useStatus === '11') groups[key].count_use++;
+
+        });
+
+        return Object.values(groups);
+    }, [rows]);
+
+    const filteredRows = useMemo(() => {
+        if (!searchTerm) return groupedRows;
+        const term = searchTerm.toLowerCase();
+        return groupedRows.filter(
+            (row) =>
+                String(row.partCode || '').toLowerCase().includes(term) ||
+                String(row.asset_detail || '').toLowerCase().includes(term) ||
+                String(row.asset_type || '').toLowerCase().includes(term)
+        );
+    }, [groupedRows, searchTerm]);
 
     const columnDefs = useMemo(() => [
         {
             headerName: 'ลำดับ',
-            width: 120,
+            width: 80,
             valueGetter: "node.rowIndex + 1",
             cellClass: "text-center flex items-center justify-center cursor-pointer",
             pinned: 'left',
             lockVisible: true,
-            suppressMovable: true,
-            headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'รหัสสินค้า',
-            field: 'asset_code',
+            headerName: 'Part Code', // เปลี่ยนจาก รหัสสินค้า เป็น Part Code
+            field: 'partCode',
             width: 200,
             filter: true,
             cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
             pinned: 'left',
-            headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'ชื่อทรัพย์สิน',
+            headerName: 'ชื่อทรัพย์สิน (Part Name)',
             field: 'asset_detail',
             minWidth: 200,
             flex: 1,
             filter: true,
             cellClass: "cursor-pointer",
-            headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'ประเภททรัพย์สิน',
+            headerName: 'ประเภท',
             field: 'asset_type',
-            minWidth: 240,
+            width: 150,
             filter: true,
-            cellClass: "cursor-pointer",
-            headerComponentParams: { align: 'center' }
+            cellClass: "cursor-pointer text-center",
         },
         {
-            headerName: 'จำนวนแยกตามสถานะ',
+            headerName: 'จำนวน (QTY)',
             headerClass: 'header-group-center header-group-red',
             children: [
                 {
                     headerName: 'ทั้งหมด',
                     width: 100,
-                    valueGetter: p => valUnit(p.data.is_status),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-blue-bold"
+                    field: 'total',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center font-bold text-blue-600 cursor-pointer"
+                },
+                // แสดงตัวอย่างคอลัมน์นับสถานะ
+                {
+                    headerName: 'ปกติ',
+                    width: 100,
+                    field: 'count_normal',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center text-green-600 cursor-pointer"
                 },
                 {
                     headerName: 'เบิกใช้',
                     width: 100,
-                    valueGetter: p => valUnit(p.data.is_status),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-green-bold"
-                },
-                {
-                    headerName: 'ปกติ',
-                    width: 100,
-                    valueGetter: p => valUnit(p.data.is_status,),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-blue-bold"
-                },
-                {
-                    headerName: 'ชำรุด',
-                    width: 100,
-                    valueGetter: p => valUnit(p.data.is_status),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-orange-bold"
+                    field: 'count_use',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center text-indigo-600 cursor-pointer"
                 },
                 {
                     headerName: 'รอซ่อม',
                     width: 100,
-                    valueGetter: p => valUnit(p.data.is_status),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-orange-bold"
+                    field: 'count_repair',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center text-orange-500 cursor-pointer"
                 },
                 {
                     headerName: 'เสีย',
                     width: 100,
-                    valueGetter: p => valUnit(p.data.is_status),
-                    headerComponentParams: { align: 'center' },
-                    filter: false,
-                    cellClass: "text-center flex items-center justify-center cursor-pointer cell-red-bold"
+                    field: 'count_broken',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center text-red-500 cursor-pointer"
                 },
             ]
         },
     ], []);
-
-    const filteredRows = useMemo(() => {
-        if (!searchTerm) return rows;
-        const term = searchTerm.toLowerCase();
-        return rows.filter(
-            (row) =>
-                String(row.asset_code || '').toLowerCase().includes(term) ||
-                String(row.asset_detail || '').toLowerCase().includes(term) ||
-                String(row.asset_type || '').toLowerCase().includes(term)
-        );
-    }, [rows, searchTerm]);
 
     return (
         <ConfigProvider
@@ -214,14 +225,14 @@ function RegisterAsset() {
         >
             <div style={containerStyle} className="bg-gray-50">
 
-                {/* Header Section: ปรับ Layout ให้ปุ่มอยู่ซ้าย */}
+                {/* Header Section */}
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหา..."
+                            placeholder="ค้นหา Part Code..."
                             allowClear
-                            bordered={false}
+                            variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />
@@ -243,8 +254,8 @@ function RegisterAsset() {
                         rowData={filteredRows}
                         columnDefs={columnDefs}
                         loading={loading}
-                        // ✅ คลิกแถวเพื่อแก้ไข
-                        onRowClicked={(params) => handleUpdate(params.data)}
+                        // เมื่อคลิกแถว (ที่ Group แล้ว) ให้ไปหน้า Detail
+                        onRowClicked={(params) => handleRowClick(params.data)}
                         rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
                     />
                 </div>

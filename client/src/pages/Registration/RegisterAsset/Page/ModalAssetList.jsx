@@ -101,6 +101,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
         { headerName: 'สี', field: 'material_color', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'รุ่น', field: 'material_model', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'คุณสมบัติ', field: 'material_feature', width: 140, headerComponentParams: { align: 'center' } },
+        { headerName: 'รายละเอียด', field: 'material_remark', width: 200, headerComponentParams: { align: 'center' } },
         { headerName: 'แหล่งที่มา', field: 'material_source', width: 140, headerComponentParams: { align: 'center' } },
         { headerName: 'ใช้สำหรับงาน', field: 'material_usedfor', width: 160, headerComponentParams: { align: 'center' } },
         { headerName: 'สกุลเงิน', field: 'currency', width: 140, cellClass: "text-center", headerComponentParams: { align: 'center' } },
@@ -145,7 +146,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 footer={null}
                 width={1200}
                 centered
-                destroyOnClose
+                destroyOnHidden={true}
                 styles={{ body: { padding: 0 } }}
             >
                 <div className="p-4 bg-gray-50 border-b border-gray-100">

@@ -18,7 +18,8 @@ async function create(req, res, next) {
     const body = req.body;
     const qty = parseInt(body.quantity) || 1;
     const baseAssetCode = body.asset_code;
-    const user = req.user?.username || 'System';
+    const user = req.user?.employee_id || 'System';
+
 
     // 1. Generate LOT
     const todayStr = dayjs().format('DDMMYY');
@@ -83,6 +84,13 @@ async function create(req, res, next) {
         asset_weight_unit: body.asset_weight_unit || '',
 
         asset_img: body.asset_img || '',
+        asset_dmg_001: body.drawing_001 || '',
+        asset_dmg_002: body.drawing_002 || '',
+        asset_dmg_003: body.drawing_003 || '',
+        asset_dmg_004: body.drawing_004 || '',
+        asset_dmg_005: body.drawing_005 || '',
+        asset_dmg_006: body.drawing_006 || '',
+        asset_remark: body.asset_remark || '',
         label_register: labelReg,
         partCode: baseAssetCode,
 
@@ -127,16 +135,26 @@ async function create(req, res, next) {
 async function updatePrintStatus(req, res, next) {
   try {
     const { assetCode } = req.params;
-    const newStatus = await model.incrementPrintStatus(assetCode);
 
-    if (newStatus === null) {
+    // ✅ 1. ดึง User ID จาก Token (สำคัญมาก)
+    const user = req.user?.employee_id || 'System';
+
+    // ✅ 2. ส่ง user ไปให้ Model
+    const result = await model.incrementPrintStatus(assetCode, user);
+
+    if (result === null) {
       return res.status(404).json({ success: false, message: 'Asset not found' });
     }
+
+    const statusInfo = await model.getErpStatus('A1', result.is_status);
 
     res.json({
       success: true,
       message: 'Print status updated',
-      print_status: newStatus
+      print_status: result.print_status,
+      is_status: result.is_status,
+      is_status_name: statusInfo?.G_NAME || result.is_status,
+      is_status_color: statusInfo?.G_DESCRIPT || ''
     });
   } catch (err) {
     next(err);
@@ -153,9 +171,46 @@ async function deleteByLot(req, res, next) {
   }
 }
 
+async function cancelBulk(req, res, next) {
+  try {
+    const { assetCodes } = req.body; // รับ array ของ asset_code
+    const user = req.user?.employee_id || 'System';
+
+    if (!assetCodes || !Array.isArray(assetCodes) || assetCodes.length === 0) {
+      return res.status(400).json({ success: false, message: 'ไม่พบรายการที่ต้องการยกเลิก' });
+    }
+
+    await model.updateStatusCancel(assetCodes, user);
+
+    res.json({
+      success: true,
+      message: `ยกเลิกรายการสำเร็จ ${assetCodes.length} รายการ`
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getHistory(req, res, next) {
+  try {
+    const { assetCode } = req.params;
+    const rows = await model.getHistoryByCode(assetCode);
+
+    res.json({
+      success: true,
+      asset_code: assetCode,
+      data: rows
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAll,
   create,
   updatePrintStatus,
-  deleteByLot
+  deleteByLot,
+  cancelBulk,
+  getHistory
 };

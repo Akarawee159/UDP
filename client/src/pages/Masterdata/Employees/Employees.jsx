@@ -269,7 +269,7 @@ function Employees() {
               prefix={<SearchOutlined className="text-gray-400" />}
               placeholder="ค้นหาชื่อ, รหัสพนักงาน..."
               allowClear
-              bordered={false}
+              variant="borderless"
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full md:w-64 bg-transparent"
             />

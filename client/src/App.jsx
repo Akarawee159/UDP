@@ -24,6 +24,8 @@ import Material from "./pages/Masterdata/Material/Material";
 // ระบบขึ้นทะเบียนทรัพย์สิน
 import RegisterAsset from "./pages/Registration/RegisterAsset/RegisterAsset";
 import AssetList from "./pages/Registration/RegisterAsset/Page/AssetList";
+import AssetDetail from "./pages/Registration/RegisterAsset/Page/AssetDetail";
+import AssetLog from "./pages/Registration/RegisterAsset/Page/AssetLog";
 
 // ตั้งค่าเริ่มต้น
 import Branch from "./pages/Settings/Branch/Branch";
@@ -219,6 +221,28 @@ export default function App() {
               <ProtectedRoute mainId="50" subId="501">
                 <AdminLayout>
                   <AssetList />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/registration/register-asset/detail"
+            element={
+              <ProtectedRoute mainId="50" subId="501">
+                <AdminLayout>
+                  <AssetDetail />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/registration/register-asset/log"
+            element={
+              <ProtectedRoute mainId="50" subId="501">
+                <AdminLayout>
+                  <AssetLog />
                 </AdminLayout>
               </ProtectedRoute>
             }

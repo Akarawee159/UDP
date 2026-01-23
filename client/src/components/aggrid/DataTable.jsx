@@ -101,18 +101,18 @@ const DataTable = ({
     .ag-theme-alpine .cell-green-bold { color: #16a34a !important; font-weight: bold !important; }
     .ag-theme-alpine .cell-orange-bold { color: #f97316 !important; font-weight: bold !important; }
     .ag-theme-alpine .cell-red-bold { color: #dc2626 !important; font-weight: bold !important; }
+    
   `;
 
   const defaultColDef = useMemo(() => ({
-    sortable: true,
+    sortable: false, // 🔴 แก้เป็น false (ปิด sort ทุกคอลัมน์เป็นค่าเริ่มต้น)
     resizable: true,
     suppressMovable: false,
-    filter: true,
-    floatingFilter: false, // ปิดช่องค้นหาใต้ Header (ใช้ปุ่ม Filter ที่หัวตารางแทน)
+    filter: false,   // 🔴 แก้เป็น false (ปิด filter ทุกคอลัมน์เป็นค่าเริ่มต้น)
+    floatingFilter: false,
     lockVisible: true,
-    headerComponent: CustomHeader, // ใช้ Custom Header
-    // ❌ ลบ menuTabs ออก (แก้ Error #200 เพราะเป็น Enterprise Feature)
-    // ❌ ลบ suppressMenu ออก (แก้ Warning เพราะเลิกใช้แล้ว)
+    headerComponent: CustomHeader,
+    headerComponentParams: { align: 'center' },
   }), []);
 
   return (

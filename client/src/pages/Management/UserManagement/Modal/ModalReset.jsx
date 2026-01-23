@@ -262,7 +262,7 @@ const ModalReset = ({ open, record, onClose }) => {
                                     <SafetyCertificateOutlined className="text-blue-500" />
                                     <span>กำหนดโดยระบบ</span>
                                 </span>
-                                <Tag color="blue" bordered={false} className="m-0 px-2 font-semibold text-sm">
+                                <Tag color="blue" variant="borderless" className="m-0 px-2 font-semibold text-sm">
                                     {policyDays} วัน
                                 </Tag>
                             </div>

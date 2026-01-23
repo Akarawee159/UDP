@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Row, Col, InputNumber, Switch, Upload, Select, Typography, Badge, Card } from 'antd';
+import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Row, Col, InputNumber, Switch, Upload, Select, Typography, Card } from 'antd';
 import {
     IdcardOutlined, TagOutlined, PlusCircleOutlined, EditOutlined, SaveOutlined,
     DeleteOutlined, ShopOutlined, BgColorsOutlined, BarcodeOutlined,
     NumberOutlined, DollarOutlined, ColumnWidthOutlined, FileImageOutlined,
     CheckCircleOutlined, StopOutlined, CloudUploadOutlined, ExpandAltOutlined,
-    ColumnHeightOutlined, GatewayOutlined
+    ColumnHeightOutlined, GatewayOutlined, EyeOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
@@ -25,7 +25,6 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
 
     // Watch status for UI changes
     const isStatusActive = Form.useWatch('is_status', form);
-
     const isEditMode = !!record?.material_id;
 
     const [loading, setLoading] = useState(false);
@@ -34,29 +33,31 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const [originalCode, setOriginalCode] = useState(null);
     const [unitOptions, setUnitOptions] = useState([]);
     const [currencyOptions, setCurrencyOptions] = useState([]);
+    const [packagingOptions, setPackagingOptions] = useState([]);
 
+    // --- State สำหรับรูปหลัก ---
     const [previewOpen, setPreviewOpen] = useState(false);
     const [previewImage, setPreviewImage] = useState('');
     const [fileList, setFileList] = useState([]);
-    const [packagingOptions, setPackagingOptions] = useState([]); // ✅ เพิ่ม State เก็บข้อมูล Packaging ทั้งก้อน
+
+    // --- State สำหรับ Drawing (6 รูป) ---
+    const [drawingFiles, setDrawingFiles] = useState({}); // { 1: [], 2: [], ... }
+    const [previewDrawing, setPreviewDrawing] = useState({ open: false, url: '' });
 
     const timerRef = useRef(null);
 
     const fetchOptions = useCallback(async () => {
         try {
             const res = await api.get('/masterdata/material/options');
-            const { units, currencies, packagings } = res.data?.data || {}; // ✅ รับ packagings
+            const { units, currencies, packagings } = res.data?.data || {};
 
             if (units) setUnitOptions(units.map(u => ({ label: u.name, value: u.name })));
             if (currencies) setCurrencyOptions(currencies.map(c => ({ label: c.name, value: c.name })));
-
-            // ✅ เก็บข้อมูล Packaging พร้อม object เต็มๆ ไว้ใช้ตอน select
             if (packagings) setPackagingOptions(packagings.map(p => ({
                 label: p.G_NAME,
                 value: p.G_ID,
-                fullData: p // เก็บข้อมูลดิบไว้ map ลง form
+                fullData: p
             })));
-
         } catch (error) { console.error("Fetch options error", error); }
     }, []);
 
@@ -65,18 +66,41 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             setFetching(true);
             const res = await api.get(`/masterdata/material/${id}`);
             const data = res?.data?.data;
+
             if (data) {
+                const apiBase = import.meta.env.VITE_API_PATH.replace('/api', '');
+
+                // 1. Set Main Image
                 if (data.material_image) {
                     setFileList([{
                         uid: '-1',
                         name: data.material_image,
                         status: 'done',
-                        url: `${import.meta.env.VITE_API_PATH.replace('/api', '')}/img/material/${data.material_image}`
+                        url: `${apiBase}/img/material/${data.material_image}`
                     }]);
                 } else {
                     setFileList([]);
                 }
 
+                // 2. Set Drawing Images (1-6)
+                const newDrawings = {};
+                for (let i = 1; i <= 6; i++) {
+                    const key = `drawing_00${i}`;
+                    const val = data[key];
+                    if (val) {
+                        newDrawings[i] = [{
+                            uid: `-${i}`, // negative uid for existing files
+                            name: val,
+                            status: 'done',
+                            url: `${apiBase}/img/material/drawing/${val}`
+                        }];
+                    } else {
+                        newDrawings[i] = [];
+                    }
+                }
+                setDrawingFiles(newDrawings);
+
+                // 3. Set Form Values
                 form.setFieldsValue({
                     ...data,
                     is_status: Number(data.is_status) === 1,
@@ -98,6 +122,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             form.resetFields();
             setOriginalCode(null);
             setFileList([]);
+            setDrawingFiles({}); // Reset Drawing
 
             if (isEditMode) {
                 form.setFieldsValue({ ...record, is_status: Number(record.is_status) === 1 });
@@ -110,16 +135,18 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                     quantity_mainunit: 0, quantity_subunit: 0,
                     minimum_order: 0, minstock: 0, maxstock: 0
                 });
+                // Initialize empty drawings
+                const emptyDrawings = {};
+                for (let i = 1; i <= 6; i++) emptyDrawings[i] = [];
+                setDrawingFiles(emptyDrawings);
             }
         }
     }, [open, isEditMode, record, form, fetchDetail, fetchOptions]);
 
-    // ✅ ฟังก์ชันเมื่อเลือก Packaging ให้ Auto-fill ข้อมูล
     const handlePackagingChange = (value, option) => {
         if (option && option.fullData) {
             const p = option.fullData;
             form.setFieldsValue({
-                // Mapping จาก tb_packaging -> materials
                 material_width: p.G_WIDTH,
                 material_width_unit: p.G_WIDTH_UNIT,
                 material_length: p.G_LENGTH,
@@ -134,31 +161,29 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }
     };
 
-    // Component ย่อยสำหรับ Input ขนาด (ใช้ซ้ำได้)
-    const DimensionInput = ({ label, name, unitName, icon, placeholder }) => (
-        <Form.Item label={label} className="mb-0">
-            <div className="flex">
-                <Form.Item name={name} noStyle>
-                    <InputNumber
-                        prefix={icon}
-                        placeholder={placeholder}
-                        className="!rounded-r-none flex-1 border-r-0 w-full"
-                        min={0}
-                        precision={2} // หรือ 4 ตามต้องการ
-                    />
-                </Form.Item>
-                <Form.Item name={unitName} noStyle>
-                    <Select
-                        options={unitOptions}
-                        placeholder="หน่วย"
-                        style={{ width: 100 }}
-                        allowClear
-                        className="!rounded-l-none bg-gray-50"
-                    />
-                </Form.Item>
-            </div>
-        </Form.Item>
-    );
+    // --- Handler สำหรับ Drawing ---
+    const handleDrawingChange = (index, { fileList: newFileList }) => {
+        // จำกัดแค่ 1 รูป (slice(-1) หรือ maxCount={1} ใน Upload ก็ได้)
+        setDrawingFiles(prev => ({ ...prev, [index]: newFileList }));
+    };
+
+    const handleDrawingPreview = async (file) => {
+        if (!file.url && !file.preview) {
+            file.preview = await getBase64(file.originFileObj);
+        }
+        setPreviewDrawing({ open: true, url: file.url || file.preview });
+    };
+
+    // --- Handler สำหรับ Main Image ---
+    const handleUploadChange = ({ fileList: newFileList }) => setFileList(newFileList);
+
+    const handlePreview = async (file) => {
+        if (!file.url && !file.preview) {
+            file.preview = await getBase64(file.originFileObj);
+        }
+        setPreviewImage(file.url || file.preview);
+        setPreviewOpen(true);
+    };
 
     const validateCode = (_rule, value) => new Promise((resolve, reject) => {
         const code = (value || '').trim();
@@ -181,23 +206,15 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }, 600);
     });
 
-    const handleUploadChange = ({ fileList: newFileList }) => setFileList(newFileList);
-
-    const handlePreview = async (file) => {
-        if (!file.url && !file.preview) {
-            file.preview = await getBase64(file.originFileObj);
-        }
-        setPreviewImage(file.url || file.preview);
-        setPreviewOpen(true);
-    };
-
     const handleOk = async () => {
         try {
             const raw = await form.validateFields();
             const formData = new FormData();
 
+            // 1. Append Text Fields
             Object.keys(raw).forEach(key => {
-                if (key !== 'is_status' && key !== 'image') {
+                // ข้าม field รูป และ status (จัดการแยก)
+                if (key !== 'is_status' && key !== 'image' && !key.startsWith('drawing_')) {
                     if (raw[key] !== undefined && raw[key] !== null) {
                         formData.append(key, raw[key]);
                     }
@@ -206,6 +223,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
 
             formData.append('is_status', raw.is_status ? 1 : 2);
 
+            // 2. Append Main Image
             if (fileList.length > 0) {
                 if (fileList[0].originFileObj) {
                     formData.append('image', fileList[0].originFileObj);
@@ -214,6 +232,25 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 }
             } else {
                 formData.append('material_image', '');
+            }
+
+            // 3. Append Drawing Images (1-6)
+            for (let i = 1; i <= 6; i++) {
+                const files = drawingFiles[i] || [];
+                const fieldName = `drawing_00${i}`;
+
+                if (files.length > 0) {
+                    if (files[0].originFileObj) {
+                        // กรณีอัปโหลดใหม่
+                        formData.append(fieldName, files[0].originFileObj);
+                    } else {
+                        // กรณีรูปเดิม (ส่งชื่อไฟล์กลับไป)
+                        formData.append(fieldName, files[0].name);
+                    }
+                } else {
+                    // กรณีลบรูป (ส่งค่าว่าง)
+                    formData.append(fieldName, '');
+                }
             }
 
             setLoading(true);
@@ -242,13 +279,53 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }
     };
 
+    const DimensionInput = ({ label, name, unitName, icon, placeholder }) => (
+        <Form.Item label={label} className="mb-0">
+            <div className="flex">
+                <Form.Item name={name} noStyle>
+                    <InputNumber prefix={icon} placeholder={placeholder} className="!rounded-r-none flex-1 border-r-0 w-full" min={0} precision={2} />
+                </Form.Item>
+                <Form.Item name={unitName} noStyle>
+                    <Select options={unitOptions} placeholder="หน่วย" style={{ width: 100 }} allowClear className="!rounded-l-none bg-gray-50" />
+                </Form.Item>
+            </div>
+        </Form.Item>
+    );
+
+    // Component การ์ดอัปโหลด Drawing
+    const DrawingUploadCard = ({ index }) => (
+        <Card
+            size="small"
+            title={<span className="text-xs font-semibold text-slate-600">DWG. {String(index).padStart(2, '0')}</span>}
+            className="shadow-sm border-slate-200 h-full"
+            bodyStyle={{ display: 'flex', justifyContent: 'center', padding: '12px', alignItems: 'center', minHeight: '120px' }}
+        >
+            <Upload
+                listType="picture-card"
+                fileList={drawingFiles[index] || []}
+                onChange={(info) => handleDrawingChange(index, info)}
+                onPreview={handleDrawingPreview}
+                beforeUpload={() => false}
+                maxCount={1}
+                showUploadList={{ showPreviewIcon: true, showRemoveIcon: true }}
+            >
+                {(drawingFiles[index]?.length || 0) < 1 && (
+                    <div className="flex flex-col items-center">
+                        <PlusCircleOutlined className="text-xl text-slate-400 mb-1" />
+                        <span className="text-[10px] text-slate-400">เพิ่มรูป</span>
+                    </div>
+                )}
+            </Upload>
+        </Card>
+    );
+
     return (
         <ConfigProvider
             theme={{
                 token: {
                     colorPrimary: '#2563eb',
                     borderRadius: 8,
-                    fontFamily: "'Prompt', 'Inter', sans-serif" // แนะนำให้ใช้ Font ที่สวยงาม
+                    fontFamily: "'Prompt', 'Inter', sans-serif"
                 },
                 components: {
                     Input: { controlHeight: 40 },
@@ -302,10 +379,10 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                             <div className="w-full md:w-[320px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0 overflow-y-auto">
                                 <div className="space-y-6">
 
-                                    {/* Image Upload */}
+                                    {/* Main Image Upload */}
                                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 text-center">
                                         <div className="mb-3 font-semibold text-slate-700 flex items-center justify-center gap-2">
-                                            <FileImageOutlined /> รูปภาพสินค้า
+                                            <FileImageOutlined /> รูปภาพสินค้าหลัก
                                         </div>
                                         <div className="flex justify-center">
                                             <Upload
@@ -326,26 +403,21 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Upload>
                                         </div>
                                         <div className="text-xs text-slate-400 mt-2">
-                                            รองรับไฟล์ JPG, PNG <br />ขนาดแนะนำ 1:1
+                                            รองรับไฟล์ JPG, PNG
                                         </div>
                                     </div>
 
                                     {/* Primary Key Input */}
                                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                                         <Form.Item
-                                            label={<span className="font-semibold text-slate-700">รหัสวัสดุ (Code)</span>}
+                                            label={<span className="font-semibold text-slate-700">รหัสวัสดุ</span>}
                                             name="material_code"
                                             rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]}
                                             hasFeedback
                                             validateStatus={checkingCode ? 'validating' : undefined}
                                             className="mb-0"
                                         >
-                                            <Input
-                                                prefix={<IdcardOutlined className="text-slate-400" />}
-                                                placeholder="Ex. MAT-001"
-                                                className="font-mono font-medium"
-                                                maxLength={20}
-                                            />
+                                            <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="Ex. MAT-001" className="font-mono font-medium" maxLength={20} />
                                         </Form.Item>
                                     </div>
 
@@ -357,10 +429,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                                 {isStatusActive ? 'พร้อมใช้งาน' : 'ปิดการใช้งาน'}
                                             </span>
                                             <Form.Item name="is_status" valuePropName="checked" noStyle>
-                                                <Switch
-                                                    size="small"
-                                                    className={isStatusActive ? 'bg-green-500' : 'bg-slate-300'}
-                                                />
+                                                <Switch size="small" className={isStatusActive ? 'bg-green-500' : 'bg-slate-300'} />
                                             </Form.Item>
                                         </div>
                                         <div className={`text-xs ${isStatusActive ? 'text-green-600' : 'text-red-600'} opacity-80`}>
@@ -377,9 +446,8 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 <div className="mb-8">
                                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
                                         <TagOutlined className="text-blue-600" />
-                                        <h3 className="text-base font-bold text-slate-800 m-0">ข้อมูลทั่วไป (General Info)</h3>
+                                        <h3 className="text-base font-bold text-slate-800 m-0">ข้อมูลทั่วไป</h3>
                                     </div>
-
                                     <Row gutter={[16, 16]}>
                                         <Col span={24}>
                                             <Form.Item label="ชื่อวัสดุ" name="material_name" rules={[{ required: true, message: 'ระบุชื่อวัสดุ' }]} className="mb-1">
@@ -429,115 +497,90 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                     </Row>
                                 </div>
 
+                                {/* Section 2: ขนาดและบรรจุภัณฑ์ */}
                                 <div className="mb-8">
                                     <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
                                         <div className="flex items-center gap-2">
                                             <ExpandAltOutlined className="text-purple-600" />
-                                            <h3 className="text-base font-bold text-slate-800 m-0">ขนาดและบรรจุภัณฑ์ (Dimension Specs)</h3>
+                                            <h3 className="text-base font-bold text-slate-800 m-0">ขนาดและบรรจุภัณฑ์</h3>
                                         </div>
                                     </div>
-
                                     <div className="bg-slate-50 p-5 rounded-xl border border-gray-100">
                                         <Row gutter={[16, 16]}>
-                                            {/* เลือก Packaging Template */}
                                             <Col span={24}>
-                                                <Form.Item label="เลือกจากบรรจุภัณฑ์ต้นแบบ (Optional)" className="mb-2">
-                                                    <Select
-                                                        options={packagingOptions}
-                                                        placeholder="-- เลือกเพื่อดึงข้อมูลขนาดอัตโนมัติ --"
-                                                        onChange={handlePackagingChange}
-                                                        allowClear
-                                                        showSearch
-                                                        optionFilterProp="label"
-                                                    />
+                                                <Form.Item label="เลือกจากขนาดบรรจุภัณฑ์ต้นแบบ" className="mb-2">
+                                                    <Select options={packagingOptions} placeholder="-- เลือกเพื่อดึงข้อมูลขนาดอัตโนมัติ --" onChange={handlePackagingChange} allowClear showSearch optionFilterProp="label" />
                                                 </Form.Item>
                                             </Col>
-
                                             <Col span={24}><div className="h-px bg-gray-200 mb-2"></div></Col>
-
-                                            {/* ช่องกรอกขนาด */}
-                                            <Col span={8}>
-                                                <DimensionInput label="ความกว้าง" name="material_width" unitName="material_width_unit" icon={<ColumnWidthOutlined className="text-slate-400" />} placeholder="0.00" />
-                                            </Col>
-                                            <Col span={8}>
-                                                <DimensionInput label="ความยาว" name="material_length" unitName="material_length_unit" icon={<ColumnHeightOutlined className="rotate-90 text-slate-400" />} placeholder="0.00" />
-                                            </Col>
-                                            <Col span={8}>
-                                                <DimensionInput label="ความสูง" name="material_height" unitName="material_height_unit" icon={<ColumnHeightOutlined className="text-slate-400" />} placeholder="0.00" />
-                                            </Col>
-
-                                            {/* ความจุและน้ำหนัก */}
-                                            <Col span={12}>
-                                                <DimensionInput label="ความจุ (Capacity)" name="material_capacity" unitName="material_capacity_unit" icon={<GatewayOutlined className="text-slate-400" />} placeholder="0.00" />
-                                            </Col>
-                                            <Col span={12}>
-                                                <DimensionInput label="น้ำหนัก (Weight)" name="material_weight" unitName="material_weight_unit" icon={<span className="text-slate-400 text-xs font-bold">W</span>} placeholder="0.00" />
-                                            </Col>
+                                            <Col span={8}><DimensionInput label="ความกว้าง" name="material_width" unitName="material_width_unit" icon={<ColumnWidthOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
+                                            <Col span={8}><DimensionInput label="ความยาว" name="material_length" unitName="material_length_unit" icon={<ColumnHeightOutlined className="rotate-90 text-slate-400" />} placeholder="0.00" /></Col>
+                                            <Col span={8}><DimensionInput label="ความสูง" name="material_height" unitName="material_height_unit" icon={<ColumnHeightOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
+                                            <Col span={12}><DimensionInput label="ความจุ (Capacity)" name="material_capacity" unitName="material_capacity_unit" icon={<GatewayOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
+                                            <Col span={12}><DimensionInput label="น้ำหนัก (Weight)" name="material_weight" unitName="material_weight_unit" icon={<span className="text-slate-400 text-xs font-bold">W</span>} placeholder="0.00" /></Col>
                                         </Row>
                                     </div>
                                 </div>
 
-                                {/* Section 2: คลังสินค้าและหน่วยนับ */}
-                                <div className="mb-2">
+                                {/* ✅ Section 3: Drawing Parts (เพิ่มใหม่) */}
+                                <div className="mb-8">
                                     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
-                                        <NumberOutlined className="text-orange-500" />
-                                        <h3 className="text-base font-bold text-slate-800 m-0">คลังสินค้าและหน่วยนับ (Inventory & Units)</h3>
+                                        <FileImageOutlined className="text-pink-600" />
+                                        <h3 className="text-base font-bold text-slate-800 m-0">ส่วนประกอบชิ้นส่วน DWG.</h3>
                                     </div>
-
-                                    <div className="bg-slate-50 p-5 rounded-xl border border-gray-100">
-                                        <Row gutter={[16, 16]}>
-                                            {/* Units Group */}
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-gray-100">
+                                        <Row gutter={[12, 12]}>
+                                            {/* --- ส่วนที่เพิ่มใหม่: Textarea รายละเอียด --- */}
                                             <Col span={24}>
-                                                <div className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">Conversion Rate</div>
-                                                <div className="flex items-center gap-2 bg-white p-3 rounded-lg border border-gray-200">
-                                                    <div className="flex-1">
-                                                        <Form.Item label="จำนวนหน่วยหลัก" name="quantity_mainunit" className="mb-0">
-                                                            <InputNumber className="w-full" min={0} placeholder="1" />
-                                                        </Form.Item>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <Form.Item label="หน่วยหลัก" name="mainunit_name" className="mb-0">
-                                                            <Select options={unitOptions} showSearch allowClear placeholder="เลือกหน่วย" />
-                                                        </Form.Item>
-                                                    </div>
-                                                    <div className="pt-6 text-slate-400 font-bold">=</div>
-                                                    <div className="flex-1">
-                                                        <Form.Item label="จำนวนหน่วยย่อย" name="quantity_subunit" className="mb-0">
-                                                            <InputNumber className="w-full" min={0} placeholder="1" />
-                                                        </Form.Item>
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <Form.Item label="หน่วยย่อย" name="subunit_name" className="mb-0">
-                                                            <Select options={unitOptions} showSearch allowClear placeholder="เลือกหน่วย" />
-                                                        </Form.Item>
-                                                    </div>
+                                                <div className="pb-8">
+                                                    <Form.Item
+                                                        label="รายละเอียด (Detail)"
+                                                        name="material_remark"
+                                                        className="mb-0"
+                                                    >
+                                                        <Input.TextArea
+                                                            rows={4}
+                                                            placeholder="ระบุรายละเอียดเพิ่มเติม..."
+                                                            className="bg-white"
+                                                            showCount
+                                                            maxLength={500}
+                                                        />
+                                                    </Form.Item>
                                                 </div>
                                             </Col>
 
-                                            <Col span={24}><div className="h-px bg-gray-200 my-1"></div></Col>
+                                            {[1, 2, 3, 4, 5, 6].map(i => (
+                                                <Col span={8} key={i}>
+                                                    <DrawingUploadCard index={i} />
+                                                </Col>
+                                            ))}
+                                        </Row>
+                                    </div>
+                                </div>
 
-                                            {/* Stock Levels */}
-                                            <Col span={8}>
-                                                <Form.Item label="ปริมาณต่ำสุด" name="minstock" className="mb-0" help={<span className="text-[10px] text-slate-400">Min Stock</span>}>
-                                                    <InputNumber prefix={<span className="text-orange-400 text-xs">▼</span>} className="w-full border-orange-200 focus:border-orange-400" min={0} />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={8}>
-                                                <Form.Item label="ปริมาณสูงสุด" name="maxstock" className="mb-0" help={<span className="text-[10px] text-slate-400">Max Stock</span>}>
-                                                    <InputNumber prefix={<span className="text-green-400 text-xs">▲</span>} className="w-full border-green-200 focus:border-green-400" min={0} />
-                                                </Form.Item>
-                                            </Col>
-                                            <Col span={8}>
-                                                <Form.Item label="ปริมาณสั่งซื้อขั้นต่ำ" name="minimum_order" className="mb-0" help={<span className="text-[10px] text-slate-400">MOQ</span>}>
-                                                    <InputNumber className="w-full" min={0} placeholder="0" />
-                                                </Form.Item>
-                                            </Col>
-
+                                {/* Section 4: คลังสินค้าและหน่วยนับ */}
+                                <div className="mb-2">
+                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-100">
+                                        <NumberOutlined className="text-orange-500" />
+                                        <h3 className="text-base font-bold text-slate-800 m-0">คลังสินค้าและหน่วยนับ</h3>
+                                    </div>
+                                    <div className="bg-slate-50 p-5 rounded-xl border border-gray-100">
+                                        <Row gutter={[16, 16]}>
                                             <Col span={24}>
-                                                <Form.Item label="สกุลเงินที่ใช้ซื้อ" name="currency" className="mb-0 mt-2">
-                                                    <Select options={currencyOptions} showSearch prefix={<DollarOutlined />} placeholder="เลือกสกุลเงิน" />
-                                                </Form.Item>
+                                                <div className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">Conversion Rate</div>
+                                                <div className="flex items-center gap-2 bg-white p-3 rounded-lg border border-gray-200">
+                                                    <div className="flex-1"><Form.Item label="จำนวนหน่วยหลัก" name="quantity_mainunit" className="mb-0"><InputNumber className="w-full" min={0} placeholder="1" /></Form.Item></div>
+                                                    <div className="flex-1"><Form.Item label="หน่วยหลัก" name="mainunit_name" className="mb-0"><Select options={unitOptions} showSearch allowClear placeholder="เลือกหน่วย" /></Form.Item></div>
+                                                    <div className="pt-6 text-slate-400 font-bold">=</div>
+                                                    <div className="flex-1"><Form.Item label="จำนวนหน่วยย่อย" name="quantity_subunit" className="mb-0"><InputNumber className="w-full" min={0} placeholder="1" /></Form.Item></div>
+                                                    <div className="flex-1"><Form.Item label="หน่วยย่อย" name="subunit_name" className="mb-0"><Select options={unitOptions} showSearch allowClear placeholder="เลือกหน่วย" /></Form.Item></div>
+                                                </div>
                                             </Col>
+                                            <Col span={24}><div className="h-px bg-gray-200 my-1"></div></Col>
+                                            <Col span={8}><Form.Item label="ปริมาณต่ำสุด" name="minstock" className="mb-0" help={<span className="text-[10px] text-slate-400">Min Stock</span>}><InputNumber prefix={<span className="text-orange-400 text-xs">▼</span>} className="w-full border-orange-200 focus:border-orange-400" min={0} /></Form.Item></Col>
+                                            <Col span={8}><Form.Item label="ปริมาณสูงสุด" name="maxstock" className="mb-0" help={<span className="text-[10px] text-slate-400">Max Stock</span>}><InputNumber prefix={<span className="text-green-400 text-xs">▲</span>} className="w-full border-green-200 focus:border-green-400" min={0} /></Form.Item></Col>
+                                            <Col span={8}><Form.Item label="ปริมาณสั่งซื้อขั้นต่ำ" name="minimum_order" className="mb-0" help={<span className="text-[10px] text-slate-400">MOQ</span>}><InputNumber className="w-full" min={0} placeholder="0" /></Form.Item></Col>
+                                            <Col span={24}><Form.Item label="สกุลเงินที่ใช้ซื้อ" name="currency" className="mb-0 mt-2"><Select options={currencyOptions} showSearch prefix={<DollarOutlined />} placeholder="เลือกสกุลเงิน" /></Form.Item></Col>
                                         </Row>
                                     </div>
                                 </div>
@@ -551,33 +594,16 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 <div className="bg-white px-8 py-4 border-t border-gray-100 flex justify-between items-center z-50">
                     <div>
                         {isEditMode && (
-                            <Button
-                                danger
-                                type="text"
-                                onClick={onDelete}
-                                disabled={loading}
-                                icon={<DeleteOutlined />}
-                                className="hover:bg-red-50"
-                            >
+                            <Button danger type="text" onClick={onDelete} disabled={loading} icon={<DeleteOutlined />} className="hover:bg-red-50">
                                 ลบข้อมูลนี้
                             </Button>
                         )}
                     </div>
                     <div className="flex gap-3">
-                        <Button
-                            type="primary"
-                            loading={loading}
-                            onClick={handleOk}
-                            icon={<SaveOutlined />}
-                            className={`h-10 px-6 rounded-lg shadow-lg shadow-blue-200 font-medium ${loading ? '' : 'hover:scale-105 transition-transform'}`}
-                        >
+                        <Button type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className={`h-10 px-6 rounded-lg shadow-lg shadow-blue-200 font-medium ${loading ? '' : 'hover:scale-105 transition-transform'}`}>
                             {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}
                         </Button>
-                        <Button
-                            onClick={() => { form.resetFields(); onClose?.(); }}
-                            disabled={loading}
-                            className="h-10 px-6 rounded-lg border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800"
-                        >
+                        <Button onClick={() => { form.resetFields(); onClose?.(); }} disabled={loading} className="h-10 px-6 rounded-lg border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-800">
                             ยกเลิก
                         </Button>
                     </div>
@@ -585,9 +611,14 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
 
             </Modal>
 
-            {/* Image Preview Modal */}
+            {/* Image Preview Modal (Main) */}
             <Modal open={previewOpen} title={null} footer={null} onCancel={() => setPreviewOpen(false)} centered width={500}>
                 <img alt="preview" style={{ width: '100%', borderRadius: '8px' }} src={previewImage} />
+            </Modal>
+
+            {/* Drawing Preview Modal */}
+            <Modal open={previewDrawing.open} title="DWG Preview" footer={null} onCancel={() => setPreviewDrawing({ open: false, url: '' })} centered width={600}>
+                <img alt="dwg-preview" style={{ width: '100%', borderRadius: '8px' }} src={previewDrawing.url} />
             </Modal>
         </ConfigProvider>
     );
