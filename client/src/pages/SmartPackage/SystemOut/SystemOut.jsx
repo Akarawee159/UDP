@@ -1,15 +1,16 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid } from 'antd';
 import {
-    CaretUpOutlined,
-    SearchOutlined
+    ShoppingCartOutlined,
+    SearchOutlined,
+    ToolOutlined
 } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
 import { useNavigate } from 'react-router-dom';
 
-function RegisterAsset() {
+function SystemOut() {
     const navigate = useNavigate();
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
@@ -71,7 +72,7 @@ function RegisterAsset() {
 
     // Actions
     const handleCreate = () => {
-        navigate('/registration/register-asset/create');
+        navigate('/smart-package/system-out/list');
     };
 
     // เมื่อคลิกแถว ให้ไปหน้า Detail พร้อมส่ง partCode ไปด้วย
@@ -161,7 +162,7 @@ function RegisterAsset() {
             lockVisible: true,
         },
         {
-            headerName: 'รหัสทรัพย์สิน',
+            headerName: 'เลขที่ใบเบิกใช้',
             field: 'partCode',
             width: 200,
             filter: true,
@@ -169,7 +170,7 @@ function RegisterAsset() {
             pinned: 'left',
         },
         {
-            headerName: 'ชื่อทรัพย์สิน',
+            headerName: 'รายละเอียด',
             field: 'asset_detail',
             minWidth: 200,
             flex: 1,
@@ -177,59 +178,32 @@ function RegisterAsset() {
             cellClass: "cursor-pointer",
         },
         {
-            headerName: 'ประเภท',
-            field: 'asset_type',
+            headerName: 'ต้นทาง',
+            field: '##',
             width: 150,
             filter: true,
             cellClass: "cursor-pointer text-center",
         },
         {
-            headerName: 'จำนวน (QTY)',
-            headerClass: 'header-group-center header-group-red',
-            children: [
-                {
-                    headerName: 'ทั้งหมด',
-                    width: 100,
-                    field: 'count_total',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center font-bold cursor-pointer"
-                },
-                {
-                    headerName: 'ปกติ', // Status 10 + 11
-                    width: 100,
-                    field: 'count_normal',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-blue-bold cursor-pointer"
-                },
-                {
-                    headerName: 'เบิกใช้', // Status 11
-                    width: 100,
-                    field: 'count_use',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-green-bold cursor-pointer"
-                },
-                {
-                    headerName: 'ชำรุด', // Status 13
-                    width: 100,
-                    field: 'count_damaged',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-orange-bold cursor-pointer"
-                },
-                {
-                    headerName: 'รอซ่อม', // Status 14
-                    width: 100,
-                    field: 'count_repair',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-orange-bold cursor-pointer"
-                },
-                {
-                    headerName: 'เสีย', // Status 15
-                    width: 100,
-                    field: 'count_broken',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-red-bold cursor-pointer"
-                },
-            ]
+            headerName: 'ปลายทาง',
+            field: '##',
+            width: 150,
+            filter: true,
+            cellClass: "cursor-pointer text-center",
+        },
+        {
+            headerName: 'วันที่เบิก',
+            field: '##',
+            width: 150,
+            filter: true,
+            cellClass: "cursor-pointer text-center",
+        },
+        {
+            headerName: 'จำนวนที่เบิก',
+            width: 160,
+            field: 'count_total',
+            cellRenderer: p => valUnit(p.value),
+            cellClass: "text-center font-bold cursor-pointer"
         },
     ], []);
 
@@ -247,21 +221,33 @@ function RegisterAsset() {
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหา รหัสทรัพย์สิน..."
+                            placeholder="ค้นหา เลขที่ใบเบิกใช้..."
                             allowClear
                             variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />
                         <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                        <Button
-                            type="primary"
-                            icon={<CaretUpOutlined />}
-                            onClick={handleCreate}
-                            className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                        >
-                            ขึ้นทะเบียนทรัพย์สิน
-                        </Button>
+                        <ConfigProvider theme={{ token: { colorPrimary: '#008236' } }}>
+                            <Button
+                                type="primary"
+                                icon={<ShoppingCartOutlined />}
+                                onClick={handleCreate}
+                                className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                            >
+                                เบิกใช้
+                            </Button>
+                        </ConfigProvider>
+                        <ConfigProvider theme={{ token: { colorPrimary: '#f54a00' } }}>
+                            <Button
+                                type="primary"
+                                icon={<ToolOutlined />}
+                                onClick={handleCreate}
+                                className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                            >
+                                เบิกซ่อม
+                            </Button>
+                        </ConfigProvider>
                     </div>
                 </div>
 
@@ -280,4 +266,4 @@ function RegisterAsset() {
     );
 }
 
-export default RegisterAsset;
+export default SystemOut;

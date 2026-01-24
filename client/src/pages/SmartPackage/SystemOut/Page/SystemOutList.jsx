@@ -1,4 +1,4 @@
-// src/pages/Registration/RegisterAsset/Page/AssetList.jsx
+// src/pages/Registration/RegisterAsset/Page/SystemOutList.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Form, Input, Button, Select, InputNumber,
@@ -18,7 +18,6 @@ import dayjs from 'dayjs';
 import api from "../../../../api";
 import { ThaiDateInput } from '../../../../components/form/ThaiDateInput';
 import DataTable from '../../../../components/aggrid/DataTable';
-import ModalAssetList from './ModalAssetList';
 
 // Import สำหรับการพิมพ์
 import { QRCodeSVG } from 'qrcode.react';
@@ -26,7 +25,7 @@ import { useReactToPrint } from 'react-to-print';
 
 const { Title, Text } = Typography;
 
-function AssetList() {
+function SystemOutList() {
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
 
@@ -424,10 +423,10 @@ function AssetList() {
                     />
                     <div>
                         <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2">
-                            <span className="bg-blue-600 w-2 h-6 rounded-r-md block"></span>
-                            ลงทะเบียนทรัพย์สิน
+                            <span className="bg-green-600 w-2 h-6 rounded-r-md block"></span>
+                            ระบบจ่ายออก
                         </Title>
-                        <Text className="text-slate-500 text-xs ml-4">ระบบจัดการและสร้างรายการทรัพย์สินใหม่ (Asset Registration)</Text>
+                        <Text className="text-slate-500 text-xs ml-4">ระบบจ่ายออกทรัพย์สิน</Text>
                     </div>
                 </div>
                 <Button
@@ -445,276 +444,12 @@ function AssetList() {
             <div className="p-2 flex-1 overflow-hidden flex flex-col">
 
                 {/* === SECTION 1: Form === */}
-                <Form form={form} layout="vertical">
-                    <Card
-                        className="shadow-sm border-gray-200 rounded-xl h-full flex flex-col" // เพิ่ม h-full และ flex-col
-                        styles={{
-                            body: {
-                                padding: 0,
-                                flex: 1,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                overflow: 'hidden' // สำคัญ: เพื่อให้ Grid scroll อยู่ภายใน Body นี้
-                            }
-                        }}
-                    >
-                        <Row>
-                            {/* --- Col 1: ข้อมูลทั่วไป --- */}
-                            <Col xs={24} lg={8} className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 bg-white">
-                                <div className="mb-5 flex items-center gap-2 text-slate-700">
-                                    <FileTextOutlined className="text-blue-500 text-lg" />
-                                    <span className="font-semibold text-base">ข้อมูลทั่วไป</span>
-                                </div>
-                                <Form.Item name="asset_remark" hidden>
-                                    <Input />
-                                </Form.Item>
-                                <Form.Item label="รหัสทรัพย์สิน" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสทรัพย์สิน' }]}>
-                                    <Input
-                                        size="large"
-                                        prefix={<BarcodeOutlined className="text-slate-400 mr-1" />}
-                                        placeholder="Scan / ระบุรหัส"
-                                        disabled={isFormLocked}
-                                        readOnly
-                                        addonAfter={
-                                            <Button
-                                                type="text"
-                                                size="small"
-                                                icon={<SearchOutlined />}
-                                                className="text-blue-600 hover:text-blue-700 font-medium"
-                                                onClick={() => setIsModalListOpen(true)}
-                                                disabled={isFormLocked}
-                                            >
-                                                เลือกทรัพย์สิน
-                                            </Button>
-                                        }
-                                        className="rounded-lg"
-                                    />
-                                </Form.Item>
 
-                                <Form.Item label="ชื่อทรัพย์สิน" name="asset_detail" rules={[{ required: true, message: 'ระบุชื่อทรัพย์สิน' }]}>
-                                    <Input size="large" prefix={<FileTextOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อทรัพย์สิน" className="rounded-lg" disabled={isFormLocked} />
-                                </Form.Item>
-
-                                <Row gutter={12}>
-                                    <Col span={12}>
-                                        <Form.Item label="ประเภท" name="asset_type">
-                                            <Input prefix={<BgColorsOutlined className="text-slate-400" />} placeholder="ประเภท" disabled={isFormLocked} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={12}>
-                                        <Form.Item label="วันที่ซื้อ" name="asset_date">
-                                            <ThaiDateInput placeholder="เลือกวันที่" disabled={isFormLocked} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-
-                                <Row gutter={12}>
-                                    <Col span={12}>
-                                        <Form.Item label="เลขที่เอกสาร" name="docID">
-                                            <Input prefix={<NumberOutlined className="text-slate-400" />} placeholder="DOC-XXX" disabled={isFormLocked} />
-                                        </Form.Item>
-                                    </Col>
-                                    <Col span={12}>
-                                        <Form.Item label="หมายเลขล็อต" name="asset_lot">
-                                            <Input prefix={<InboxOutlined className="text-slate-400" />} className="bg-gray-50 text-gray-500" readOnly placeholder="Auto Generate" disabled={isFormLocked} />
-                                        </Form.Item>
-                                    </Col>
-                                </Row>
-
-                                <Form.Item label="ผู้ครอบครอง" name="asset_holder">
-                                    <Input prefix={<UserOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อผู้ครอบครอง" disabled={isFormLocked} />
-                                </Form.Item>
-
-                                <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="asset_location" className="mb-0">
-                                    <Input.TextArea
-                                        rows={2}
-                                        placeholder="ระบุสถานที่ติดตั้ง"
-                                        className="rounded-lg"
-                                        disabled={isFormLocked}
-                                    />
-                                </Form.Item>
-                            </Col>
-
-                            {/* --- Col 2: Specs & QTY --- */}
-                            <Col xs={24} lg={8} className="p-6 border-b lg:border-b-0 lg:border-r border-gray-100 bg-slate-50/30">
-                                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg mb-8 relative overflow-hidden group transition-all hover:shadow-blue-300">
-                                    <div className="absolute top-[-20px] right-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
-                                    <div className="absolute bottom-[-20px] left-[-20px] w-20 h-20 bg-white/10 rounded-full blur-lg"></div>
-
-                                    <div className="text-center relative z-10">
-                                        <div className="text-blue-100 text-sm font-medium mb-2 uppercase tracking-wide flex justify-center items-center gap-2">
-                                            <NumberOutlined /> จำนวนที่ต้องการขึ้นทะเบียน (QTY)
-                                        </div>
-                                        <Form.Item name="quantity" className="mb-0" rules={[{ required: true, message: 'กรุณาระบุจำนวน' }]}>
-                                            <InputNumber
-                                                min={1}
-                                                max={9999}
-                                                maxLength={4}
-                                                precision={0}
-                                                placeholder="0"
-                                                variant="borderless"
-                                                className="w-full text-center input-qty-highlight"
-                                                style={{
-                                                    fontSize: '48px',
-                                                    fontWeight: 'bold',
-                                                    color: 'white',
-                                                    background: 'transparent'
-                                                }}
-                                                controls={true}
-                                                onKeyPress={(event) => {
-                                                    if (!/[0-9]/.test(event.key)) {
-                                                        event.preventDefault();
-                                                    }
-                                                }}
-                                                disabled={isFormLocked}
-                                            />
-                                        </Form.Item>
-                                        <div className="h-px bg-white/20 w-1/2 mx-auto my-2"></div>
-                                        <div className="text-xs text-blue-200">ระบุจำนวนที่ต้องการ Generate Label</div>
-                                    </div>
-                                </div>
-
-                                <div className="mb-4">
-                                    <div className="flex items-center gap-2 text-slate-700 mb-4">
-                                        <ExpandAltOutlined className="text-orange-500 text-lg" />
-                                        <span className="font-semibold text-base">ขนาดและน้ำหนัก</span>
-                                    </div>
-
-                                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                                        <SpecInput label="ความกว้าง" name="asset_width" unitName="asset_width_unit" unitOptions={unitOptions} disabled={isFormLocked} />
-                                        <SpecInput label="ความยาว" name="asset_length" unitName="asset_length_unit" unitOptions={unitOptions} disabled={isFormLocked} />
-                                        <SpecInput label="ความสูง" name="asset_height" unitName="asset_height_unit" unitOptions={unitOptions} disabled={isFormLocked} />
-                                        <Divider className="my-2 border-gray-100" />
-                                        <SpecInput label="ความจุ" name="asset_capacity" unitName="asset_capacity_unit" unitOptions={unitOptions} disabled={isFormLocked} />
-                                        <SpecInput label="น้ำหนัก" name="asset_weight" unitName="asset_weight_unit" unitOptions={unitOptions} disabled={isFormLocked} />
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-center gap-1 mt-1">
-                                    <Button
-                                        type="primary"
-                                        icon={<SaveOutlined />}
-                                        onClick={handleSave}
-                                        disabled={isFormLocked}
-                                        className="bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-200 px-6 h-9 rounded-lg font-semibold border-none"
-                                    >
-                                        บันทึกสร้างรายการ
-                                    </Button>
-
-                                    <div className="h-6 w-px bg-gray-200 mx-2"></div>
-
-                                    <Button
-                                        type="primary"
-                                        danger
-                                        icon={<DeleteOutlined />}
-                                        onClick={handleClearAll}
-                                        className="shadow-md shadow-red-200 px-6 h-9 rounded-lg font-semibold"
-                                    >
-                                        ลบรายการทั้งหมด
-                                    </Button>
-                                </div>
-                            </Col>
-
-                            {/* --- Col 3: Image --- */}
-                            <Col xs={24} lg={8} className="p-6 bg-white flex flex-col h-full">
-                                <div className="mb-4 flex items-center gap-2 text-slate-700">
-                                    <PictureOutlined className="text-purple-500 text-lg" />
-                                    <span className="font-semibold text-base">รูปภาพทรัพย์สิน</span>
-                                </div>
-
-                                <div className="flex-1 flex flex-col">
-                                    <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner group hover:border-blue-400 transition-colors">
-                                        {displayedImage ? (
-                                            <>
-                                                <Image
-                                                    src={displayedImage}
-                                                    className="object-contain w-full h-full"
-                                                    style={{ maxHeight: '100%', maxWidth: '100%' }}
-                                                    alt="Asset Image"
-                                                />
-                                                <div className="absolute top-3 right-3">
-                                                    <Badge status="processing" text={<span className="bg-white/90 px-2 py-0.5 rounded text-xs font-bold shadow-sm text-green-600">PREVIEW</span>} />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="text-center p-6">
-                                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition-transform">
-                                                    <PictureOutlined className="text-3xl text-slate-300 group-hover:text-blue-400 transition-colors" />
-                                                </div>
-                                                <Text className="text-slate-400 block">ไม่มีรูปภาพแสดง</Text>
-                                                <Text className="text-slate-300 text-xs">(รูปภาพจะปรากฏเมื่อเลือกสินค้า)</Text>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="mt-6 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-blue-600">
-                                                <InboxOutlined />
-                                            </div>
-                                            <div>
-                                                <Text strong className="text-slate-700 block text-sm">หมายเหตุ</Text>
-                                                <Text className="text-slate-500 text-xs">
-                                                    ข้อมูลขนาดและรูปภาพจะถูกดึงมาอัตโนมัติเมื่อทำการเลือกรายการสินค้า (Master Data)
-                                                </Text>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </Col>
-                        </Row>
-                    </Card>
-                </Form>
 
                 {/* === SECTION 2: Table === */}
-                <Card className="shadow-sm border-gray-200 rounded-xl" styles={{ body: { padding: 0 } }}>
-                    <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-t-xl">
-                        <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                            <Input
-                                prefix={<SearchOutlined className="text-gray-400" />}
-                                placeholder="ค้นหา รหัส, รายละเอียด..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                allowClear
-                                variant="borderless"
-                                className="w-64 bg-transparent"
-                            />
-                            <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                            {/* ปุ่มพิมพ์สติ๊กเกอร์ (Bulk Print) */}
-                            <Button
-                                type="primary"
-                                icon={<PrinterOutlined />}
-                                onClick={handleBulkPrint}
-                                loading={isPrinting} // <--- ใส่ตรงนี้
-                                disabled={isPrinting || selectedRows.length === 0} // กันกดซ้ำ
-                                className="bg-emerald-600 hover:bg-emerald-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                            >
-                                พิมพ์สติ๊กเกอร์ ({selectedRows.length})
-                            </Button>
-                        </div>
-                    </div>
 
-                    <div style={{ height: 600 }} className="w-full">
-                        <DataTable
-                            rowData={filteredRows}
-                            columnDefs={columnDefs}
-                            loading={false}
-                            rowSelection="multiple"
-                            suppressRowClickSelection={true}
-                            onSelectionChanged={(params) => {
-                                setSelectedRows(params.api.getSelectedRows());
-                            }}
-                        />
-                    </div>
-                </Card>
 
             </div>
-
-            {/* Modal */}
-            <ModalAssetList
-                open={isModalListOpen}
-                onClose={() => setIsModalListOpen(false)}
-                onSelect={handleMaterialSelect}
-            />
 
             {/* --- Hidden Print Component --- */}
             <div style={{ display: 'none' }}>
@@ -812,4 +547,4 @@ const SpecInput = ({ label, name, unitName, unitOptions, disabled }) => (
     </div>
 );
 
-export default AssetList;
+export default SystemOutList;

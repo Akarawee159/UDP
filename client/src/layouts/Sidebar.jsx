@@ -20,6 +20,7 @@ import {
   FileTextOutlined,
   DropboxOutlined,
   UserOutlined,
+  CodeSandboxOutlined,
 } from "@ant-design/icons";
 
 /* Menu Config (โครงสร้างเดิม) */
@@ -77,12 +78,23 @@ export const menuItems = [
   },
   {
     id: "60",
+    label: "SMART PACKAGE TRACKING",
+    icon: <CodeSandboxOutlined />,
+    type: "dropdown",
+    children: [
+      { id: "601", label: "ระบบจ่ายออก", path: "/smart-package/system-out" },
+      { id: "602", label: "ระบบรับคืน", path: "/smart-package/system-in" },
+      { id: "603", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
+    ]
+  },
+  {
+    id: "70",
     label: "รายงาน",
     icon: <FileTextOutlined />,
     type: "dropdown",
     children: [
-      { id: "601", label: "รายงานพิเศษ (Non-Move)", path: "/reports/employee-report" },
-      { id: "602", label: "รายงานตามสถานะกล่อง", path: "/reports/training-report" },
+      { id: "701", label: "รายงานพิเศษ (Non-Move)", path: "/reports/employee-report" },
+      { id: "702", label: "รายงานตามสถานะกล่อง", path: "/reports/training-report" },
     ]
   },
 ];

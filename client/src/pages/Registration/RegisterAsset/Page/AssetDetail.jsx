@@ -24,10 +24,11 @@ function AssetDetail() {
 
     const containerStyle = useMemo(() => ({
         margin: isMd ? '-8px' : '0',
-        padding: isMd ? '16px' : '12px',
-        minHeight: '100vh',
+        padding: 0, // ปรับ padding เป็น 0 เพื่อจัดการ layout เอง
+        height: '100vh', // เปลี่ยนจาก minHeight เป็น height
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden' // ซ่อน scroll bar ของ browser
     }), [isMd]);
 
     const navigate = useNavigate();
@@ -256,10 +257,8 @@ function AssetDetail() {
             headerName: 'ประวัติ',
             width: 80,
             pinned: 'left',
-            // --- เพิ่ม 2 บรรทัดนี้เพื่อจัดกึ่งกลางทั้ง Header และ Cell ---
             cellClass: 'flex justify-center items-center',
             headerClass: 'text-center justify-center',
-            // ---------------------------------------------------
             cellRenderer: (params) => (
                 <Button
                     type="text"
@@ -272,12 +271,17 @@ function AssetDetail() {
             )
         },
         {
-            headerName: '',
             checkboxSelection: true,
-            headerCheckboxSelection: true,
+            headerCheckboxSelection: true, // ต้องเป็น true
             width: 50,
             pinned: 'left',
-            lockVisible: true
+            lockVisible: true,
+
+            // --- แก้ไขตรงนี้ ---
+            // ลบพวก flex justify-center ออก แล้วใส่ชื่อ class เฉพาะลงไป
+            headerClass: 'header-center-checkbox',
+
+            cellClass: "flex justify-center items-center",
         },
         {
             headerName: 'สติ๊กเกอร์', field: 'label_register', width: 120, pinned: 'left',
@@ -309,6 +313,7 @@ function AssetDetail() {
             headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
             sortable: true,
             filter: true,
+            filterValueGetter: (params) => params.data.asset_status_name,
             cellRenderer: (params) => {
                 const name = params.data.asset_status_name || params.value;
                 const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
@@ -324,6 +329,7 @@ function AssetDetail() {
             headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 150,
             sortable: true,
             filter: true,
+            filterValueGetter: (params) => params.data.is_status_name,
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
@@ -364,7 +370,7 @@ function AssetDetail() {
         <div style={containerStyle} className="bg-slate-50 relative">
 
             {/* --- Header Bar (Sticky Top) --- */}
-            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 z-20 shadow-sm backdrop-blur-md bg-white/90">
+            <div className="bg-white px-6 py-2 border-b rounded-md border-gray-300 flex items-center justify-between sticky top-0 z-20 shadow-sm backdrop-blur-sm bg-white/90">
                 <div className="flex items-center gap-4">
                     <Button
                         icon={<ArrowLeftOutlined />}
@@ -389,14 +395,25 @@ function AssetDetail() {
                     onClick={() => navigate(-1)}
                     className="hover:bg-red-50 rounded-full"
                 >
-                    ปิดหน้าต่าง
+                    ปิด
                 </Button>
             </div>
 
             {/* --- Main Content --- */}
-            <div className="p-4 space-y-4">
-                <Card className="shadow-sm border-gray-200 rounded-xl" styles={{ body: { padding: 0 } }}>
-                    <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-t-xl">
+            <div className="p-2 flex-1 overflow-hidden flex flex-col">
+                <Card
+                    className="shadow-sm border-gray-200 rounded-md h-full flex flex-col" // เพิ่ม h-full และ flex-col
+                    styles={{
+                        body: {
+                            padding: 0,
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden' // สำคัญ: เพื่อให้ Grid scroll อยู่ภายใน Body นี้
+                        }
+                    }}
+                >
+                    <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-t-xl flex-none">
                         <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 flex-wrap">
                             <Input
                                 prefix={<SearchOutlined className="text-gray-400" />}
@@ -435,7 +452,7 @@ function AssetDetail() {
                         </div>
                     </div>
 
-                    <div style={{ height: 'calc(100vh - 160px)' }} className="w-full">
+                    <div className="w-full flex-1 overflow-hidden">
                         <DataTable
                             rowData={filteredRows}
                             columnDefs={columnDefs}
@@ -445,6 +462,8 @@ function AssetDetail() {
                             onSelectionChanged={(params) => {
                                 setSelectedRows(params.api.getSelectedRows());
                             }}
+                            // AgGrid React ปกติจะต้องการ height 100% ของ parent
+                            style={{ width: '100%', height: '100%' }}
                         />
                     </div>
                 </Card>

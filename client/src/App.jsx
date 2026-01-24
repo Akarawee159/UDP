@@ -37,6 +37,12 @@ import Location from "./pages/Settings/Location/Location";
 import CountingUnit from "./pages/Settings/CountingUnit/CountingUnit";
 import PackagingSize from "./pages/Settings/PackagingSize/PackagingSize";
 
+// SMART PACKAGE TRACKING
+import SystemOut from "./pages/SmartPackage/SystemOut/SystemOut";
+import SystemOutList from "./pages/SmartPackage/SystemOut/Page/SystemOutList";
+import SystemIn from "./pages/SmartPackage/SystemIn/SystemIn";
+import SystemRepair from "./pages/SmartPackage/SystemRepair/SystemRepair";
+
 // รายงาน
 import EmployeeReport from "./pages/Reports/EmployeeReport/EmployeeReport";
 import TrainingReport from "./pages/Reports/TrainingReport/TrainingReport";
@@ -248,11 +254,56 @@ export default function App() {
             }
           />
 
-          {/* รายงาน main=60 */}
+          {/* SMART PACKAGE TRACKING main=60 */}
+          <Route
+            path="/smart-package/system-out"
+            element={
+              <ProtectedRoute mainId="60" subId="601">
+                <AdminLayout>
+                  <SystemOut />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/smart-package/system-out/list"
+            element={
+              <ProtectedRoute mainId="60" subId="601">
+                <AdminLayout>
+                  <SystemOutList />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/smart-package/system-in"
+            element={
+              <ProtectedRoute mainId="60" subId="602">
+                <AdminLayout>
+                  <SystemIn />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/smart-package/system-repair"
+            element={
+              <ProtectedRoute mainId="60" subId="603">
+                <AdminLayout>
+                  <SystemRepair />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* รายงาน main=70 */}
           <Route
             path="/registration/register-asset"
             element={
-              <ProtectedRoute mainId="60" subId="601">
+              <ProtectedRoute mainId="70" subId="701">
                 <AdminLayout>
                   <EmployeeReport />
                 </AdminLayout>
@@ -263,7 +314,7 @@ export default function App() {
           <Route
             path="/reports/training-report"
             element={
-              <ProtectedRoute mainId="60" subId="602">
+              <ProtectedRoute mainId="70" subId="702">
                 <AdminLayout>
                   <TrainingReport />
                 </AdminLayout>

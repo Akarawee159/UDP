@@ -19,10 +19,11 @@ function AssetLog() {
 
     const containerStyle = useMemo(() => ({
         margin: isMd ? '-8px' : '0',
-        padding: isMd ? '16px' : '12px',
-        minHeight: '100vh',
+        padding: 0, // ปรับ padding เป็น 0 เพื่อจัดการ layout เอง
+        height: '100vh', // เปลี่ยนจาก minHeight เป็น height
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden' // ซ่อน scroll bar ของ browser
     }), [isMd]);
 
     const navigate = useNavigate();
@@ -110,6 +111,9 @@ function AssetLog() {
         // --- แก้ไขส่วน asset_status (สถานะใช้งาน) ---
         {
             headerName: 'สถานะใช้งาน', field: 'asset_status', width: 200,
+            sortable: true,
+            filter: true,
+            filterValueGetter: (params) => params.data.asset_status_name,
             cellRenderer: (params) => {
                 // ดึงชื่อและสีจากที่ backend join มาให้
                 const name = params.data.asset_status_name || params.value;
@@ -126,6 +130,9 @@ function AssetLog() {
         // --- แก้ไขส่วน is_status (สถานะทรัพย์สิน) ---
         {
             headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 200,
+            sortable: true,
+            filter: true,
+            filterValueGetter: (params) => params.data.is_status_name,
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
@@ -154,7 +161,7 @@ function AssetLog() {
     return (
         <div style={containerStyle} className="bg-slate-50 relative">
             {/* --- Header --- */}
-            <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+            <div className="bg-white px-6 py-2 border-b rounded-md border-gray-300 flex items-center justify-between sticky top-0 z-20 shadow-sm backdrop-blur-sm bg-white/90">
                 <div className="flex items-center gap-4">
                     <Button
                         icon={<ArrowLeftOutlined />}
@@ -183,9 +190,20 @@ function AssetLog() {
             </div>
 
             {/* --- Content --- */}
-            <div className="p-4">
-                <Card className="shadow-sm border-gray-200 rounded-xl" styles={{ body: { padding: 0 } }}>
-                    <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-4 bg-white rounded-t-xl">
+            <div className="p-2 flex-1 overflow-hidden flex flex-col">
+                <Card
+                    className="shadow-sm border-gray-200 rounded-md h-full flex flex-col" // เพิ่ม h-full และ flex-col
+                    styles={{
+                        body: {
+                            padding: 0,
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden' // สำคัญ: เพื่อให้ Grid scroll อยู่ภายใน Body นี้
+                        }
+                    }}
+                >
+                    <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white rounded-t-xl flex-none">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
                             placeholder="ค้นหา Action, ผู้ทำรายการ..."
@@ -196,7 +214,7 @@ function AssetLog() {
                         />
                     </div>
 
-                    <div style={{ height: 'calc(100vh - 180px)' }} className="w-full">
+                    <div style={{ height: 'calc(100vh - 180px)' }} className="w-full flex-1 overflow-hidden">
                         <DataTable
                             rowData={filteredData}
                             columnDefs={columnDefs}

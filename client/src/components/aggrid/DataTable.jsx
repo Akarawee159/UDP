@@ -102,6 +102,19 @@ const DataTable = ({
     .ag-theme-alpine .cell-orange-bold { color: #f97316 !important; font-weight: bold !important; }
     .ag-theme-alpine .cell-red-bold { color: #dc2626 !important; font-weight: bold !important; }
     
+    /* ------------------------------------------------------- */
+    /* 10. (เพิ่มใหม่ล่าสุด) บังคับ Header Checkbox ให้อยู่ตรงกลาง */
+    /* ------------------------------------------------------- */
+    .ag-theme-alpine .header-center-checkbox .ag-header-select-all {
+        justify-content: center !important;
+        width: 180% !important;
+        margin-right: 0 !important; /* ลบ margin ที่อาจจะดันให้เบี้ยว */
+    }
+    
+    /* กรณีมี label ว่างๆ กวนใจ ให้ซ่อน หรือจัดระเบียบ */
+    .ag-theme-alpine .header-center-checkbox .ag-header-cell-label {
+        justify-content: center !important;
+    }
   `;
 
   const defaultColDef = useMemo(() => ({
