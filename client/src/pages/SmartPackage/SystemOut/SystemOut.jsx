@@ -32,7 +32,7 @@ function SystemOut() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/registration/registerasset');
+            const res = await api.get('/smartpackage/systemOut');
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
@@ -71,13 +71,16 @@ function SystemOut() {
     }, []);
 
     // Actions
-    const handleCreate = () => {
+    const handleList = () => {
         navigate('/smart-package/system-out/list');
     };
+    const handleRepair = () => {
+        navigate('/smart-package/system-out/repair');
+    };
 
-    // เมื่อคลิกแถว ให้ไปหน้า Detail พร้อมส่ง partCode ไปด้วย
+    // เมื่อคลิกแถว ให้ไปหน้า SystemOutDetail พร้อมส่ง partCode ไปด้วย
     const handleRowClick = (record) => {
-        navigate('/registration/register-asset/detail', {
+        navigate('#', {
             state: {
                 partCode: record.partCode,
                 partName: record.asset_detail
@@ -185,7 +188,7 @@ function SystemOut() {
             cellClass: "cursor-pointer text-center",
         },
         {
-            headerName: 'ปลายทาง',
+            headerName: 'ปลายทาง555',
             field: '##',
             width: 150,
             filter: true,
@@ -232,7 +235,7 @@ function SystemOut() {
                             <Button
                                 type="primary"
                                 icon={<ShoppingCartOutlined />}
-                                onClick={handleCreate}
+                                onClick={handleList}
                                 className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
                             >
                                 เบิกใช้
@@ -242,7 +245,7 @@ function SystemOut() {
                             <Button
                                 type="primary"
                                 icon={<ToolOutlined />}
-                                onClick={handleCreate}
+                                onClick={handleRepair}
                                 className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
                             >
                                 เบิกซ่อม

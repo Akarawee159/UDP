@@ -1,0 +1,20 @@
+# client/Dockerfile.dev
+
+# ใช้ Node เวอร์ชั่นเดียวกับที่คุณใช้
+FROM node:24-alpine
+
+WORKDIR /app
+
+# Copy package.json มาก่อนเพื่อ install dependencies (ใช้ cache layer)
+COPY package*.json ./
+
+RUN npm install
+
+# Copy source code ทั้งหมด (จริงๆ เราจะใช้ Volume ทับส่วนนี้อยู่แล้ว แต่ Copy ไว้เผื่อเป็น base)
+COPY . .
+
+# Expose port ที่ Vite รัน (ตาม config คุณคือ 3091)
+EXPOSE 3091
+
+# คำสั่งรัน Dev server
+CMD ["npm", "run", "dev"]

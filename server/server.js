@@ -37,6 +37,8 @@ const packagingRoutes = require("./src/modules/settings/packaging/packagingRoute
 const positionRoutes = require("./src/modules/settings/position/positionRoutes");
 const zoneRoutes = require("./src/modules/settings/zone/zoneRoutes");
 
+const systemOutRoutes = require("./src/modules/smartpackage/systemOut/systemOutRoutes");
+
 const reportEmployeeRoutes = require("./src/modules/reports/reportEmployee/reportEmployeeRoutes");
 const reportTrainingRoutes = require("./src/modules/reports/reportTraining/reportTrainingRoutes");
 const db = require("./src/config/database");
@@ -109,11 +111,18 @@ app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "
 
 /**
  * =========================
- * Reports (main=60)
+ * Smartpackage (main=60)
  * =========================
  */
-app.use("/api/report/employee", auth, permit({ mainId: "60", subId: "601" }), reportEmployeeRoutes);
-app.use("/api/report/training", auth, permit({ mainId: "60", subId: "602" }), reportTrainingRoutes);
+app.use("/api/smartpackage/systemOut", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
+
+/**
+ * =========================
+ * Reports (main=70)
+ * =========================
+ */
+app.use("/api/report/employee", auth, permit({ mainId: "70", subId: "701" }), reportEmployeeRoutes);
+app.use("/api/report/training", auth, permit({ mainId: "70", subId: "702" }), reportTrainingRoutes);
 
 /* --------------------- Static File Serving ------------------- */
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));

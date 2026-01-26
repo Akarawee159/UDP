@@ -1,4 +1,4 @@
-// src/pages/Registration/RegisterAsset/Page/SystemOutList.jsx
+// src/pages/Registration/RegisterAsset/Page/SystemOutRepair.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Form, Input, Button, Select, InputNumber,
@@ -25,7 +25,7 @@ import { useReactToPrint } from 'react-to-print';
 
 const { Title, Text } = Typography;
 
-function SystemOutList() {
+function SystemOutRepair() {
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
 
@@ -423,10 +423,10 @@ function SystemOutList() {
                     />
                     <div>
                         <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2">
-                            <span className="bg-green-600 w-2 h-6 rounded-r-md block"></span>
-                            ทำรายการจ่ายออก
+                            <span className="bg-orange-600 w-2 h-6 rounded-r-md block"></span>
+                            ทำรายการเบิกซ่อม
                         </Title>
-                        <Text className="text-slate-500 text-xs ml-4">ระบบจ่ายออกทรัพย์สิน</Text>
+                        <Text className="text-slate-500 text-xs ml-4">ระบบเบิกซ่อมทรัพย์สิน</Text>
                     </div>
                 </div>
                 <Button
@@ -547,4 +547,4 @@ const SpecInput = ({ label, name, unitName, unitOptions, disabled }) => (
     </div>
 );
 
-export default SystemOutList;
+export default SystemOutRepair;

@@ -40,6 +40,7 @@ import PackagingSize from "./pages/Settings/PackagingSize/PackagingSize";
 // SMART PACKAGE TRACKING
 import SystemOut from "./pages/SmartPackage/SystemOut/SystemOut";
 import SystemOutList from "./pages/SmartPackage/SystemOut/Page/SystemOutList";
+import SystemOutRepair from "./pages/SmartPackage/SystemOut/Page/SystemOutRepair";
 import SystemIn from "./pages/SmartPackage/SystemIn/SystemIn";
 import SystemRepair from "./pages/SmartPackage/SystemRepair/SystemRepair";
 
@@ -272,6 +273,17 @@ export default function App() {
               <ProtectedRoute mainId="60" subId="601">
                 <AdminLayout>
                   <SystemOutList />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/smart-package/system-out/repair"
+            element={
+              <ProtectedRoute mainId="60" subId="601">
+                <AdminLayout>
+                  <SystemOutRepair />
                 </AdminLayout>
               </ProtectedRoute>
             }
