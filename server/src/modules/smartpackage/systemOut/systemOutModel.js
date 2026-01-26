@@ -7,7 +7,7 @@ const db = require('../../../config/database');
 async function getAll() {
   const sql = `
     SELECT *
-    FROM a_tb_aabbff
+    FROM aaaaaaaaaaaaaaaaaaa
   `;
   const [rows] = await db.query(sql);
   return rows;
