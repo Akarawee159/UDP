@@ -11,6 +11,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import api from "../../../../api";
 import DataTable from '../../../../components/aggrid/DataTable';
+import { getSocket } from '../../../../socketClient';
 
 // Import สำหรับการพิมพ์
 import { QRCodeSVG } from 'qrcode.react';
@@ -91,6 +92,49 @@ function AssetDetail() {
 
         fetchAndFilter();
     }, [partCode, message]);
+
+    // --- SOCKET LISTENER (New Addition) ---
+    useEffect(() => {
+        const s = getSocket();
+        if (!s) return;
+
+        const onUpsert = (incomingRow) => {
+            // 1. Update tableData (Filtered list)
+            setTableData(prev => {
+                const idx = prev.findIndex(r => r.asset_code === incomingRow.asset_code);
+                if (idx === -1) return prev; // Not in current view, ignore
+
+                const next = [...prev];
+                // Merge existing data with incoming updates (e.g. print_status)
+                next[idx] = { ...next[idx], ...incomingRow };
+                return next;
+            });
+
+            // 2. Update allData (Raw list)
+            setAllData(prev => {
+                const idx = prev.findIndex(r => r.asset_code === incomingRow.asset_code);
+                if (idx === -1) return prev;
+
+                const next = [...prev];
+                next[idx] = { ...next[idx], ...incomingRow };
+                return next;
+            });
+        };
+
+        const onDelete = ({ asset_code }) => {
+            // Use this for "Cancel" actions or actual Deletes
+            setTableData(prev => prev.filter(r => r.asset_code !== asset_code));
+            setAllData(prev => prev.filter(r => r.asset_code !== asset_code));
+        };
+
+        s.on('registerasset:upsert', onUpsert);
+        s.on('registerasset:delete', onDelete);
+
+        return () => {
+            s.off('registerasset:upsert', onUpsert);
+            s.off('registerasset:delete', onDelete);
+        };
+    }, []);
 
     // --- Print Logic ---
     const handlePrintProcess = useReactToPrint({
@@ -272,15 +316,12 @@ function AssetDetail() {
         },
         {
             checkboxSelection: true,
-            headerCheckboxSelection: true, // ต้องเป็น true
+            headerCheckboxSelection: true,
+            headerCheckboxSelectionFilteredOnly: true,
             width: 50,
             pinned: 'left',
             lockVisible: true,
-
-            // --- แก้ไขตรงนี้ ---
-            // ลบพวก flex justify-center ออก แล้วใส่ชื่อ class เฉพาะลงไป
             headerClass: 'header-center-checkbox',
-
             cellClass: "flex justify-center items-center",
         },
         {

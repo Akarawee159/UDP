@@ -1,13 +1,10 @@
 # server/Dockerfile.dev
 
-# ใช้ Node 24 เหมือน Production
 FROM node:24-alpine
 
 WORKDIR /app
 
-# ----------------------------------------------------
-# 1. ติดตั้ง Chromium และ Font ภาษาไทย (Copy จากไฟล์เดิมมาเลย สำคัญมาก)
-# ----------------------------------------------------
+# 1. Chromium & Fonts setup (คงเดิมไว้)
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -19,18 +16,17 @@ RUN apk add --no-cache \
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-# ----------------------------------------------------
 
 COPY package*.json ./
 
-# เปลี่ยนจาก --production เป็น install ธรรมดา เพื่อให้ได้ devDependencies ครบ
+# 2. ติดตั้ง nodemon แบบ Global เพิ่มเติม
+RUN npm install -g nodemon
 RUN npm install
 
-# Copy source code (จริงๆ จะถูกทับด้วย Volume อยู่แล้ว แต่ทำไว้เป็น base)
 COPY . .
 
 EXPOSE 3092
 
-# ใช้ node --watch (ฟีเจอร์ใหม่ของ Node 18+) แทน nodemon ได้เลย เพราะคุณใช้ Node 24
-# มันจะ restart server ให้เองเมื่อไฟล์มีการเปลี่ยนแปลง
-CMD ["node", "--watch", "server.js"]
+# 3. แก้ CMD เป็น nodemon พร้อมตัวเลือก -L (Legacy Watch)
+# -L คือหัวใจสำคัญสำหรับ Windows Users
+CMD ["nodemon", "-L", "server.js"]

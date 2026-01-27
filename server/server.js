@@ -114,7 +114,7 @@ app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "
  * Smartpackage (main=60)
  * =========================
  */
-app.use("/api/smartpackage/systemOut", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
+app.use("/api/smartpackage/systemout", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
 
 /**
  * =========================

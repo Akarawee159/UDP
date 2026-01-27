@@ -32,7 +32,7 @@ function SystemOut() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/smartpackage/systemOut');
+            const res = await api.get('/smartpackage/systemout');
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);

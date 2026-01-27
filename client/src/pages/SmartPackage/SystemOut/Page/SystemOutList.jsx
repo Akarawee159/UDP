@@ -1,550 +1,382 @@
-// src/pages/Registration/RegisterAsset/Page/SystemOutList.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-    Form, Input, Button, Select, InputNumber,
-    Row, Col, Card, Image, Typography, Divider, App, Grid, Badge
+    Form, Input, Button, Select, Row, Col, Card, Image, Typography,
+    App, Grid, Space, Descriptions, Divider
 } from 'antd';
 import {
-    SaveOutlined, DeleteOutlined,
-    SearchOutlined, PrinterOutlined,
-    QrcodeOutlined, ArrowLeftOutlined, CloseOutlined,
-    BarcodeOutlined, FileTextOutlined,
-    UserOutlined, NumberOutlined,
-    BgColorsOutlined, ExpandAltOutlined, InboxOutlined,
-    PictureOutlined
+    ArrowLeftOutlined, CloseOutlined, ReloadOutlined,
+    InboxOutlined, QrcodeOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
-import api from "../../../../api";
-import { ThaiDateInput } from '../../../../components/form/ThaiDateInput';
+import api from "../../../../api"; // path ของ axios instance คุณ
 import DataTable from '../../../../components/aggrid/DataTable';
-
-// Import สำหรับการพิมพ์
-import { QRCodeSVG } from 'qrcode.react';
-import { useReactToPrint } from 'react-to-print';
 
 const { Title, Text } = Typography;
 
 function SystemOutList() {
-    const screens = Grid.useBreakpoint();
-    const isMd = !!screens.md;
-
-    const containerStyle = useMemo(() => ({
-        margin: isMd ? '-8px' : '0',
-        padding: isMd ? '16px' : '12px',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-    }), [isMd]);
-
     const navigate = useNavigate();
-    const { message, modal } = App.useApp?.() || { message: { success: console.log, error: console.error }, modal: {} };
+    const { message, modal } = App.useApp();
     const [form] = Form.useForm();
 
     // State
-    const [tableData, setTableData] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [displayedImage, setDisplayedImage] = useState(null);
-    const [unitOptions, setUnitOptions] = useState([]);
-    const [isModalListOpen, setIsModalListOpen] = useState(false);
-    const [lastSavedLot, setLastSavedLot] = useState(null);
-    const [isPrinting, setIsPrinting] = useState(false);
+    const [scannedList, setScannedList] = useState([]); // ข้อมูลตาราง (Status 16)
+    const [lastScanned, setLastScanned] = useState(null); // ข้อมูลตัวล่าสุดที่สแกน (แสดงข้างบน)
+    const [zones, setZones] = useState([]); // Dropdown data
+    const [loading, setLoading] = useState(false);
 
-    // state สำหรับเก็บข้อมูล drawing ชั่วคราวเมื่อเลือก Material
-    const [selectedDrawings, setSelectedDrawings] = useState({});
+    // Ag-Grid Ref
+    const gridApiRef = useRef(null);
+    const [selectedIds, setSelectedIds] = useState([]);
 
-    // State สำหรับล็อกฟอร์ม
-    const [isFormLocked, setIsFormLocked] = useState(false);
-
-    // State สำหรับ Selection และ Printing
-    const [selectedRows, setSelectedRows] = useState([]);
-    const [printList, setPrintList] = useState([]); // เก็บ Array ของข้อมูลที่จะ Print
-    const printRef = useRef();
-
-    // --- Print Logic ---
-    const handlePrintProcess = useReactToPrint({
-        contentRef: printRef,
-        onAfterPrint: () => {
-            setPrintList([]); // Clear หลังจากพิมพ์เสร็จ
-            setIsPrinting(false); // <--- 3. หยุด Loading เมื่อพิมพ์เสร็จ/ยกเลิก
-        },
-        onPrintError: () => {
-            setIsPrinting(false); // <--- 4. หยุด Loading หากมี Error ตอนเรียก Print
-        }
-    });
-
-    // 1. ฟังก์ชันพิมพ์รายตัว (จากปุ่มในตาราง)
-    const handleIndividualPrint = async (row) => {
-        setIsPrinting(true);
+    // --- 1. โหลดข้อมูลเริ่มต้น ---
+    const fetchData = useCallback(async () => {
+        setLoading(true);
         try {
-            const res = await api.patch(`/smartpackage/systemOut/print/${row.asset_code}`);
-
-            if (res.data?.success) {
-                // รับค่าที่ Backend ส่งกลับมา
-                const { print_status, is_status, is_status_name, is_status_color } = res.data;
-
-                setTableData(prev => prev.map(item =>
-                    item.asset_code === row.asset_code
-                        ? {
-                            ...item,
-                            print_status,           // อัปเดตเลขจำนวนครั้ง
-                            is_status,              // อัปเดตรหัสสถานะ (21/22)
-                            is_status_name,         // อัปเดตชื่อสถานะ
-                            is_status_color         // อัปเดตสี
-                        }
-                        : item
-                ));
-
-                setPrintList([row]);
-                setTimeout(() => handlePrintProcess(), 100);
-            } else {
-                setIsPrinting(false);
-            }
+            const [resList, resZone] = await Promise.all([
+                api.get('/smartpackage/systemout/list'),
+                api.get('/smartpackage/systemout/dropdowns')
+            ]);
+            setScannedList(resList.data.data || []);
+            setZones(resZone.data.zones || []);
         } catch (err) {
             console.error(err);
-            message.error("ไม่สามารถอัปเดตสถานะการพิมพ์ได้");
-            setIsPrinting(false);
+        } finally {
+            setLoading(false);
         }
-    };
+    }, []);
 
-    // 2. ฟังก์ชันพิมพ์หลายรายการ (จากปุ่มด้านบน)
-    const handleBulkPrint = async () => {
-        if (selectedRows.length === 0) {
-            message.warning("กรุณาเลือกรายการที่ต้องการพิมพ์");
-            return;
-        }
-
-        setIsPrinting(true);
-        try {
-            // เรียก API (Backend จะเปลี่ยน is_status เป็น 21 หรือ 22 ให้เอง)
-            // และ map promise เพื่อรอผลลัพธ์ทั้งหมด
-            const updatePromises = selectedRows.map(row =>
-                api.patch(`/smartpackage/systemOut/print/${row.asset_code}`)
-            );
-
-            // รอให้ Backend ทำงานเสร็จทุกตัว และรับค่าผลลัพธ์กลับมา
-            const responses = await Promise.all(updatePromises);
-
-            // สร้าง Map ของข้อมูลใหม่ โดยใช้ asset_code เป็น Key เพื่อให้ค้นหาง่าย
-            const updatesMap = {};
-            responses.forEach((res, index) => {
-                // เช็คว่า API สำเร็จหรือไม่
-                if (res.data?.success) {
-                    // ใช้ asset_code จาก selectedRows ตัวที่ index ตรงกัน (เพราะ Promise.all คืนค่าตามลำดับ)
-                    const assetCode = selectedRows[index].asset_code;
-                    updatesMap[assetCode] = res.data; // เก็บข้อมูลใหม่ที่ได้จาก Server (status, color, name)
-                }
-            });
-
-            // Update หน้าจอ Frontend ด้วยข้อมูลจริงจาก Server (Realtime & Dynamic)
-            setTableData(prev => prev.map(item => {
-                // ถ้า item นี้มีการอัปเดต (อยู่ใน updatesMap) ให้ใช้ค่าใหม่
-                if (updatesMap[item.asset_code]) {
-                    const newData = updatesMap[item.asset_code];
-                    return {
-                        ...item,
-                        print_status: newData.print_status,           // จำนวนครั้งที่พิมพ์
-                        is_status: newData.is_status,                 // รหัสสถานะ (21/22)
-                        is_status_name: newData.is_status_name,       // ชื่อสถานะ (ดึงจาก Master Data)
-                        is_status_color: newData.is_status_color      // สีสถานะ (ดึงจาก Master Data)
-                    };
-                }
-                return item;
-            }));
-
-            setPrintList(selectedRows);
-            setTimeout(() => handlePrintProcess(), 100);
-
-        } catch (err) {
-            console.error(err);
-            message.error("เกิดข้อผิดพลาดในการเตรียมพิมพ์หมู่");
-            setIsPrinting(false);
-        }
-    };
-
-    // --- Fetch Options ---
     useEffect(() => {
-        const fetchOptions = async () => {
-            try {
-                const res = await api.get('/masterdata/material/options');
-                const data = res.data?.data || {};
-                if (data.units) {
-                    const opts = data.units.map(u => ({ label: u.name, value: u.name }));
-                    setUnitOptions(opts);
-                }
-            } catch (err) {
-                console.error("Error fetching options:", err);
+        fetchData();
+    }, [fetchData]);
+
+    // --- 2. Socket Listener (Real-time) ---
+    useEffect(() => {
+        const handleSocketUpdate = (event) => {
+            // เมื่อมีการ Scan หรือ Return จากเครื่องอื่น หรือเครื่องนี้
+            // ให้โหลดข้อมูลตารางใหม่ทันที
+            console.log("Socket Update Received:", event.detail);
+            fetchData();
+
+            // ถ้า action เป็น scan และเราเป็นคนสแกน (หรืออยากให้เด้งล่าสุดเหมือนกัน)
+            if (event.detail?.action === 'scan' && event.detail?.data) {
+                // อัปเดตตัวโชว์ข้างบน (Optional: เช็คว่าเป็นเครื่องเราไหม หรือจะโชว์หมด)
+                setLastScanned(event.detail.data);
+                message.success('สแกนสำเร็จ: ' + event.detail.data.asset_code);
             }
         };
-        fetchOptions();
-        form.setFieldsValue({ asset_lot: 'Auto Generate' });
-    }, [form]);
 
-    // คัดลอก remark จาก Material ไปยัง asset_remark
-    const handleMaterialSelect = (material) => {
-        form.setFieldsValue({
-            asset_code: material.material_code,
-            asset_detail: material.material_name,
-            asset_type: material.material_type,
-            asset_remark: material.material_remark,
-            asset_width: material.material_width,
-            asset_width_unit: material.material_width_unit,
-            asset_length: material.material_length,
-            asset_length_unit: material.material_length_unit,
-            asset_height: material.material_height,
-            asset_height_unit: material.material_height_unit,
-            asset_capacity: material.material_capacity,
-            asset_capacity_unit: material.material_capacity_unit,
-            asset_weight: material.material_weight,
-            asset_weight_unit: material.material_weight_unit,
-        });
+        window.addEventListener('hrms:systemout-update', handleSocketUpdate);
+        return () => window.removeEventListener('hrms:systemout-update', handleSocketUpdate);
+    }, [fetchData, message]);
 
-        setSelectedDrawings({
-            drawing_001: material.drawing_001 || '',
-            drawing_002: material.drawing_002 || '',
-            drawing_003: material.drawing_003 || '',
-            drawing_004: material.drawing_004 || '',
-            drawing_005: material.drawing_005 || '',
-            drawing_006: material.drawing_006 || '',
-        });
+    // --- 3. QR Code Scanner Logic ---
+    useEffect(() => {
+        let buffer = '';
+        let timeout = null;
 
-        if (material.material_image) {
-            const url = `${import.meta.env.VITE_API_PATH.replace('/api', '')}/img/material/${material.material_image}`;
-            setDisplayedImage(url);
-        } else {
-            setDisplayedImage(null);
-        }
-        message.success(`เลือกรายการ: ${material.material_code} เรียบร้อย`);
+        const handleKeyDown = (e) => {
+            // ถ้าเผลอกด Enter ก็ให้ทำงานตามปกติ
+            if (e.key === 'Enter') {
+                if (buffer.trim().length > 0) handleScanProcess(buffer.trim());
+                buffer = '';
+                clearTimeout(timeout);
+                return;
+            }
+
+            // เก็บค่าปุ่ม (กรองปุ่มพิเศษออก)
+            if (e.key.length === 1) {
+                buffer += e.key;
+            }
+
+            // Reset Timeout ทุกครั้งที่กดปุ่ม
+            clearTimeout(timeout);
+
+            // 🟢 แก้ไขตรงนี้: ถ้าหยุดพิมพ์เกิน 300ms ให้ตรวจสอบว่ามีข้อมูลไหม ถ้ามีให้ส่งเลย
+            timeout = setTimeout(() => {
+                if (buffer.length > 10) { // ถ้า buffer ยาวกว่า 10 ตัวอักษร น่าจะเป็น QR Code
+                    console.log("Auto submitting buffer:", buffer);
+                    handleScanProcess(buffer);
+                }
+                buffer = '';
+            }, 300); // ขยายเวลาเป็น 300ms เผื่อเครื่องคอมช้า
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // ฟังก์ชันแปลงปุ่มที่กดผิดจากแป้นไทย ให้กลับเป็นอังกฤษ
+    const fixThaiInput = (str) => {
+        // ถ้ามี | อยู่แล้ว แสดงว่าถูกต้อง ไม่ต้องแก้
+        if (str.includes('|')) return str;
+
+        // Map แป้นไทย (Kedmanee) -> อังกฤษ
+        const map = {
+            'ๅ': '1', '/': '2', '-': '3', 'ภ': '4', 'ถ': '5', 'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0',
+            'ข': '-',  // ขีดกลาง
+            'ฅ': '|',  // Pipe (Shift + \)
+            '%': '|'   // บางที Scanner ส่ง Shift+5 แทน (กรณีแปลกๆ) แต่หลักๆ คือ ฅ
+        };
+
+        return str.split('').map(char => map[char] || char).join('');
     };
 
-    const handleSave = async () => {
+    const handleScanProcess = async (qrString) => {
         try {
-            const values = await form.validateFields();
-            const payload = {
-                ...values,
-                asset_date: values.asset_date ? dayjs(values.asset_date).format('YYYY-MM-DD') : null,
-                asset_img: displayedImage ? displayedImage.split('/').pop() : '',
-                ...selectedDrawings
-            };
+            // ✅ แก้ไข: แปลงค่าก่อนใช้งาน
+            const fixedQr = fixThaiInput(qrString);
 
-            const res = await api.post('/smartpackage/systemOut', payload);
+            console.log("Original:", qrString, "Fixed:", fixedQr); // ดู Log เพื่อ debug
 
-            if (res.data?.success) {
-                const newRows = res.data.data;
-                const createdLot = res.data.lot;
+            // เรียก API Scan ส่งค่าที่แก้แล้วไป
+            const res = await api.post('/smartpackage/systemout/scan', { qrString: fixedQr });
 
-                // ✅ แก้ไข: ให้แสดงเฉพาะรายการที่สร้างล่าสุดเท่านั้น (Replace ไม่ใช่ Append)
-                setTableData(newRows);
-
-                setLastSavedLot(createdLot);
-                form.setFieldValue('asset_lot', createdLot);
-                setIsFormLocked(true);
-                message.success(res.data.message || 'บันทึกข้อมูลสำเร็จ');
+            if (res.data.success) {
+                setLastScanned(res.data.data);
+                // อาจจะเพิ่มเสียง Beep ยืนยันความถูกต้องตรงนี้
             }
-
-        } catch (error) {
-            console.error('Save Failed:', error);
-            if (error?.errorFields) {
-                message.error('กรุณากรอกข้อมูลให้ครบถ้วน');
-            } else {
-                message.error('เกิดข้อผิดพลาดในการบันทึก: ' + (error?.response?.data?.message || error.message));
-            }
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            message.error(`Scan Error: ${msg}`);
         }
     };
 
-    const handleClearAll = () => {
-        if (!lastSavedLot) {
-            doClearForm();
+    // --- 4. ปุ่มคืนคลัง ---
+    const handleReturnToStock = async () => {
+        if (selectedIds.length === 0) {
+            message.warning('กรุณาเลือกรายการที่จะคืนคลัง');
             return;
         }
-
-        modal.confirm({
-            title: `ยืนยันการลบ Lot: ${lastSavedLot}`,
-            content: `คุณต้องการลบรายการล่าสุด ใช่หรือไม่?`,
-
-            // --- ส่วนที่แก้ไข: สลับข้อความและสไตล์ ---
-            // ให้ปุ่มทางซ้าย (เดิมคือ Cancel) แสดงข้อความ "ยืนยันลบ" และเป็นสีแดง
-            cancelText: 'ยืนยันลบ',
-            cancelButtonProps: {
-                type: 'primary',
-                danger: true
-            },
-
-            // ให้ปุ่มทางขวา (เดิมคือ OK) แสดงข้อความ "ยกเลิก" และเป็นปุ่มธรรมดา
-            okText: 'ยกเลิก',
-            okType: 'default',
-            okButtonProps: {
-                danger: false
-            },
-            // -------------------------------------
-
-            // ย้าย Logic การลบมาไว้ที่ onCancel แทน (เพราะตอนนี้ปุ่มลบคือปุ่มทางซ้าย)
-            onCancel: async () => {
-                try {
-                    const res = await api.delete(`/smartpackage/systemOut/${lastSavedLot}`);
-                    if (res.data?.success) {
-                        message.success(`ลบรายการ Lot ${lastSavedLot} เรียบร้อยแล้ว`);
-                        setTableData([]);
-                        setLastSavedLot(null);
-                        doClearForm();
-                    }
-                } catch (err) {
-                    message.error('ไม่สามารถลบข้อมูลได้: ' + (err?.response?.data?.message || err.message));
-                    // ต้อง throw error เพื่อให้ Modal รู้ว่า process ไม่สำเร็จ (หยุด loading ถ้ามี)
-                    throw err;
-                }
-            },
-
-            // ปุ่ม OK (ทางขวา) กลายเป็นปุ่มยกเลิก ไม่ต้องทำอะไร (Modal จะปิดเอง)
-            onOk: () => { }
-        });
+        try {
+            // ส่งไป Backend (Backend ต้องรับ ids เป็น array ของ asset_code)
+            await api.post('/smartpackage/systemout/return', { ids: selectedIds });
+            message.success('คืนคลังเรียบร้อย');
+            setSelectedIds([]);
+            gridApiRef.current?.deselectAll();
+        } catch (err) {
+            message.error('เกิดข้อผิดพลาดในการคืนคลัง');
+        }
     };
 
-    const doClearForm = () => {
-        form.resetFields();
-        form.setFieldValue('asset_lot', 'Auto Generate');
-        setDisplayedImage(null);
-        setSelectedDrawings({});
-        setIsFormLocked(false);
-        message.info('ล้างแบบฟอร์มเรียบร้อย');
+    // --- 5. Column Definition ---
+    // Helper สร้าง URL รูป
+    const getImgUrl = (filename, type = 'material') => {
+        if (!filename) return null;
+        const baseUrl = api.defaults.baseURL.replace('/api', ''); // ตัด /api ออกเพื่อเข้าถึง static files
+        const folder = type === 'drawing' ? 'img/material/drawing' : 'img/material';
+        return `${baseUrl}/${folder}/${filename}`;
     };
 
-    // --- Column Definitions ---
     const columnDefs = useMemo(() => [
+        {
+            headerName: '',
+            checkboxSelection: true,
+            headerCheckboxSelection: true,
+            width: 50,
+            pinned: 'left'
+        },
         {
             headerName: 'ลำดับ',
             valueGetter: "node.rowIndex + 1",
-            width: 60,
-            pinned: 'left',
-            cellClass: "flex justify-center items-center",
-            headerClass: "text-center justify-center",
+            width: 70,
+            pinned: 'left'
         },
+        { headerName: 'QR CODE (Label)', field: 'label_register', width: 220 },
+        { headerName: 'Lot', field: 'asset_lot', width: 120 },
         {
-            checkboxSelection: true,
-            headerCheckboxSelection: true, // ต้องเป็น true
-            width: 50,
-            pinned: 'left',
-            lockVisible: true,
-
-            // --- แก้ไขตรงนี้ ---
-            // ลบพวก flex justify-center ออก แล้วใส่ชื่อ class เฉพาะลงไป
-            headerClass: 'header-center-checkbox',
-
-            cellClass: "flex justify-center items-center",
-        },
-        {
-            headerName: 'Label', field: 'label_register', width: 120, pinned: 'left',
-            cellRenderer: (params) => (
-                <Button
-                    type="dashed"
-                    size="small"
-                    // เพิ่ม loading ตรงนี้
-                    loading={isPrinting}
-                    // เพิ่ม disabled เพื่อกันกดซ้ำ
-                    disabled={isPrinting}
-                    icon={!isPrinting && <div className="flex items-center gap-1"><QrcodeOutlined /><PrinterOutlined /></div>}
-                    className="flex items-center justify-center w-full text-blue-600 border-blue-200 hover:border-blue-500 hover:text-blue-500 bg-blue-50"
-                    onClick={() => handleIndividualPrint(params.data)}
-                >
-                    {isPrinting ? 'รอ...' : 'Print'}
-                </Button>
-            )
-        },
-        {
-            headerName: 'สถานะปริ้น', field: 'print_status', width: 150,
+            headerName: 'สถานะ',
+            field: 'status_name',
+            width: 150,
             cellRenderer: (params) => {
-                const val = parseInt(params.value) || 0;
-                if (val === 0) return <span className="text-orange-500 font-medium">ยังไม่ปริ้น</span>;
-                if (val === 1) return <span className="text-green-600 font-bold">ปริ้นแล้ว</span>;
-                return <span className="text-blue-600 font-bold">ปริ้นครั้งที่ {val}</span>;
-            }
-        },
-        {
-            headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
-            cellRenderer: (params) => {
-                // Dynamic Status: ชื่อจาก asset_status_name, สีจาก asset_status_color (Tailwind class)
-                const name = params.data.asset_status_name || params.value;
-                const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+                const colorClass = params.data.status_class || 'bg-gray-100 text-gray-800 border-gray-200';
+                // แปลง Tailwind class string เป็น style object อย่างง่าย หรือใช้ className ใน span
+                // แต่ AgGrid cellRenderer return JSX ได้
                 return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
-                        {name}
-                    </div>
+                    <span className={`px-2 py-1 rounded border text-xs font-bold ${colorClass}`}>
+                        {params.value}
+                    </span>
                 );
             }
         },
         {
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
-            cellRenderer: (params) => {
-                // Dynamic Status
-                const name = params.data.is_status_name || params.value;
-                const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
-                return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
-                        {name}
-                    </div>
-                );
-            }
+            headerName: 'รูปภาพ',
+            field: 'asset_img',
+            width: 100,
+            cellRenderer: (params) => params.value ? (
+                <Image
+                    src={getImgUrl(params.value)}
+                    height={30}
+                    preview={{ mask: <InboxOutlined /> }}
+                />
+            ) : '-'
         },
-        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 180 },
-        { headerName: 'Lot No', field: 'asset_lot', width: 150 },
-        { headerName: 'รายละเอียดทรัพย์สิน', field: 'asset_detail', width: 200 },
-        { headerName: 'ประเภททรัพย์สิน', field: 'asset_type', width: 180 },
-        { headerName: 'ที่อยู่ทรัพย์สิน', field: 'asset_location', width: 150 },
-        { headerName: 'Part Code', field: 'partCode', width: 150 },
-        { headerName: 'Part Name', field: 'partName', width: 150 },
-        { headerName: 'Label Code', field: 'label_register', width: 150 },
-        { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
-        { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
-        { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
-    ], [isPrinting]);
-
-    const filteredRows = useMemo(() => {
-        if (!searchTerm) return tableData;
-        const lower = searchTerm.toLowerCase();
-        return tableData.filter(r =>
-            String(r.asset_code || '').toLowerCase().includes(lower) ||
-            String(r.asset_detail || '').toLowerCase().includes(lower) ||
-            String(r.partName || '').toLowerCase().includes(lower)
-        );
-    }, [tableData, searchTerm]);
+        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 150 },
+        { headerName: 'ชื่อทรัพย์สิน', field: 'asset_detail', flex: 1, minWidth: 200 },
+        { headerName: 'ประเภท', field: 'asset_type', width: 120 },
+        { headerName: 'ผู้ผลิต', field: 'asset_supplier_name', width: 150 },
+        { headerName: 'รายละเอียด', field: 'asset_remark', width: 200 },
+    ], []);
 
     return (
-        <div style={containerStyle} className="bg-slate-50 relative">
-
-            {/* --- Header Bar (Sticky Top) --- */}
-            <div className="bg-white px-6 py-2 border-b rounded-md border-gray-300 flex items-center justify-between sticky top-0 z-20 shadow-sm backdrop-blur-sm bg-white/90">
+        <div className="flex flex-col min-h-screen bg-slate-50">
+            {/* Header Sticky */}
+            <div className="bg-white px-6 py-2 border-b border-gray-300 flex items-center justify-between sticky top-0 z-20 shadow-sm">
                 <div className="flex items-center gap-4">
-                    <Button
-                        icon={<ArrowLeftOutlined />}
-                        onClick={() => navigate(-1)}
-                        shape="circle"
-                        className="border-gray-200 text-slate-500 hover:text-blue-600 hover:border-blue-600"
-                    />
+                    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} shape="circle" />
                     <div>
-                        <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2">
+                        <Title level={4} style={{ margin: 0 }} className="flex items-center gap-2">
                             <span className="bg-green-600 w-2 h-6 rounded-r-md block"></span>
-                            ทำรายการจ่ายออก
+                            ทำรายการจ่ายออก (System Out)
                         </Title>
-                        <Text className="text-slate-500 text-xs ml-4">ระบบจ่ายออกทรัพย์สิน</Text>
                     </div>
                 </div>
-                <Button
-                    type="text"
-                    danger
-                    icon={<CloseOutlined />}
-                    onClick={() => navigate(-1)}
-                    className="hover:bg-red-50 rounded-full"
-                >
-                    ปิด
-                </Button>
+                <Button danger icon={<CloseOutlined />} onClick={() => navigate(-1)}>ปิด</Button>
             </div>
 
-            {/* --- Main Content --- */}
-            <div className="p-2 flex-1 overflow-hidden flex flex-col">
+            {/* Content */}
+            <div className="p-4 space-y-4">
 
-                {/* === SECTION 1: Form === */}
+                {/* PART 1: รายละเอียดจากการสแกนล่าสุด */}
+                <Card size="small" className="shadow-sm border-blue-200" title={<span><QrcodeOutlined /> ข้อมูลจากการสแกนล่าสุด</span>}>
+                    {lastScanned ? (
+                        <Row gutter={[16, 16]}>
+                            <Col xs={24} md={4} className="text-center">
+                                <Image
+                                    src={getImgUrl(lastScanned.asset_img)}
+                                    height={150}
+                                    className="object-contain border rounded p-1"
+                                    fallback="https://via.placeholder.com/150?text=No+Image"
+                                />
+                            </Col>
+                            <Col xs={24} md={12}>
+                                <Descriptions column={2} size="small" bordered>
+                                    <Descriptions.Item label="รหัสทรัพย์สิน">{lastScanned.asset_code}</Descriptions.Item>
+                                    <Descriptions.Item label="ประเภท">{lastScanned.asset_type}</Descriptions.Item>
+                                    <Descriptions.Item label="ชื่อทรัพย์สิน" span={2} labelStyle={{ fontWeight: 'bold', color: 'blue' }}>
+                                        {lastScanned.asset_detail}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="รายละเอียด" span={2}>{lastScanned.asset_remark || '-'}</Descriptions.Item>
+                                    <Descriptions.Item label="ขนาด (กxยxส)">
+                                        {`${lastScanned.asset_width || 0} x ${lastScanned.asset_length || 0} x ${lastScanned.asset_height || 0} ${lastScanned.asset_width_unit || ''}`}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="น้ำหนัก / ความจุ">
+                                        {`${lastScanned.asset_weight || 0} ${lastScanned.asset_weight_unit || ''} / ${lastScanned.asset_capacity || 0} ${lastScanned.asset_capacity_unit || ''}`}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                            </Col>
+                            <Col xs={24} md={8}>
+                                <Text strong>แบบ Drawing:</Text>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {[1, 2, 3, 4, 5, 6].map(i => {
+                                        const dwg = lastScanned[`asset_dmg_00${i}`];
+                                        if (!dwg) return null;
+                                        return (
+                                            <Image
+                                                key={i}
+                                                src={getImgUrl(dwg, 'drawing')}
+                                                width={60} height={60}
+                                                className="border rounded object-cover"
+                                            />
+                                        )
+                                    })}
+                                </div>
+                            </Col>
+                        </Row>
+                    ) : (
+                        <div className="text-center py-8 text-gray-400">
+                            <QrcodeOutlined style={{ fontSize: 48 }} />
+                            <p>กรุณาสแกน QR Code เพื่อเริ่มรายการ</p>
+                        </div>
+                    )}
+                </Card>
 
+                {/* PART 2: Split View */}
+                <Row gutter={16}>
+                    {/* LEFT 30%: Form ข้อมูลจ่ายออก */}
+                    <Col xs={24} md={7} lg={7}>
+                        <Card title="ข้อมูลจ่ายออก" className="h-full shadow-sm" size="small">
+                            <Form layout="vertical" form={form} initialValues={{ objective: 'wait_issue' }}>
+                                <Form.Item label="เลขที่เอกสารใบเบิก (Ref ID)" name="docNo">
+                                    <Input placeholder="ระบุเลขที่เอกสาร" />
+                                </Form.Item>
+                                <Form.Item label="วัตถุประสงค์" name="objective">
+                                    <Select>
+                                        <Select.Option value="wait_issue">รอจ่ายออก</Select.Option>
+                                        <Select.Option value="issue">จ่ายใช้งาน</Select.Option>
+                                        <Select.Option value="sell">จำหน่าย</Select.Option>
+                                    </Select>
+                                </Form.Item>
+                                <Form.Item label="ต้นทาง" name="origin">
+                                    <Select placeholder="เลือกต้นทาง" showSearch optionFilterProp="children">
+                                        {zones.map(z => <Select.Option key={z.name} value={z.name}>{z.name}</Select.Option>)}
+                                    </Select>
+                                </Form.Item>
+                                <Form.Item label="ปลายทาง" name="destination">
+                                    <Select placeholder="เลือกปลายทาง" showSearch optionFilterProp="children">
+                                        {zones.map(z => <Select.Option key={z.name} value={z.name}>{z.name}</Select.Option>)}
+                                    </Select>
+                                </Form.Item>
+                                <Button type="primary" block icon={<SaveOutlined />}>บันทึกข้อมูลจ่ายออก</Button>
+                            </Form>
+                        </Card>
+                    </Col>
 
-                {/* === SECTION 2: Table === */}
-
-
-            </div>
-
-            {/* --- Hidden Print Component --- */}
-            <div style={{ display: 'none' }}>
-                <div ref={printRef}>
-                    {/* Loop แสดงรายการที่เลือกพิมพ์ทั้งหมด */}
-                    {printList.map((item, index) => (
-                        <div key={index} style={{
-                            width: '5.5cm',
-                            height: '3.5cm',
-                            padding: '0.2cm',
-                            boxSizing: 'border-box',
-                            display: 'flex',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            border: '1px solid #ddd',
-                            overflow: 'hidden',
-                            pageBreakAfter: 'always',
-                            fontFamily: 'sans-serif'
-                        }}>
-                            <div style={{ flex: 1, overflow: 'hidden', fontSize: '10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>รหัสทรัพย์สิน : {item.asset_code}</div>
-                                <div>Lot No: {item.asset_lot}</div>
+                    {/* RIGHT 70%: DataTable */}
+                    <Col xs={24} md={17} lg={17}>
+                        <div className="bg-white p-4 rounded-lg shadow-sm h-full flex flex-col">
+                            <div className="flex justify-between items-center mb-2">
+                                <Title level={5} style={{ margin: 0 }}>รายการจ่ายออก ({scannedList.length})</Title>
+                                <Space>
+                                    <Button
+                                        danger
+                                        type="primary"
+                                        icon={<ReloadOutlined />}
+                                        onClick={handleReturnToStock}
+                                        disabled={selectedIds.length === 0}
+                                    >
+                                        คืนคลัง
+                                    </Button>
+                                </Space>
                             </div>
-                            <div style={{ marginLeft: '5px' }}>
-                                <QRCodeSVG
-                                    value={item.label_register}
-                                    size={80} // ปรับขนาดตามความเหมาะสมกับพื้นที่ 3.5cm
-                                    level={"M"}
+
+                            <div className="flex-1" style={{ minHeight: 400 }}>
+                                <DataTable
+                                    rowData={scannedList}
+                                    columnDefs={columnDefs}
+                                    loading={loading}
+
+                                    // ✅ เพิ่มใหม่: บอก Ag-Grid ว่า Unique Key ของแถวคือ 'asset_code' 
+                                    // (ถ้าไม่ใส่ Ag-Grid จะหา 'id' ไม่เจอแล้วจะทำงานรวน)
+                                    getRowId={(params) => params.data.asset_code}
+
+                                    onGridReady={(params) => {
+                                        gridApiRef.current = params.api;
+                                    }}
+
+                                    // ✅ แก้ไข: ตอนติ๊กเลือก ให้ดึงค่า asset_code แทน id
+                                    onSelectionChanged={(params) => {
+                                        const selected = params.api.getSelectedRows();
+                                        // เปลี่ยน r.id -> r.asset_code
+                                        setSelectedIds(selected.map(r => r.asset_code));
+                                    }}
+
+                                    rowSelection={{
+                                        mode: 'multiRow',
+                                        checkboxes: true,
+                                        headerCheckbox: true
+                                    }}
                                 />
                             </div>
                         </div>
-                    ))}
-                </div>
-            </div>
+                    </Col>
+                </Row>
 
-            {/* CSS Override for InputNumber QTY */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                .input-qty-highlight input {
-                    text-align: center !important;
-                    color: white !important;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-                .input-qty-highlight .ant-input-number-handler-wrap {
-                    opacity: 0.5;
-                    background: rgba(255,255,255,0.1);
-                }
-                .input-qty-highlight:hover .ant-input-number-handler-wrap {
-                    opacity: 1;
-                }
-                .input-qty-highlight .ant-input-number-handler-up,
-                .input-qty-highlight .ant-input-number-handler-down {
-                    border-left: 1px solid rgba(255,255,255,0.2);
-                }
-                .input-qty-highlight .anticon {
-                    color: white;
-                }
-            `}} />
+            </div>
         </div>
     );
 }
 
-// Helper Component for Specs
-const SpecInput = ({ label, name, unitName, unitOptions, disabled }) => (
-    <div className="flex items-center justify-between gap-2 text-sm">
-        <div className="text-slate-500 w-24 flex-shrink-0">{label}</div>
-        <div className={`flex flex-1 shadow-sm rounded-md overflow-hidden border border-gray-200 transition-colors ${disabled ? 'bg-gray-100' : 'focus-within:border-blue-400'}`}>
-            <Form.Item name={name} noStyle>
-                <InputNumber
-                    placeholder="0.00"
-                    className="flex-1 border-0 shadow-none !rounded-none focus:shadow-none"
-                    min={0}
-                    precision={2}
-                    disabled={disabled} // ตอนนี้จะใช้งานได้แล้ว
-                    onKeyPress={(event) => {
-                        if (!/[0-9.]/.test(event.key)) {
-                            event.preventDefault();
-                        }
-                    }}
-                />
-            </Form.Item>
-            <div className="w-px bg-gray-200"></div>
-            <Form.Item name={unitName} noStyle>
-                <Select
-                    placeholder="หน่วย"
-                    style={{ width: 160 }}
-                    options={unitOptions}
-                    variant="borderless"
-                    className="bg-slate-50 text-xs"
-                    disabled={disabled} // ตอนนี้จะใช้งานได้แล้ว
-                />
-            </Form.Item>
-        </div>
-    </div>
-);
+// Icon Save ต้อง import เพิ่ม
+import { SaveOutlined } from '@ant-design/icons';
 
 export default SystemOutList;

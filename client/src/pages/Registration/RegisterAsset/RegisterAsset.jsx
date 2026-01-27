@@ -49,20 +49,33 @@ function RegisterAsset() {
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
+
         const onUpsert = (row) => {
             setRows((prev) => {
-                const idx = prev.findIndex((r) => r.asset_id === row.asset_id);
-                if (idx === -1) return [...prev, row].sort((a, b) => a.asset_id - b.asset_id);
+                // FIX: Use 'asset_code' instead of 'asset_id'
+                const idx = prev.findIndex((r) => r.asset_code === row.asset_code);
+
+                if (idx === -1) {
+                    // New Record
+                    return [...prev, row].sort((a, b) => a.asset_code.localeCompare(b.asset_code));
+                }
+
+                // Update Existing Record
+                // We merge the new data (row) into the old data (prev[idx])
                 const next = prev.slice();
-                next[idx] = row;
+                next[idx] = { ...next[idx], ...row };
                 return next;
             });
         };
-        const onDelete = ({ asset_id }) => {
-            setRows((prev) => prev.filter((r) => r.asset_id !== asset_id));
+
+        const onDelete = ({ asset_code }) => {
+            // FIX: Use 'asset_code' instead of 'asset_id'
+            setRows((prev) => prev.filter((r) => r.asset_code !== asset_code));
         };
+
         s.on('registerasset:upsert', onUpsert);
         s.on('registerasset:delete', onDelete);
+
         return () => {
             s.off('registerasset:upsert', onUpsert);
             s.off('registerasset:delete', onDelete);
@@ -104,6 +117,7 @@ function RegisterAsset() {
                     asset_type: row.asset_type,
                     count_total: 0,
                     count_normal: 0,
+                    count_prepare: 0,
                     count_use: 0,
                     count_damaged: 0,
                     count_repair: 0,
@@ -125,6 +139,11 @@ function RegisterAsset() {
             // แยกนับ "เบิกใช้" เฉพาะ 11 ด้วย
             if (status === '11') {
                 groups[key].count_use++;
+            }
+
+            // แยกนับ "เบิกใช้" เฉพาะ 16 ด้วย
+            if (status === '16') {
+                groups[key].count_prepare++;
             }
 
             // สถานะอื่นๆ
@@ -198,6 +217,13 @@ function RegisterAsset() {
                     headerName: 'ปกติ', // Status 10 + 11
                     width: 100,
                     field: 'count_normal',
+                    cellRenderer: p => valUnit(p.value),
+                    cellClass: "text-center cell-blue-bold cursor-pointer"
+                },
+                {
+                    headerName: 'เตรียมเบิก', // Status 16
+                    width: 100,
+                    field: 'count_prepare',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-blue-bold cursor-pointer"
                 },

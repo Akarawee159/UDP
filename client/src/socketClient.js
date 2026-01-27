@@ -77,6 +77,7 @@ export function connectWithStoredToken() {
             { s: 'forgot_password:update', w: 'hrms:forgot-password-update' },
             { s: 'auth:password_expired', w: 'hrms:password-expired' },
             { s: 'auth:password_changed', w: 'hrms:password-changed' },
+            { s: 'systemout:update', w: 'hrms:systemout-update' },
         ];
 
         customMappings.forEach(m => forward(m.s, m.w));

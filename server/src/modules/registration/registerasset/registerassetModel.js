@@ -15,7 +15,7 @@ const COLUMNS_LIST = `
   asset_weight, asset_weight_unit, 
   asset_img, 
   asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
-  asset_remark, label_register, partCode, 
+  asset_remark, asset_usedfor, asset_brand, asset_feature, asset_supplier_name, label_register, partCode, 
   print_status, asset_status, is_status, 
   create_date, created_by, created_at,
   updated_by, updated_at, asset_action
@@ -127,7 +127,7 @@ async function createBulk(dataArray) {
     item.asset_img,
     item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.label_register, item.partCode,
+    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
     item.print_status, item.asset_status, item.is_status,
     new Date(), item.created_by, new Date(),
     null, null, null // updated_by, updated_at, asset_action (ใน Main อาจเป็น null)
@@ -154,7 +154,7 @@ async function createBulk(dataArray) {
       asset_weight, asset_weight_unit, 
       asset_img, 
       asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
-      asset_remark, label_register, partCode, 
+      asset_remark, asset_usedfor, asset_brand, asset_feature, asset_supplier_name, label_register, partCode, 
       print_status, asset_status, is_status, 
       create_date, created_by, created_at
     ) VALUES ?
@@ -171,7 +171,7 @@ async function createBulk(dataArray) {
     item.asset_img,
     item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.label_register, item.partCode,
+    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
     item.print_status, item.asset_status, item.is_status,
     new Date(), item.created_by, new Date()
   ]);
@@ -207,7 +207,7 @@ async function insertDetailLog(dataObjArray) {
     item.asset_weight, item.asset_weight_unit,
     item.asset_img,
     item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003, item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.label_register, item.partCode,
+    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
     item.print_status, item.asset_status, item.is_status,
     item.create_date || new Date(), item.created_by, item.created_at || new Date(),
     item.updated_by, item.updated_at, item.asset_action

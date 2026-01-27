@@ -189,6 +189,10 @@ function AssetList() {
             asset_detail: material.material_name,
             asset_type: material.material_type,
             asset_remark: material.material_remark,
+            asset_usedfor: material.material_usedfor,
+            asset_brand: material.material_brand,
+            asset_feature: material.material_feature,
+            asset_supplier_name: material.supplier_name,
             asset_width: material.material_width,
             asset_width_unit: material.material_width_unit,
             asset_length: material.material_length,
@@ -398,6 +402,10 @@ function AssetList() {
         { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
         { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
+        { headerName: 'ใช้สำหรับงาน', field: 'asset_usedfor', width: 150 },
+        { headerName: 'ผู้จำหน่าย', field: 'asset_supplier_name', width: 150 },
+        { headerName: 'ยี่ห้อ', field: 'asset_brand', width: 150 },
+        { headerName: 'คุณสมบัติ', field: 'asset_feature', width: 150 },
     ], [isPrinting]);
 
     const filteredRows = useMemo(() => {
@@ -466,6 +474,18 @@ function AssetList() {
                                     <span className="font-semibold text-base">ข้อมูลทั่วไป</span>
                                 </div>
                                 <Form.Item name="asset_remark" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="asset_usedfor" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="asset_brand" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="asset_feature" hidden>
+                                    <Input />
+                                </Form.Item>
+                                <Form.Item name="asset_supplier_name" hidden>
                                     <Input />
                                 </Form.Item>
                                 <Form.Item label="รหัสทรัพย์สิน" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสทรัพย์สิน' }]}>
