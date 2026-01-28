@@ -4,7 +4,7 @@ import { SearchOutlined, CaretRightOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
-import SystemOutList from './Page/SystemOutList'; // Import Component Modal
+import SystemOutList from './Page/SystemOutList';
 
 function SystemOut() {
     const screens = Grid.useBreakpoint();
@@ -15,11 +15,9 @@ function SystemOut() {
     const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState(null);
 
-    // Fetch Bookings
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
@@ -37,40 +35,36 @@ function SystemOut() {
         fetchData();
     }, [fetchData]);
 
-    // Socket Listener
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
         const onUpdate = (payload) => {
-            // ถ้ามีการ confirm ใบเบิก ให้โหลดตารางใหม่
-            if (payload?.detail?.action === 'confirm' || payload?.action === 'confirm') {
+            // refresh เมื่อมี action ต่างๆ
+            const acts = ['confirm', 'header_update', 'finalized', 'unlocked', 'cancel'];
+            if (acts.includes(payload?.action) || acts.includes(payload?.detail?.action)) {
                 fetchData();
             }
         };
-        // ฟัง event ที่ส่งมาจาก Controller (systemout:update -> hrms:systemout-update)
         window.addEventListener('hrms:systemout-update', onUpdate);
         return () => window.removeEventListener('hrms:systemout-update', onUpdate);
     }, [fetchData]);
 
-    // Open Modal: Create New
     const handleCreate = () => {
-        setSelectedDraftId(null); // Null = New
+        setSelectedDraftId(null);
         setIsModalOpen(true);
     };
 
-    // Open Modal: Edit/View (Row Click)
     const handleRowClick = (record) => {
-        setSelectedDraftId(record.draft_id); // Pass Draft ID
+        setSelectedDraftId(record.draft_id);
         setIsModalOpen(true);
     };
 
     const handleModalClose = () => {
         setIsModalOpen(false);
         setSelectedDraftId(null);
-        fetchData(); // Refresh list on close
+        fetchData();
     };
 
-    // Filter Logic
     const filteredRows = useMemo(() => {
         if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase();
@@ -82,26 +76,31 @@ function SystemOut() {
 
     const columnDefs = useMemo(() => [
         { headerName: 'ลำดับ', width: 60, valueGetter: "node.rowIndex + 1", cellClass: "text-center" },
-        { headerName: 'Draft ID', field: 'draft_id', width: 140, hide: true },
         { headerName: 'เลขที่เอกสาร', field: 'refID', width: 180, cellClass: "font-bold text-blue-600" },
         {
-            headerName: 'สถานะ', field: 'is_status', width: 120, cellClass: "text-center",
+            headerName: 'สถานะ', field: 'is_status_name', width: 150, cellClass: "text-center",
             cellRenderer: p => {
-                const isDraft = String(p.value) === '16';
-                return <Tag color={isDraft ? 'orange' : 'green'}>{isDraft ? 'Draft' : 'Confirmed'}</Tag>
+                // ✅ ใช้สีและชื่อจาก DB
+                return (
+                    <span className={`px-2 py-1 rounded text-xs border ${p.data.is_status_color || 'bg-gray-100'}`}>
+                        {p.value || '-'}
+                    </span>
+                );
             }
         },
-        { headerName: 'จำนวนรายการ', field: 'attendees', width: 120, cellClass: "text-center" },
+        { headerName: 'จำนวน', field: 'attendees', width: 100, cellClass: "text-center" },
         { headerName: 'หมายเหตุ', field: 'booking_remark', flex: 1 },
-        { headerName: 'ผู้ทำรายการ', field: 'created_by', width: 120 },
-        { headerName: 'วันที่สร้าง', field: 'create_date', width: 120, valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString() : '-' },
+        { headerName: 'ผู้ทำรายการ', field: 'created_by_name', width: 180 }, // ✅ Show Joined Name
+        {
+            headerName: 'วันที่', field: 'create_date', width: 120,
+            valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString('th-TH') : '-' // ✅ Thai Date
+        },
+        { headerName: 'เวลา', field: 'create_time', width: 100 }, // ✅ Show Time
     ], []);
 
     return (
         <ConfigProvider theme={{ token: { colorPrimary: '#34a853', borderRadius: 8 } }}>
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
-
-                {/* --- Header Section (Updated Design) --- */}
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
                         <Input
@@ -123,9 +122,7 @@ function SystemOut() {
                         </Button>
                     </div>
                 </div>
-                {/* --------------------------------------- */}
 
-                {/* Table */}
                 <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                     <DataTable
                         rowData={filteredRows}
@@ -136,7 +133,6 @@ function SystemOut() {
                     />
                 </div>
 
-                {/* Modal Component */}
                 <SystemOutList
                     open={isModalOpen}
                     onCancel={handleModalClose}

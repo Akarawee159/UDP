@@ -2,7 +2,7 @@
 'use strict';
 const model = require('./systemOutModel');
 
-// ... (initBooking, getScannedList, generateBookingRef คงเดิม)
+
 async function initBooking(req, res, next) {
   try {
     const { draft_id } = req.body;
@@ -28,46 +28,73 @@ async function generateBookingRef(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
     const result = await model.generateRefID(draft_id, user_id);
+
+    // Notify
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'confirm', draft_id });
+    if (io) io.emit('systemout:update', { action: 'ref_generated', draft_id });
+
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
 
-// ✅ Confirm / Save Booking Header (บันทึกข้อมูล/ปิด)
 async function confirmBooking(req, res, next) {
   try {
-    const { draft_id, booking_remark, origin, destination } = req.body; // รับ origin, destination
+    const { draft_id, booking_remark, origin, destination } = req.body;
     const user_id = req.user?.employee_id;
-
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // เรียกฟังก์ชันใหม่ updateBookingHeader
+    // บันทึกและเปลี่ยน status -> 17
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
-    if (io) {
-      io.emit('systemout:update', { action: 'header_update', draft_id });
-    }
+    if (io) io.emit('systemout:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, data: result });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 }
 
-// Scan QR
+// ✅ ใหม่: จ่ายออก (Finalize)
+async function finalizeBooking(req, res, next) {
+  try {
+    const { draft_id } = req.body;
+    const user_id = req.user?.employee_id;
+    if (!draft_id) throw new Error("Draft ID missing");
+
+    await model.finalizeBooking(draft_id, user_id);
+
+    const io = req.app.get('io');
+    if (io) io.emit('systemout:update', { action: 'finalized', draft_id });
+
+    res.json({ success: true, message: 'Finalized' });
+  } catch (err) { next(err); }
+}
+
+// ✅ ใหม่: ปลดล็อค (Unlock)
+async function unlockBooking(req, res, next) {
+  try {
+    const { draft_id } = req.body;
+    const user_id = req.user?.employee_id;
+    if (!draft_id) throw new Error("Draft ID missing");
+
+    await model.unlockBooking(draft_id, user_id);
+
+    const io = req.app.get('io');
+    if (io) io.emit('systemout:update', { action: 'unlocked', draft_id });
+
+    res.json({ success: true, message: 'Unlocked' });
+  } catch (err) { next(err); }
+}
+
+// ... (scanAsset, returnSingle, returnAssets, getDropdowns, getBookingList, getBookingDetail, cancelBooking คงเดิม) ...
 async function scanAsset(req, res, next) {
   try {
     let { qrString, draft_id, refID } = req.body;
     const user_id = req.user?.employee_id;
-
-    if (!qrString || !draft_id || !refID) throw new Error('Invalid Data (RefID required)');
+    if (!qrString || !draft_id || !refID) throw new Error('Invalid Data');
 
     qrString = qrString.replace(/ฅ/g, '|');
     const parts = qrString.split('|');
     const uniqueId = parts[2];
-
     if (!uniqueId) throw new Error('QR Code format invalid');
 
     const result = await model.scanCheckIn(uniqueId, draft_id, refID, user_id);
@@ -75,38 +102,26 @@ async function scanAsset(req, res, next) {
     if (result.success) {
       const io = req.app.get('io');
       if (io) {
-        // 1. แจ้งหน้า SystemOutList (รายการในตะกร้า)
         io.emit('systemout:update', { action: 'scan', data: result.data, draft_id });
-
-        // ✅ 2. แจ้งหน้า RegisterAsset (ทะเบียนทรัพย์สิน) เพื่อเปลี่ยนสีสถานะทันที
         io.emit('registerasset:upsert', result.data);
       }
       res.json({ success: true, data: result.data });
     } else {
-      res.json({
-        success: false,
-        code: result.code,
-        message: result.message,
-        data: result.data
-      });
+      res.json({ success: false, code: result.code, message: result.message, data: result.data });
     }
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 }
 
-// ... (returnSingle, returnAssets, getDropdowns, getBookingList, getBookingDetail คงเดิม)
 async function returnSingle(req, res, next) {
   try {
-    const { asset_code } = req.body;
-    const updatedItem = await model.returnSingleAsset(asset_code); // คืนค่า status 10
+    // ✅ รับ draft_id มาด้วย เพื่อส่งกลับไปให้ Frontend รู้ว่าต้อง refresh ตะกร้าไหน
+    const { asset_code, draft_id } = req.body;
 
+    const updatedItem = await model.returnSingleAsset(asset_code);
     const io = req.app.get('io');
     if (io) {
-      // 1. แจ้งหน้า SystemOutList
-      io.emit('systemout:update', { action: 'return', data: updatedItem });
-
-      // ✅ 2. แจ้งหน้า RegisterAsset เพื่อเปลี่ยนสีสถานะกลับเป็นว่าง
+      // ✅ ส่ง draft_id กลับไปใน socket payload
+      io.emit('systemout:update', { action: 'return', data: updatedItem, draft_id });
       io.emit('registerasset:upsert', updatedItem);
     }
     res.json({ success: true, message: 'Returned' });
@@ -115,22 +130,19 @@ async function returnSingle(req, res, next) {
 
 async function returnAssets(req, res, next) {
   try {
-    const { ids } = req.body;
-    const updatedItems = await model.returnToStock(ids);
+    // ✅ รับ draft_id มาด้วย
+    const { ids, draft_id } = req.body;
 
+    const updatedItems = await model.returnToStock(ids);
     const io = req.app.get('io');
     if (io) {
-      io.emit('systemout:update', { action: 'return', ids });
-
-      // ✅ 3. Loop แจ้งหน้า RegisterAsset ทุกรายการที่ถูกคืน
-      updatedItems.forEach(item => {
-        io.emit('registerasset:upsert', item);
-      });
+      // ✅ ส่ง draft_id กลับไปใน socket payload
+      io.emit('systemout:update', { action: 'return', ids, draft_id });
+      updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
     res.json({ success: true, message: 'Returned to stock' });
   } catch (err) { next(err); }
 }
-
 async function getDropdowns(req, res, next) {
   try {
     const zones = await model.getZones();
@@ -155,36 +167,21 @@ async function getBookingDetail(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ยกเลิกใบเบิก (Cancel Booking)
 async function cancelBooking(req, res, next) {
   try {
     const { draft_id } = req.body;
     const user_id = req.user?.employee_id;
-
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // 1. ตรวจสอบว่ามีรายการค้างในตะกร้าหรือไม่ (ใช้ function เดิมที่มีอยู่แล้ว)
     const assets = await model.getAssetsByDraft(draft_id);
-    // getAssetsByDraft ดึงของที่มี status 16 (หรือถ้าแก้แล้วดึงทั้งหมด ให้เช็คว่ามี item หรือไม่)
-    // แต่ตาม Logic ถ้า status=11 (จ่ายแล้ว) หรือ 16 (draft) ก็ถือว่ามีของ ห้ามยกเลิก
-    // เนื่องจาก getAssetsByDraft ใน Model ปัจจุบันดึงทุกสถานะที่ผูกกับ draft_id
-    if (assets && assets.length > 0) {
-      throw new Error("ไม่สามารถยกเลิกได้ เนื่องจากมีรายการสินค้าค้างอยู่ในใบเบิก");
-    }
+    if (assets && assets.length > 0) throw new Error("ไม่สามารถยกเลิกได้ เนื่องจากมีรายการสินค้าค้างอยู่ในใบเบิก");
 
-    // 2. อัปเดตสถานะเป็น 17
     await model.cancelBooking(draft_id, user_id);
-
-    // 3. Notify Socket ให้หน้าจอหลัก refresh
     const io = req.app.get('io');
-    if (io) {
-      io.emit('systemout:update', { action: 'cancel', draft_id });
-    }
+    if (io) io.emit('systemout:update', { action: 'cancel', draft_id });
 
     res.json({ success: true, message: 'Booking cancelled' });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 }
 
 module.exports = {
@@ -198,5 +195,7 @@ module.exports = {
   getBookingList,
   getBookingDetail,
   generateBookingRef,
-  cancelBooking
+  cancelBooking,
+  finalizeBooking, // New
+  unlockBooking // New
 };
