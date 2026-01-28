@@ -6,9 +6,16 @@ const router = express.Router();
 const auth = require('../../../auth/middleware/authMiddleware');
 const controller = require('./systemOutController');
 
-router.get('/list', auth, controller.getScannedList);     // ดึงตารางขวา
-router.post('/scan', auth, controller.scanAsset);         // ยิง QR
-router.post('/return', auth, controller.returnAssets);    // คืนคลัง
-router.get('/dropdowns', auth, controller.getDropdowns);  // ดึง Zone
+router.post('/generate-ref', auth, controller.generateBookingRef); // Generate RefID
+router.get('/', auth, controller.getBookingList);           // Main Table (Bookings)
+router.get('/detail', auth, controller.getBookingDetail);   // Booking Detail (Header + Assets)
+router.post('/init-booking', auth, controller.initBooking);   // Create Draft ID
+router.get('/list', auth, controller.getScannedList);         // List by Draft ID
+router.post('/scan', auth, controller.scanAsset);             // Scan
+router.post('/return-single', auth, controller.returnSingle); // Return from Modal
+router.post('/return', auth, controller.returnAssets);        // Batch Return
+router.post('/confirm', auth, controller.confirmBooking);     // Save/Gen RefID
+router.post('/cancel', auth, controller.cancelBooking);       // Cancel Booking
+router.get('/dropdowns', auth, controller.getDropdowns);      // Dropdowns
 
 module.exports = router;

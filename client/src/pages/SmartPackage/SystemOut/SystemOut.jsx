@@ -1,34 +1,25 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Grid } from 'antd';
-import {
-    ShoppingCartOutlined,
-    SearchOutlined,
-    ToolOutlined
-} from '@ant-design/icons';
+import { App, Button, Input, ConfigProvider, Grid, Tag } from 'antd';
+import { SearchOutlined, CaretRightOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
-import { useNavigate } from 'react-router-dom';
+import SystemOutList from './Page/SystemOutList'; // Import Component Modal
 
 function SystemOut() {
-    const navigate = useNavigate();
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
-    const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
-
-    const containerStyle = useMemo(() => ({
-        margin: isMd ? '-8px' : '0',
-        padding: isMd ? '16px' : '12px',
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-    }), [isMd]);
+    const { message } = App.useApp();
 
     const [loading, setLoading] = useState(false);
-    const [rows, setRows] = useState([]); // ข้อมูลดิบทั้งหมด
+    const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Fetch API
+    // Modal State
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedDraftId, setSelectedDraftId] = useState(null);
+
+    // Fetch Bookings
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
@@ -36,7 +27,7 @@ function SystemOut() {
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลทะเบียนทรัพย์สินไม่สำเร็จ');
+            message.error('ดึงข้อมูลรายการใบเบิกไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -46,216 +37,96 @@ function SystemOut() {
         fetchData();
     }, [fetchData]);
 
-    // Socket Setup
+    // Socket Listener
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
-        const onUpsert = (row) => {
-            setRows((prev) => {
-                const idx = prev.findIndex((r) => r.asset_id === row.asset_id);
-                if (idx === -1) return [...prev, row].sort((a, b) => a.asset_id - b.asset_id);
-                const next = prev.slice();
-                next[idx] = row;
-                return next;
-            });
+        const onUpdate = (payload) => {
+            // ถ้ามีการ confirm ใบเบิก ให้โหลดตารางใหม่
+            if (payload?.detail?.action === 'confirm' || payload?.action === 'confirm') {
+                fetchData();
+            }
         };
-        const onDelete = ({ asset_id }) => {
-            setRows((prev) => prev.filter((r) => r.asset_id !== asset_id));
-        };
-        s.on('registerasset:upsert', onUpsert);
-        s.on('registerasset:delete', onDelete);
-        return () => {
-            s.off('registerasset:upsert', onUpsert);
-            s.off('registerasset:delete', onDelete);
-        };
-    }, []);
+        // ฟัง event ที่ส่งมาจาก Controller (systemout:update -> hrms:systemout-update)
+        window.addEventListener('hrms:systemout-update', onUpdate);
+        return () => window.removeEventListener('hrms:systemout-update', onUpdate);
+    }, [fetchData]);
 
-    // Actions
-    const handleList = () => {
-        navigate('/smart-package/system-out/list');
-    };
-    const handleRepair = () => {
-        navigate('/smart-package/system-out/repair');
+    // Open Modal: Create New
+    const handleCreate = () => {
+        setSelectedDraftId(null); // Null = New
+        setIsModalOpen(true);
     };
 
-    // เมื่อคลิกแถว ให้ไปหน้า SystemOutDetail พร้อมส่ง partCode ไปด้วย
+    // Open Modal: Edit/View (Row Click)
     const handleRowClick = (record) => {
-        navigate('#', {
-            state: {
-                partCode: record.partCode,
-                partName: record.asset_detail
-            }
-        });
+        setSelectedDraftId(record.draft_id); // Pass Draft ID
+        setIsModalOpen(true);
     };
 
-    // Helper render ค่า
-    const valUnit = (val) => {
-        if (!val) return '-';
-        return Number(val).toLocaleString();
+    const handleModalClose = () => {
+        setIsModalOpen(false);
+        setSelectedDraftId(null);
+        fetchData(); // Refresh list on close
     };
 
-    // --- Logic Grouping Data by PartCode ---
-    const groupedRows = useMemo(() => {
-        const groups = {};
-
-        rows.forEach(row => {
-            const key = row.partCode || 'UNKNOWN'; // Group ตาม partCode
-
-            if (!groups[key]) {
-                groups[key] = {
-                    partCode: row.partCode,
-                    asset_detail: row.partName || row.asset_detail,
-                    asset_type: row.asset_type,
-                    count_total: 0,
-                    count_normal: 0,
-                    count_use: 0,
-                    count_damaged: 0,
-                    count_repair: 0,
-                    count_broken: 0
-                };
-            }
-
-            // 1. นับจำนวนรวมทั้งหมด (Inventory Total)
-            groups[key].count_total += 1;
-
-            // 2. แยกสถานะตาม asset_status
-            const status = String(row.asset_status);
-
-            // asset_status = 10 (ว่าง/ปกติ) หรือ 11 (เบิกใช้/ปกติ) -> นับเป็น "ปกติ"
-            if (status === '10' || status === '11') {
-                groups[key].count_normal++;
-            }
-
-            // แยกนับ "เบิกใช้" เฉพาะ 11 ด้วย
-            if (status === '11') {
-                groups[key].count_use++;
-            }
-
-            // สถานะอื่นๆ
-            if (status === '13') {
-                groups[key].count_damaged++;
-            } else if (status === '14') {
-                groups[key].count_repair++;
-            } else if (status === '15') {
-                groups[key].count_broken++;
-            }
-        });
-
-        return Object.values(groups);
-    }, [rows]);
-
+    // Filter Logic
     const filteredRows = useMemo(() => {
-        if (!searchTerm) return groupedRows;
+        if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase();
-        return groupedRows.filter(
-            (row) =>
-                String(row.partCode || '').toLowerCase().includes(term) ||
-                String(row.asset_detail || '').toLowerCase().includes(term) ||
-                String(row.asset_type || '').toLowerCase().includes(term)
+        return rows.filter(r =>
+            (r.refID || '').toLowerCase().includes(term) ||
+            (r.booking_remark || '').toLowerCase().includes(term)
         );
-    }, [groupedRows, searchTerm]);
+    }, [rows, searchTerm]);
 
     const columnDefs = useMemo(() => [
+        { headerName: 'ลำดับ', width: 60, valueGetter: "node.rowIndex + 1", cellClass: "text-center" },
+        { headerName: 'Draft ID', field: 'draft_id', width: 140, hide: true },
+        { headerName: 'เลขที่เอกสาร', field: 'refID', width: 180, cellClass: "font-bold text-blue-600" },
         {
-            headerName: 'ลำดับ',
-            width: 80,
-            valueGetter: "node.rowIndex + 1",
-            cellClass: "text-center flex items-center justify-center cursor-pointer",
-            pinned: 'left',
-            lockVisible: true,
+            headerName: 'สถานะ', field: 'is_status', width: 120, cellClass: "text-center",
+            cellRenderer: p => {
+                const isDraft = String(p.value) === '16';
+                return <Tag color={isDraft ? 'orange' : 'green'}>{isDraft ? 'Draft' : 'Confirmed'}</Tag>
+            }
         },
-        {
-            headerName: 'เลขที่ใบเบิกใช้',
-            field: 'partCode',
-            width: 200,
-            filter: true,
-            cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
-            pinned: 'left',
-        },
-        {
-            headerName: 'รายละเอียด',
-            field: 'asset_detail',
-            minWidth: 200,
-            flex: 1,
-            filter: true,
-            cellClass: "cursor-pointer",
-        },
-        {
-            headerName: 'ต้นทาง',
-            field: '##',
-            width: 150,
-            filter: true,
-            cellClass: "cursor-pointer text-center",
-        },
-        {
-            headerName: 'ปลายทาง555',
-            field: '##',
-            width: 150,
-            filter: true,
-            cellClass: "cursor-pointer text-center",
-        },
-        {
-            headerName: 'วันที่เบิก',
-            field: '##',
-            width: 150,
-            filter: true,
-            cellClass: "cursor-pointer text-center",
-        },
-        {
-            headerName: 'จำนวนที่เบิก',
-            width: 160,
-            field: 'count_total',
-            cellRenderer: p => valUnit(p.value),
-            cellClass: "text-center font-bold cursor-pointer"
-        },
+        { headerName: 'จำนวนรายการ', field: 'attendees', width: 120, cellClass: "text-center" },
+        { headerName: 'หมายเหตุ', field: 'booking_remark', flex: 1 },
+        { headerName: 'ผู้ทำรายการ', field: 'created_by', width: 120 },
+        { headerName: 'วันที่สร้าง', field: 'create_date', width: 120, valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString() : '-' },
     ], []);
 
     return (
-        <ConfigProvider
-            theme={{
-                token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: 'Inter, "Sarabun", sans-serif' },
-                components: { Button: { primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)' } }
-            }}
-        >
-            <div style={containerStyle} className="bg-gray-50">
+        <ConfigProvider theme={{ token: { colorPrimary: '#34a853', borderRadius: 8 } }}>
+            <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
 
-                {/* Header Section */}
+                {/* --- Header Section (Updated Design) --- */}
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหา เลขที่ใบเบิกใช้..."
+                            placeholder="ค้นหา เลขที่เอกสาร..."
                             allowClear
                             variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full md:w-64 bg-transparent"
                         />
                         <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                        <ConfigProvider theme={{ token: { colorPrimary: '#008236' } }}>
-                            <Button
-                                type="primary"
-                                icon={<ShoppingCartOutlined />}
-                                onClick={handleList}
-                                className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                            >
-                                เบิกใช้
-                            </Button>
-                        </ConfigProvider>
-                        <ConfigProvider theme={{ token: { colorPrimary: '#f54a00' } }}>
-                            <Button
-                                type="primary"
-                                icon={<ToolOutlined />}
-                                onClick={handleRepair}
-                                className="border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                            >
-                                เบิกซ่อม
-                            </Button>
-                        </ConfigProvider>
+                        <Button
+                            type="primary"
+                            icon={<CaretRightOutlined />}
+                            onClick={handleCreate}
+                            className="bg-green-600 hover:bg-green-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                        >
+                            สร้างรายการจ่ายออก
+                        </Button>
                     </div>
                 </div>
+                {/* --------------------------------------- */}
 
-                {/* Table Content */}
-                <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+                {/* Table */}
+                <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                     <DataTable
                         rowData={filteredRows}
                         columnDefs={columnDefs}
@@ -264,6 +135,13 @@ function SystemOut() {
                         rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
                     />
                 </div>
+
+                {/* Modal Component */}
+                <SystemOutList
+                    open={isModalOpen}
+                    onCancel={handleModalClose}
+                    targetDraftId={selectedDraftId}
+                />
             </div>
         </ConfigProvider>
     );
