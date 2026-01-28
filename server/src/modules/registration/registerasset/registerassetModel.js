@@ -97,7 +97,7 @@ async function incrementPrintStatus(assetCode, user) {
     is_status: newIsStatus,
     updated_by: user,
     updated_at: now,
-    asset_action: 'print' // Action ตามโจทย์
+    asset_action: 'พิมพ์' // Action ตามโจทย์
   };
 
   // 5. Insert ลง Detail
@@ -183,7 +183,7 @@ async function createBulk(dataArray) {
     ...item,
     updated_by: item.created_by, // ใช้คนสร้างเป็นคน update ใน log แรก
     updated_at: new Date(),
-    asset_action: 'first-time'
+    asset_action: 'สร้าง'
   }));
 
   await insertDetailLog(dataForDetail);
@@ -258,7 +258,7 @@ async function updateStatusCancel(assetCodes, user) {
     is_status: '99',
     updated_by: user,
     updated_at: now,
-    asset_action: 'cancel'
+    asset_action: 'ยกเลิก'
   }));
 
   // 4. Insert Detail
@@ -272,16 +272,42 @@ async function getHistoryByCode(assetCode) {
   // เรียงตามเวลาล่าสุด (updated_at DESC)
   const sql = `
     SELECT d.*, 
+           -- Status Joins
            s1.G_NAME as asset_status_name, s1.G_DESCRIPT as asset_status_color,
-           s2.G_NAME as is_status_name, s2.G_DESCRIPT as is_status_color
+           s2.G_NAME as is_status_name, s2.G_DESCRIPT as is_status_color,
+           
+           -- 1. ชื่อผู้ทำรายการ (booking_created_by) จาก created_by
+           CONCAT(COALESCE(e1.titlename_th, ''), COALESCE(e1.firstname_th, ''), ' ', COALESCE(e1.lastname_th, '')) as booking_created_by,
+
+           -- 2. ชื่อผู้พิมพ์/ผู้แก้ไข (updated_by) จาก updated_by
+           CONCAT(COALESCE(e2.titlename_th, ''), COALESCE(e2.firstname_th, ''), ' ', COALESCE(e2.lastname_th, '')) as updated_by_name,
+           
+           -- Custom Fields for Frontend
+           d.doc_no as refID,                               -- เลขที่เอกสาร
+           DATE_FORMAT(d.updated_at, '%Y-%m-%d') as create_date, -- วันที่ทำรายการ
+           DATE_FORMAT(d.updated_at, '%H:%i:%s') as create_time  -- เวลาทำรายการ
+
     FROM tb_asset_lists_detail d
     LEFT JOIN tb_erp_status s1 ON d.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
     LEFT JOIN tb_erp_status s2 ON d.is_status = s2.G_CODE AND s2.G_USE = 'A1'
+    
+    -- Join employees ตัวที่ 1: สำหรับ created_by
+    LEFT JOIN employees e1 ON d.created_by = e1.employee_id
+
+    -- Join employees ตัวที่ 2: สำหรับ updated_by (ตามโจทย์ใหม่)
+    LEFT JOIN employees e2 ON d.updated_by = e2.employee_id
+    
     WHERE d.asset_code = ?
-    ORDER BY updated_at DESC, asset_action DESC
+    ORDER BY d.updated_at DESC, d.asset_action DESC
   `;
+
   const [rows] = await db.query(sql, [assetCode]);
-  return rows;
+
+  // Map ข้อมูลกลับไป โดยเอาชื่อ (updated_by_name) ไปทับค่า ID เดิมใน field updated_by
+  return rows.map(row => ({
+    ...row,
+    updated_by: row.updated_by_name || row.updated_by // ถ้ามีชื่อให้ใช้ชื่อ ถ้าไม่มีให้ใช้ ID เดิม
+  }));
 }
 
 

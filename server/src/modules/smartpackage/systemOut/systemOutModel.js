@@ -5,21 +5,19 @@ const db = require('../../../config/database');
 const dayjs = require('dayjs');
 
 // ✅ Helper: สร้างเวลาปัจจุบันเป็น Timezone ไทย (UTC+7)
-// หาก Server เป็น UTC การบวก 7 ชั่วโมงจะทำให้ได้เวลาไทยที่ถูกต้อง
 const getThaiNow = () => {
   return dayjs().add(7, 'hour').format('YYYY-MM-DD HH:mm:ss');
 };
 
 async function createBooking(data) {
   const { draft_id, created_by } = data;
-  const now = getThaiNow(); // ✅ ใช้เวลาไทย
+  const now = getThaiNow();
   const sql = `
     INSERT INTO booking_asset_lists 
     (draft_id, create_date, create_time, is_status, created_by, created_at)
     VALUES (?, ?, ?, '16', ?, ?)
     ON DUPLICATE KEY UPDATE updated_at = ?
   `;
-  // แยกวันที่และเวลาจากตัวแปร now
   const dateOnly = dayjs(now).format('YYYY-MM-DD');
   const timeOnly = dayjs(now).format('HH:mm:ss');
 
@@ -32,7 +30,7 @@ async function generateRefID(draft_id, user_id) {
   const seq = countRes[0].cnt + 1;
   const dateStr = dayjs().format('DDMMYY');
   const refID = `RF${dateStr}${String(seq).padStart(4, '0')}`;
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
 
   await db.query(`
         UPDATE booking_asset_lists
@@ -47,7 +45,7 @@ async function generateRefID(draft_id, user_id) {
 
 async function updateBookingHeader(draft_id, body, user_id) {
   const { booking_remark, origin, destination } = body;
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
 
   await db.query(`
         UPDATE booking_asset_lists
@@ -65,6 +63,8 @@ async function updateBookingHeader(draft_id, body, user_id) {
 
 async function finalizeBooking(draft_id, user_id) {
   const now = getThaiNow(); // ✅
+
+  // 1. อัปเดตสถานะ Header เป็น 18 (จ่ายออกแล้ว)
   await db.query(`
         UPDATE booking_asset_lists
         SET is_status = '18',
@@ -72,11 +72,48 @@ async function finalizeBooking(draft_id, user_id) {
             updated_at = ?
         WHERE draft_id = ?
     `, [user_id, now, draft_id]);
+
+  // 2. ✅ คัดลอกข้อมูลจาก tb_asset_lists ลง tb_asset_lists_detail
+  const sqlInsertDetail = `
+    INSERT INTO tb_asset_lists_detail (
+        draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+        doc_no, asset_lot, asset_holder, asset_location,
+        asset_width, asset_width_unit, asset_length, asset_length_unit,
+        asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+        asset_weight, asset_weight_unit, asset_img,
+        asset_dmg_001, asset_dmg_002, asset_dmg_003,
+        asset_dmg_004, asset_dmg_005, asset_dmg_006,
+        asset_remark, asset_usedfor, asset_brand, asset_feature,
+        asset_supplier_name, label_register, partCode, print_status,
+        asset_status, asset_action, is_status,
+        create_date, created_by, created_at,
+        updated_by, updated_at, scan_by, scan_at
+    )
+    SELECT
+        draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+        doc_no, asset_lot, asset_holder, asset_location,
+        asset_width, asset_width_unit, asset_length, asset_length_unit,
+        asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+        asset_weight, asset_weight_unit, asset_img,
+        asset_dmg_001, asset_dmg_002, asset_dmg_003,
+        asset_dmg_004, asset_dmg_005, asset_dmg_006,
+        asset_remark, asset_usedfor, asset_brand, asset_feature,
+        asset_supplier_name, label_register, partCode, print_status,
+        asset_status, 'จ่ายออก', is_status, 
+        create_date, created_by, created_at,
+        updated_by, updated_at, scan_by, scan_at
+    FROM tb_asset_lists
+    WHERE draft_id = ?
+  `;
+  // หมายเหตุ: is_status ใน select กำหนดค่าเป็น '1' (Active) เนื่องจากเป็นรายการ Log ใหม่ใน Detail
+
+  await db.query(sqlInsertDetail, [draft_id]);
+
   return true;
 }
 
 async function unlockBooking(draft_id, user_id) {
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
   await db.query(`
         UPDATE booking_asset_lists
         SET is_status = '17',
@@ -88,7 +125,7 @@ async function unlockBooking(draft_id, user_id) {
 }
 
 async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
 
   const sqlGet = `
         SELECT a.*, 
@@ -131,7 +168,7 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
 }
 
 async function returnSingleAsset(assetCode) {
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
   await db.query(`
           UPDATE tb_asset_lists 
           SET asset_status = 10, 
@@ -144,9 +181,6 @@ async function returnSingleAsset(assetCode) {
       `, [now, assetCode]);
   return await getAssetWithStatus(assetCode);
 }
-
-// ... (Functions เดิม: getAssetWithStatus, getAssetsByDraft, getZones, getAllBookings, getBookingDetail) ...
-// ให้คงไว้ตามเดิม (หากมีการใช้ NOW() ใน function เหล่านี้ ให้เปลี่ยนเป็น getThaiNow() ด้วย แต่ส่วนใหญ่เป็น SELECT)
 
 async function getAssetWithStatus(assetCode) {
   const sql = `
@@ -207,11 +241,10 @@ async function getBookingDetail(draft_id) {
 
 async function returnToStock(ids) {
   if (!ids || ids.length === 0) return [];
-  const now = getThaiNow(); // ✅
+  const now = getThaiNow();
   const sql = `UPDATE tb_asset_lists SET asset_status = 10, draft_id = NULL, refID = NULL, updated_at = ? WHERE asset_code IN (?) AND asset_status = 11`;
   await db.query(sql, [now, ids]);
 
-  // Fetch logic...
   const sqlFetch = `
       SELECT a.*, s1.G_NAME as asset_status_name, s1.G_DESCRIPT as asset_status_color
       FROM tb_asset_lists a
@@ -223,8 +256,7 @@ async function returnToStock(ids) {
 }
 
 async function cancelBooking(draft_id, user_id) {
-  const now = getThaiNow(); // ✅
-  // ยกเลิกเปลี่ยนสถานะเป็น 19 (Cancelled)
+  const now = getThaiNow();
   const sql = `UPDATE booking_asset_lists SET is_status = '19', updated_by = ?, updated_at = ? WHERE draft_id = ?`;
   await db.query(sql, [user_id, now, draft_id]);
   return true;

@@ -76,9 +76,9 @@ function AssetLog() {
                 let color = 'default';
                 let text = action.toUpperCase();
 
-                if (action === 'first-time') { color = 'green'; text = 'CREATE'; }
-                else if (action === 'print') { color = 'blue'; text = 'PRINT'; }
-                else if (action === 'cancel') { color = 'red'; text = 'CANCEL'; }
+                if (action === 'สร้าง') { color = 'green'; text = 'สร้าง'; }
+                else if (action === 'พิมพ์') { color = 'blue'; text = 'พิมพ์'; }
+                else if (action === 'ยกเลิก') { color = 'red'; text = 'ยกเลิก'; }
 
                 return <Tag color={color}>{text}</Tag>;
             }
@@ -93,7 +93,23 @@ function AssetLog() {
             )
         },
         {
-            headerName: 'ผู้ทำรายการ', field: 'updated_by', width: 200,
+            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 200,
+            sortable: true,
+            filter: true,
+            filterValueGetter: (params) => params.data.is_status_name,
+            cellRenderer: (params) => {
+                const name = params.data.is_status_name || params.value;
+                const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+
+                return (
+                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                        {name}
+                    </div>
+                );
+            }
+        },
+        {
+            headerName: 'ผู้พิมพ์สติ๊กเกอร์', field: 'updated_by', width: 200,
             cellRenderer: (params) => (
                 <div className="flex items-center gap-2">
                     <UserOutlined className="text-gray-400" />
@@ -108,7 +124,6 @@ function AssetLog() {
                 <span className="font-medium text-blue-600">{params.value}</span>
             )
         },
-        // --- แก้ไขส่วน asset_status (สถานะใช้งาน) ---
         {
             headerName: 'สถานะใช้งาน', field: 'asset_status', width: 200,
             sortable: true,
@@ -127,24 +142,11 @@ function AssetLog() {
                 );
             }
         },
-        // --- แก้ไขส่วน is_status (สถานะทรัพย์สิน) ---
-        {
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 200,
-            sortable: true,
-            filter: true,
-            filterValueGetter: (params) => params.data.is_status_name,
-            cellRenderer: (params) => {
-                const name = params.data.is_status_name || params.value;
-                const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
-
-                return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
-                        {name}
-                    </div>
-                );
-            }
-        },
-        { headerName: 'หมายเหตุ', field: 'asset_remark', flex: 1, width: 200 },
+        { headerName: 'เลขที่เอกสาร', field: 'refID', width: 200 },
+        { headerName: 'ผู้ทำรายการ', field: 'booking_created_by', width: 200 },
+        { headerName: 'วันที่ทำรายการ', field: 'create_date', width: 200 },
+        { headerName: 'เวลาทำรายการ', field: 'create_time', width: 200 },
+        { headerName: 'หมายเหตุ', field: 'asset_remark', width: 200 },
         { headerName: 'สถานที่', field: 'asset_location', width: 200 },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 200 },
     ], []);
