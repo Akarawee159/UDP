@@ -50,7 +50,30 @@ function SystemOut() {
     }, [fetchData]);
 
     const handleCreate = () => {
-        setSelectedDraftId(null);
+        // 1. ดึงข้อมูล User ปัจจุบัน (ปกติมักเก็บใน localStorage ชื่อ 'user')
+        const storedUser = localStorage.getItem('user');
+        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+        let foundDraft = null;
+
+        // 2. ถ้ามีข้อมูล User ให้ทำการค้นหา Draft ที่ค้างอยู่
+        if (currentUser && currentUser.employee_id) {
+            // ค้นหาจาก rows (ซึ่งเรียงลำดับล่าสุดมาแล้วจาก BE)
+            foundDraft = rows.find(r =>
+                String(r.created_by) === String(currentUser.employee_id) && // เป็นของผู้ใช้คนนี้
+                String(r.is_status) === '16' &&                             // สถานะยังเป็น Draft
+                (!r.refID || r.refID === '')                                // ยังไม่ได้ Gen เลขที่ใบเบิก
+            );
+        }
+
+        // 3. กำหนด Logic การเปิด Modal
+        if (foundDraft) {
+            message.info('ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ');
+            setSelectedDraftId(foundDraft.draft_id); // ใช้ ID เดิมเพื่อ Resume
+        } else {
+            setSelectedDraftId(null); // เป็น null เพื่อให้ Modal ไปสร้างใหม่ (init-booking)
+        }
+
         setIsModalOpen(true);
     };
 

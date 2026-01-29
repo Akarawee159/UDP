@@ -249,7 +249,6 @@ function AssetDetail() {
             okText: 'ยืนยันการยกเลิก',
             okType: 'danger',
             cancelText: 'ปิด',
-            // [Modified] ใช้ footer เพื่อสลับตำแหน่งปุ่ม (แสดง OkBtn ก่อน CancelBtn)
             footer: (_, { OkBtn, CancelBtn }) => (
                 <>
                     <OkBtn />
@@ -268,17 +267,56 @@ function AssetDetail() {
 
                     if (res.data?.success) {
                         message.success(res.data.message || 'ยกเลิกรายการสำเร็จ');
-
-                        // อัปเดต Table
-                        setTableData(prev => prev.filter(item => !assetCodes.includes(item.asset_code)));
-                        setAllData(prev => prev.filter(item => !assetCodes.includes(item.asset_code)));
-
-                        // เคลียร์ Selection
+                        // Socket จะทำงานอัตโนมัติเพื่อลบ row (จาก useEffect ที่เขียนไว้แล้ว)
                         setSelectedRows([]);
                     }
                 } catch (err) {
                     console.error(err);
-                    message.error(err?.response?.data?.message || "เกิดข้อผิดพลาดในการยกเลิกรายการ");
+
+                    // --- เพิ่มส่วนตรวจสอบ Error Validation ---
+                    if (err.response && err.response.status === 400 && err.response.data?.code === 'INVALID_STATUS') {
+                        const { invalidItem } = err.response.data;
+
+                        // ปิด Modal เดิมก่อน (เพราะ confirm modal มันค้างอยู่ถ้า throw error)
+                        // แต่ Antd Modal.confirm onOk ถ้า return promise มันจะรอ loading แล้วปิดเองเมื่อ resolve
+                        // กรณีนี้เราอยากเปิด Modal ใหม่ซ้อน หรือแจ้งเตือน
+
+                        // เรียก Modal แจ้งเตือน "รับทราบ"
+                        setTimeout(() => {
+                            modal.warning({
+                                title: 'ไม่สามารถยกเลิกรายการได้',
+                                icon: <StopOutlined className="text-orange-500" />,
+                                content: (
+                                    <div className="flex flex-col gap-2 mt-2">
+                                        <Text>พบรายการที่มีสถานะไม่ถูกต้อง:</Text>
+                                        <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <Text type="secondary" className="text-xs">รหัสทรัพย์สิน</Text>
+                                                <Text strong>{invalidItem.asset_code}</Text>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <Text type="secondary" className="text-xs">สถานะปัจจุบัน</Text>
+                                                {/* ใช้ Class สีที่ส่งมาจาก Database (Backend) */}
+                                                <span className={`px-2 py-0.5 rounded text-xs border font-medium ${invalidItem.status_color}`}>
+                                                    {invalidItem.status_name}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Text type="secondary" className="text-xs text-center mt-2">
+                                            *ต้องมีสถานะ "คงคลัง" เท่านั้นจึงจะยกเลิกได้
+                                        </Text>
+                                    </div>
+                                ),
+                                okText: 'รับทราบ',
+                                okButtonProps: { type: 'primary' }, // ปุ่มสีน้ำเงินปกติ
+                                maskClosable: true,
+                            });
+                        }, 300); // delay เล็กน้อยให้ modal เก่าปิดสวยๆ
+
+                    } else {
+                        // Error อื่นๆ
+                        message.error(err?.response?.data?.message || "เกิดข้อผิดพลาดในการยกเลิกรายการ");
+                    }
                 } finally {
                     setIsCanceling(false);
                 }

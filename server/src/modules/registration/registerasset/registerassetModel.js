@@ -3,8 +3,20 @@
 
 const db = require('../../../config/database');
 
-// รายชื่อคอลัมน์สำหรับ tb_asset_lists และ tb_asset_lists_detail (ไม่รวม id)
-// เพิ่ม asset_action เข้าไปในลิสต์นี้เพื่อให้จัดการง่ายขึ้น
+// Helper: ดึงเวลาปัจจุบันเป็น Timezone Bangkok แบบ String (YYYY-MM-DD HH:mm:ss)
+// เพื่อให้ Database บันทึกค่าตามนี้เป๊ะๆ ไม่แปลงกลับเป็น UTC
+function getBangkokNow() {
+  const dateStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+  const d = new Date(dateStr);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const seconds = String(d.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 const COLUMNS_LIST = `
   asset_code, asset_detail, asset_type, asset_date, doc_no, 
   asset_lot, asset_holder, asset_location, 
@@ -61,14 +73,12 @@ async function getErpStatus(gUse, gCode) {
  * และบันทึก History ลง tb_asset_lists_detail (Action = 'print')
  */
 async function incrementPrintStatus(assetCode, user) {
-  // 1. ดึงข้อมูลปัจจุบันก่อน
   const checkSql = `SELECT * FROM tb_asset_lists WHERE asset_code = ?`;
   const [rows] = await db.query(checkSql, [assetCode]);
 
   if (rows.length === 0) return null;
   const currentData = rows[0];
 
-  // 2. คำนวณสถานะใหม่
   let currentStatus = parseInt(currentData.print_status);
   if (isNaN(currentStatus)) currentStatus = 0;
   const newPrintStatus = currentStatus + 1;
@@ -80,27 +90,26 @@ async function incrementPrintStatus(assetCode, user) {
     newIsStatus = '22';
   }
 
-  const now = new Date();
+  // [Timezone Fix] ใช้เวลา Bangkok
+  const nowBangkok = getBangkokNow();
 
-  // 3. อัปเดตตารางหลัก
   const updateSql = `
     UPDATE tb_asset_lists 
     SET print_status = ?, is_status = ?, updated_by = ?, updated_at = ?
     WHERE asset_code = ?
   `;
-  await db.query(updateSql, [newPrintStatus, newIsStatus, user, now, assetCode]);
+  await db.query(updateSql, [newPrintStatus, newIsStatus, user, nowBangkok, assetCode]);
 
-  // 4. เตรียมข้อมูลสำหรับ Insert Log (ใช้ข้อมูลเดิม แต่ทับค่าใหม่ที่เปลี่ยนไป)
+  // เตรียมข้อมูลสำหรับ Insert Log
   const logData = {
     ...currentData,
     print_status: newPrintStatus,
     is_status: newIsStatus,
     updated_by: user,
-    updated_at: now,
-    asset_action: 'พิมพ์' // Action ตามโจทย์
+    updated_at: nowBangkok, // ใช้เวลา Bangkok
+    asset_action: 'พิมพ์'
   };
 
-  // 5. Insert ลง Detail
   await insertDetailLog([logData]);
 
   return {
@@ -110,13 +119,14 @@ async function incrementPrintStatus(assetCode, user) {
 }
 
 /** * บันทึกรายการใหม่ 
- * (ลงทั้ง tb_asset_lists และ tb_asset_lists_detail โดย action='first-time') 
+ * (ลงทั้ง tb_asset_lists และ tb_asset_lists_detail โดย action='สร้าง') 
  */
 async function createBulk(dataArray) {
   if (!dataArray || dataArray.length === 0) return;
 
-  // แปลง data object เป็น array เพื่อ insert
-  const valuesMain = dataArray.map(item => [
+  // [Timezone Fix] ใช้ item.created_at ที่ Controller ส่งมา (ซึ่งเป็น Bangkok แล้ว)
+  // หรือถ้าไม่มี ให้ใช้ getBangkokNow()
+  const valuesForMain = dataArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
     item.asset_lot, item.asset_holder, item.asset_location,
     item.asset_width, item.asset_width_unit,
@@ -129,19 +139,9 @@ async function createBulk(dataArray) {
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
     item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
     item.print_status, item.asset_status, item.is_status,
-    new Date(), item.created_by, new Date(),
-    null, null, null // updated_by, updated_at, asset_action (ใน Main อาจเป็น null)
+    // created_at, created_by, created_at
+    item.created_at || getBangkokNow(), item.created_by, item.created_at || getBangkokNow()
   ]);
-
-  // 1. Insert ตารางหลัก (Column list ต้องตรงกับ values)
-  // ตัด asset_action ออกจาก Main หรือไม่? ถ้า Main ไม่มี col นี้ให้ลบออก 
-  // แต่ถ้า Main มี col นี้ ให้ใส่ 'first-time' หรือ null ก็ได้ 
-  // *สมมติว่าตาราง Main ไม่มี asset_action ให้ใช้ SQL แยก*
-
-  // เพื่อความชัวร์ ผมจะเขียน SQL แยกสำหรับ Main และ Detail
-
-  const columnsMain = COLUMNS_LIST.replace(', asset_action', ''); // เอา action ออกจากตารางหลัก (ถ้าไม่มี)
-  // หรือถ้าตารางหลักมี asset_action ให้แก้ตรงนี้ได้เลย
 
   const sqlMain = `
     INSERT INTO tb_asset_lists (
@@ -160,29 +160,13 @@ async function createBulk(dataArray) {
     ) VALUES ?
   `;
 
-  const valuesForMain = dataArray.map(item => [
-    item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
-    item.asset_lot, item.asset_holder, item.asset_location,
-    item.asset_width, item.asset_width_unit,
-    item.asset_length, item.asset_length_unit,
-    item.asset_height, item.asset_height_unit,
-    item.asset_capacity, item.asset_capacity_unit,
-    item.asset_weight, item.asset_weight_unit,
-    item.asset_img,
-    item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
-    item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
-    item.print_status, item.asset_status, item.is_status,
-    new Date(), item.created_by, new Date()
-  ]);
-
   const [result] = await db.query(sqlMain, [valuesForMain]);
 
-  // 2. Insert Detail (Log) : Action = 'first-time'
+  // ใน Detail Log: updated_by/updated_at เป็น NULL สำหรับ Action 'สร้าง'
   const dataForDetail = dataArray.map(item => ({
     ...item,
-    updated_by: item.created_by, // ใช้คนสร้างเป็นคน update ใน log แรก
-    updated_at: new Date(),
+    updated_by: null,
+    updated_at: null,
     asset_action: 'สร้าง'
   }));
 
@@ -197,6 +181,7 @@ async function insertDetailLog(dataObjArray) {
 
   const sql = `INSERT INTO tb_asset_lists_detail (${COLUMNS_LIST}) VALUES ?`;
 
+  // [Timezone Fix] ใช้ getBangkokNow() เป็น default แทน new Date()
   const values = dataObjArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
     item.asset_lot, item.asset_holder, item.asset_location,
@@ -209,8 +194,16 @@ async function insertDetailLog(dataObjArray) {
     item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003, item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
     item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
     item.print_status, item.asset_status, item.is_status,
-    item.create_date || new Date(), item.created_by, item.created_at || new Date(),
-    item.updated_by, item.updated_at, item.asset_action
+
+    // create_date / created_at (ถ้าไม่มีค่า ให้ใช้ Bangkok Now)
+    item.create_date || getBangkokNow(),
+    item.created_by,
+    item.created_at || getBangkokNow(),
+
+    // updated_by / updated_at
+    item.updated_by,
+    item.updated_at, // ค่านี้ถ้าส่งมาจะเป็น Bangkok แล้ว หรือถ้าเป็น null ก็ปล่อย null
+    item.asset_action
   ]);
 
   await db.query(sql, [values]);
@@ -231,17 +224,42 @@ async function deleteByLot(lotNo) {
  * และบันทึก History ลง tb_asset_lists_detail (Action = 'cancel')
  */
 async function updateStatusCancel(assetCodes, user) {
-  if (!assetCodes || assetCodes.length === 0) return;
+  if (!assetCodes || assetCodes.length === 0) return { success: false };
 
-  // 1. ดึงข้อมูลเดิมก่อนอัปเดต เพื่อเอามาทำ Log
-  const selectSql = `SELECT * FROM tb_asset_lists WHERE asset_code IN (?)`;
-  const [originalRows] = await db.query(selectSql, [assetCodes]);
+  // 1. ดึงข้อมูลรายการที่เลือก พร้อม Join Status เพื่อเช็คชื่อและสี
+  const checkSql = `
+    SELECT a.*, 
+           s.G_NAME as asset_status_name, 
+           s.G_DESCRIPT as asset_status_color
+    FROM tb_asset_lists a
+    LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
+    WHERE a.asset_code IN (?)
+  `;
+  const [rows] = await db.query(checkSql, [assetCodes]);
 
-  if (originalRows.length === 0) return;
+  if (rows.length === 0) return { success: false, message: 'ไม่พบข้อมูล' };
 
-  const now = new Date();
+  // 2. ตรวจสอบเงื่อนไข: ต้องเป็น asset_status = '10' ทุกรายการ
+  const invalidItem = rows.find(r => r.asset_status !== '10');
 
-  // 2. อัปเดตตารางหลัก
+  if (invalidItem) {
+    // เจอรายการที่สถานะไม่ใช่ 10 -> ห้ามยกเลิก ส่งข้อมูลกลับไปแจ้งเตือน
+    return {
+      success: false,
+      errorType: 'INVALID_STATUS',
+      invalidItem: {
+        asset_code: invalidItem.asset_code,
+        status_code: invalidItem.asset_status,
+        status_name: invalidItem.asset_status_name || invalidItem.asset_status,
+        status_color: invalidItem.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200'
+      }
+    };
+  }
+
+  // 3. ถ้าผ่านเงื่อนไขหมด -> ทำการ Update
+  // [Timezone Fix] ใช้เวลา Bangkok
+  const nowBangkok = getBangkokNow();
+
   const updateSql = `
     UPDATE tb_asset_lists 
     SET is_status = '99', 
@@ -249,52 +267,38 @@ async function updateStatusCancel(assetCodes, user) {
         updated_at = ?
     WHERE asset_code IN (?)
   `;
-  const [result] = await db.query(updateSql, [user, now, assetCodes]);
+  const [result] = await db.query(updateSql, [user, nowBangkok, assetCodes]); // <--- แก้ไข: รับค่า result ตรงนี้
 
-  // 3. เตรียมข้อมูลลง Log (Detail)
-  // ให้ข้อมูล log เป็นข้อมูลใหม่ (status=99, action=cancel)
-  const logDataArray = originalRows.map(row => ({
+  // 4. เตรียมข้อมูลลง Log
+  const logDataArray = rows.map(row => ({
     ...row,
     is_status: '99',
     updated_by: user,
-    updated_at: now,
+    updated_at: nowBangkok,
     asset_action: 'ยกเลิก'
   }));
 
-  // 4. Insert Detail
   await insertDetailLog(logDataArray);
 
-  return result;
+  return { success: true, result };
 }
 
 /** ดึงประวัติการแก้ไข (History) จาก tb_asset_lists_detail ตาม asset_code */
 async function getHistoryByCode(assetCode) {
-  // เรียงตามเวลาล่าสุด (updated_at DESC)
   const sql = `
     SELECT d.*, 
-           -- Status Joins
            s1.G_NAME as asset_status_name, s1.G_DESCRIPT as asset_status_color,
            s2.G_NAME as is_status_name, s2.G_DESCRIPT as is_status_color,
-           
-           -- 1. ชื่อผู้ทำรายการ (booking_created_by) จาก created_by
            CONCAT(COALESCE(e1.titlename_th, ''), COALESCE(e1.firstname_th, ''), ' ', COALESCE(e1.lastname_th, '')) as booking_created_by,
-
-           -- 2. ชื่อผู้พิมพ์/ผู้แก้ไข (updated_by) จาก updated_by
            CONCAT(COALESCE(e2.titlename_th, ''), COALESCE(e2.firstname_th, ''), ' ', COALESCE(e2.lastname_th, '')) as updated_by_name,
-           
-           -- Custom Fields for Frontend
-           d.doc_no as refID,                               -- เลขที่เอกสาร
-           DATE_FORMAT(d.updated_at, '%Y-%m-%d') as create_date, -- วันที่ทำรายการ
-           DATE_FORMAT(d.updated_at, '%H:%i:%s') as create_time  -- เวลาทำรายการ
+           d.refID as refID,
+           DATE_FORMAT(d.updated_at, '%Y-%m-%d') as create_date,
+           DATE_FORMAT(d.updated_at, '%H:%i:%s') as create_time
 
     FROM tb_asset_lists_detail d
     LEFT JOIN tb_erp_status s1 ON d.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
     LEFT JOIN tb_erp_status s2 ON d.is_status = s2.G_CODE AND s2.G_USE = 'A1'
-    
-    -- Join employees ตัวที่ 1: สำหรับ created_by
     LEFT JOIN employees e1 ON d.created_by = e1.employee_id
-
-    -- Join employees ตัวที่ 2: สำหรับ updated_by (ตามโจทย์ใหม่)
     LEFT JOIN employees e2 ON d.updated_by = e2.employee_id
     
     WHERE d.asset_code = ?
@@ -303,13 +307,11 @@ async function getHistoryByCode(assetCode) {
 
   const [rows] = await db.query(sql, [assetCode]);
 
-  // Map ข้อมูลกลับไป โดยเอาชื่อ (updated_by_name) ไปทับค่า ID เดิมใน field updated_by
   return rows.map(row => ({
     ...row,
-    updated_by: row.updated_by_name || row.updated_by // ถ้ามีชื่อให้ใช้ชื่อ ถ้าไม่มีให้ใช้ ID เดิม
+    updated_by: row.updated_by_name || row.updated_by
   }));
 }
-
 
 module.exports = {
   getAll,

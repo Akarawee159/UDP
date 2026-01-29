@@ -22,12 +22,12 @@ export const ACTION_MASTER = [
             { label: 'ลบได้', value: 'dochistory:delete' }
         ]
     },
-    // อนาคตเพิ่ม Module อื่นต่อท้ายตรงนี้ได้เลย
-    // {
-    //     module: 'ข้อมูลพนักงาน (Employee)',
-    //     key: 'employee',
-    //     options: [
-    //         { label: 'Export PDF', value: 'employee:export' }
-    //     ]
-    // }
+    {
+        module: 'ระบบจ่ายออก',
+        key: 'system-out',
+        options: [
+            { label: 'สร้างได้', value: 'system-out:create' },
+            { label: 'ปลดล็อคได้', value: 'system-out:unlock' },
+        ]
+    },
 ];

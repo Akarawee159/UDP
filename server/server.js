@@ -38,6 +38,7 @@ const positionRoutes = require("./src/modules/settings/position/positionRoutes")
 const zoneRoutes = require("./src/modules/settings/zone/zoneRoutes");
 
 const systemOutRoutes = require("./src/modules/smartpackage/systemOut/systemOutRoutes");
+const systemInRoutes = require("./src/modules/smartpackage/systemIn/systemInRoutes");
 
 const reportEmployeeRoutes = require("./src/modules/reports/reportEmployee/reportEmployeeRoutes");
 const reportTrainingRoutes = require("./src/modules/reports/reportTraining/reportTrainingRoutes");
@@ -115,6 +116,7 @@ app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "
  * =========================
  */
 app.use("/api/smartpackage/systemout", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
+app.use("/api/smartpackage/systemin", auth, permit({ mainId: "60", subId: "602" }), systemInRoutes);
 
 /**
  * =========================

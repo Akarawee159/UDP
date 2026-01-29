@@ -1,4 +1,4 @@
-// src/modules/Smartpackage/systemOut/systemOutModel.js
+// src/modules/Smartpackage/systemIn/systemInModel.js
 'use strict';
 
 const db = require('../../../config/database');

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     Form, Input, Button, Select, Row, Col, Card, Image, Typography,
-    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip
+    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip, ConfigProvider // ✅ 1. เพิ่ม ConfigProvider
 } from 'antd';
 import {
     ReloadOutlined, SaveOutlined, ExclamationCircleOutlined,
@@ -9,7 +9,7 @@ import {
     CloseOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
-// Removed Ag-Grid DataTable import
+import { usePermission } from '../../../../hooks/usePermission';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -18,7 +18,7 @@ const generateDraftId = () => {
     return 'D-' + Math.random().toString(36).substr(2, 9).toUpperCase() + Date.now().toString(36).toUpperCase().substr(-5);
 };
 
-function SystemOutList({ open, onCancel, targetDraftId }) {
+function SystemInDefective({ open, onCancel, targetDraftId }) {
     const { message, modal } = App.useApp();
     const [form] = Form.useForm();
 
@@ -36,6 +36,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     // Status Logic
     const [bookingStatus, setBookingStatus] = useState('16');
     const processingRef = useRef(false);
+    const { canUse } = usePermission();
 
     const getFullImgUrl = (subPath, filename) => {
         if (!filename) return null;
@@ -47,16 +48,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const groupedData = useMemo(() => {
         const groups = {};
         scannedList.forEach(item => {
-            // Group by partCode (Default to 'Unknown' if missing)
             const key = item.partCode || 'NO_PART_CODE';
             if (!groups[key]) {
                 groups[key] = {
-                    key: key, // Unique key for Parent Row
+                    key: key,
                     partCode: key,
                     asset_detail: item.asset_detail,
                     asset_type: item.asset_type,
-                    asset_img: item.asset_img, // Keep one image for preview
-                    // Keep reference to the first item for "View Detail"
+                    asset_img: item.asset_img,
                     firstItem: item,
                     count: 0,
                     childrenList: []
@@ -72,18 +71,17 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (!open) return;
         setLoading(true);
         try {
-            const resZone = await api.get('/smartpackage/systemout/dropdowns');
+            const resZone = await api.get('/smartpackage/systemin/dropdowns');
             setZones(resZone.data.zones || []);
 
             const currentDraftId = targetDraftId || draftId;
 
             if (currentDraftId) {
-                const res = await api.get(`/smartpackage/systemout/detail?draft_id=${currentDraftId}`);
+                const res = await api.get(`/smartpackage/systemin/detail?draft_id=${currentDraftId}`);
                 const { booking, assets } = res.data;
 
                 setDraftId(currentDraftId);
                 setScannedList(assets || []);
-
                 setLastScanned({});
 
                 if (booking) {
@@ -92,7 +90,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     form.setFieldsValue({
                         draft_id: booking.draft_id,
                         refID: booking.refID,
-                        objective: 'ทำรายการจ่ายออก',
+                        objective: 'ทำรายการรับเข้าของชำรุด',
                         attendees: booking.attendees || (assets || []).length,
                         booking_remark: booking.booking_remark,
                         origin: booking.origin,
@@ -101,7 +99,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 }
             } else {
                 const newId = generateDraftId();
-                await api.post('/smartpackage/systemout/init-booking', { draft_id: newId });
+                await api.post('/smartpackage/systemin/init-booking', { draft_id: newId });
 
                 setDraftId(newId);
                 setRefID(null);
@@ -111,7 +109,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
-                    objective: 'ทำรายการจ่ายออก',
+                    objective: 'ทำรายการรับเข้าของชำรุด',
                     attendees: 0
                 });
             }
@@ -132,7 +130,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             setDraftId(null);
             setScannedList([]);
             setLastScanned({});
-            setSelectedIds([]); // Clear selection
+            setSelectedIds([]);
         }
     }, [open, targetDraftId]);
 
@@ -145,14 +143,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
             if (incomingDraftId === draftId) {
                 if (action === 'header_update' || action === 'finalized' || action === 'unlocked' || action === 'cancel') {
-                    api.get(`/smartpackage/systemout/detail?draft_id=${draftId}`).then(res => {
+                    api.get(`/smartpackage/systemin/detail?draft_id=${draftId}`).then(res => {
                         const { booking } = res.data;
                         if (booking) setBookingStatus(String(booking.is_status));
                     });
                 }
 
                 if (action === 'scan' || action === 'return') {
-                    api.get(`/smartpackage/systemout/list?draft_id=${draftId}`).then(res => {
+                    api.get(`/smartpackage/systemin/list?draft_id=${draftId}`).then(res => {
                         setScannedList(res.data.data || []);
                         form.setFieldValue('attendees', (res.data.data || []).length);
                     });
@@ -174,22 +172,22 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const handleGenerateRef = async () => {
         if (refID) return;
         try {
-            const res = await api.post('/smartpackage/systemout/generate-ref', { draft_id: draftId });
+            const res = await api.post('/smartpackage/systemin/generate-ref', { draft_id: draftId });
             if (res.data.success) {
                 const newRef = res.data.data.refID;
                 setRefID(newRef);
                 form.setFieldsValue({ refID: newRef });
-                message.success('สร้างเลขที่ใบเบิกเรียบร้อย');
+                message.success('สร้างเลขรับเข้าของชำรุดเรียบร้อย');
             }
         } catch (err) {
-            message.error('สร้างเลขที่ใบเบิกไม่สำเร็จ');
+            message.error('สร้างเลขรับเข้าของชำรุดไม่สำเร็จ');
         }
     };
 
     const handleSaveHeader = async () => {
         try {
             const values = await form.validateFields(['origin', 'destination', 'booking_remark']);
-            await api.post('/smartpackage/systemout/confirm', {
+            await api.post('/smartpackage/systemin/confirm', {
                 draft_id: draftId,
                 booking_remark: values.booking_remark,
                 origin: values.origin,
@@ -214,7 +212,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             keyboard: false,
             onCancel: async () => {
                 try {
-                    await api.post('/smartpackage/systemout/finalize', { draft_id: draftId });
+                    await api.post('/smartpackage/systemin/finalize', { draft_id: draftId });
                     setBookingStatus('18');
                     message.success('จ่ายออกเรียบร้อย');
                 } catch (e) {
@@ -239,8 +237,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             keyboard: false,
             onCancel: async () => {
                 try {
-                    await api.post('/smartpackage/systemout/unlock', { draft_id: draftId });
-                    setBookingStatus('17');
+                    await api.post('/smartpackage/systemin/unlock', { draft_id: draftId });
+                    setBookingStatus('26');
                     message.success('ปลดล็อคเรียบร้อย');
                 } catch (e) {
                     message.error('Failed');
@@ -269,7 +267,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             okButtonProps: { type: 'default' },
             onCancel: async () => {
                 try {
-                    await api.post('/smartpackage/systemout/cancel', { draft_id: draftId });
+                    await api.post('/smartpackage/systemin/cancel', { draft_id: draftId });
                     message.success('ยกเลิกใบเบิกเรียบร้อย');
                     onCancel();
                 } catch (err) {
@@ -283,7 +281,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const handleReturnToStock = async () => {
         if (selectedIds.length === 0) return message.warning('กรุณาเลือกรายการ');
         try {
-            await api.post('/smartpackage/systemout/return', {
+            await api.post('/smartpackage/systemin/return', {
                 ids: selectedIds,
                 draft_id: draftId
             });
@@ -302,7 +300,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             return;
         }
         if (!refID) {
-            modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขที่ใบเบิกก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
+            modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขรับเข้าของชำรุดก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
         if (bookingStatus === '16') {
@@ -317,7 +315,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
         try {
             const fixedQr = fixThaiInput(qrString);
-            const res = await api.post('/smartpackage/systemout/scan', {
+            const res = await api.post('/smartpackage/systemin/scan', {
                 qrString: fixedQr,
                 draft_id: draftId,
                 refID: refID
@@ -340,7 +338,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                         okButtonProps: { type: 'default' },
                         onCancel: async () => {
                             try {
-                                await api.post('/smartpackage/systemout/return-single', {
+                                await api.post('/smartpackage/systemin/return-single', {
                                     asset_code: data.asset_code,
                                     draft_id: draftId
                                 });
@@ -428,13 +426,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
     const isEditingDisabled = !refID || bookingStatus === '18';
     const hasScannedItems = scannedList.length > 0;
-    const showSaveCancel = refID && bookingStatus !== '18' && !hasScannedItems;
-    const showConfirm = bookingStatus === '17' && hasScannedItems;
+    const showSaveCancel = refID && bookingStatus !== '18' && bookingStatus !== '26' && !hasScannedItems;
+    const showConfirm = (bookingStatus === '17' || bookingStatus === '26') && hasScannedItems;
     const showCancelButton = bookingStatus !== '18' && !hasScannedItems;
 
     // --- 2. Table Column Definitions ---
 
-    // ฟังก์ชันสำหรับสร้างกล่องค้นหาในตาราง
     const getColumnSearchProps = (dataIndex) => ({
         filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }) => (
             <div style={{ padding: 8 }} onKeyDown={(e) => e.stopPropagation()}>
@@ -477,7 +474,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 : '',
     });
 
-    // Parent Columns (Grouped by PartCode)
     const parentColumns = [
         {
             title: 'ดูรายละเอียด',
@@ -491,7 +487,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                         icon={<EyeOutlined className="text-blue-500 text-lg" />}
                         onClick={(e) => {
                             e.stopPropagation();
-                            // Update the detail card with the representative item of this group
                             setLastScanned(record.firstItem);
                         }}
                     />
@@ -504,6 +499,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             title: 'ชื่อทรัพย์สิน',
             dataIndex: 'asset_detail',
             key: 'asset_detail',
+            width: 120,
             ...getColumnSearchProps('asset_detail')
         },
         { title: 'ประเภท', dataIndex: 'asset_type', key: 'asset_type', width: 120 },
@@ -517,7 +513,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         },
     ];
 
-    // Child Columns (Individual Scanned Items)
     const childColumns = [
         { title: 'ลำดับ', key: 'index', width: 60, align: 'center', render: (_, __, index) => index + 1 },
         { title: 'รหัสทรัพย์สิน', dataIndex: 'asset_code', key: 'asset_code', ...getColumnSearchProps('asset_code') },
@@ -554,7 +549,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         { title: 'ผู้ทำรายการ', dataIndex: 'scan_by_name', key: 'scan_by_name' }
     ];
 
-    // Child Table Renderer
     const expandedRowRender = (record) => {
         return (
             <Table
@@ -568,14 +562,13 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     selectedRowKeys: selectedIds,
                     onChange: (selectedKeys) => setSelectedIds(selectedKeys),
                     getCheckboxProps: (record) => ({
-                        disabled: bookingStatus === '18', // Disable selection if finalized
+                        disabled: bookingStatus === '18',
                     }),
                 }}
             />
         );
     };
 
-    // ✅ 1. เพิ่มฟังก์ชันสำหรับสร้างปุ่ม Expand ที่ไม่มีการ Focus
     const customExpandIcon = ({ expanded, onExpand, record }) => {
         return (
             <span
@@ -585,205 +578,208 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 onClick={(e) => {
                     onExpand(record, e);
                 }}
-                // 🔥 จุดสำคัญ: ป้องกันไม่ให้ปุ่มได้รับ Focus เมื่อคลิก
                 onMouseDown={(e) => e.preventDefault()}
             />
         );
     };
 
+    // ✅ 2. Wrap ด้วย ConfigProvider สีส้ม
     return (
-        <Modal
-            title={<Title level={4} style={{ margin: 0 }}>{targetDraftId ? 'แก้ไขรายการจ่ายออก' : 'สร้างรายการจ่ายออก (System Out)'}</Title>}
-            open={open}
-            onCancel={onCancel}
-            width="95%"
-            style={{ top: 20 }}
-            footer={null}
-            destroyOnClose
-            maskClosable={false}
-            keyboard={false}
-        >
-            <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg" style={{ minHeight: '80vh' }}>
-                <Card
-                    className="shadow-sm border-blue-200 bg-blue-50/30"
-                    title={<Space><InfoCircleOutlined className="text-blue-600" /> รายละเอียดทรัพย์สิน ({lastScanned?.asset_code || 'กรุณาสแกนหรือเลือกรายการ'})</Space>}
-                    size="small"
-                >
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={4} className="flex justify-center items-start">
-                            {lastScanned?.asset_img ? (
-                                <Image
-                                    src={getFullImgUrl('material', lastScanned.asset_img)}
-                                    className="rounded-lg border object-cover"
-                                    style={{ maxHeight: 200, width: '100%' }}
-                                />
-                            ) : (
-                                <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-400">
-                                    <PictureOutlined style={{ fontSize: 40 }} />
+        <ConfigProvider theme={{ token: { colorPrimary: '#f97316', borderRadius: 6 } }}>
+            <Modal
+                title={<Title level={4} style={{ margin: 0 }}>{targetDraftId ? 'แก้ไขรายการรับเข้าของเสีย' : 'สร้างรายการรับเข้าของเสีย'}</Title>}
+                open={open}
+                onCancel={onCancel}
+                width="95%"
+                style={{ top: 20 }}
+                footer={null}
+                destroyOnClose
+                maskClosable={false}
+                keyboard={false}
+            >
+                <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg" style={{ minHeight: '80vh' }}>
+                    <Card
+                        className="shadow-sm border-blue-200 bg-blue-50/30"
+                        title={<Space><InfoCircleOutlined className="text-blue-600" /> รายละเอียดทรัพย์สิน ({lastScanned?.asset_code || 'กรุณาสแกนหรือเลือกรายการ'})</Space>}
+                        size="small"
+                    >
+                        <Row gutter={[16, 16]}>
+                            <Col xs={24} md={4} className="flex justify-center items-start">
+                                {lastScanned?.asset_img ? (
+                                    <Image
+                                        src={getFullImgUrl('material', lastScanned.asset_img)}
+                                        className="rounded-lg border object-cover"
+                                        style={{ maxHeight: 200, width: '100%' }}
+                                    />
+                                ) : (
+                                    <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-400">
+                                        <PictureOutlined style={{ fontSize: 40 }} />
+                                    </div>
+                                )}
+                            </Col>
+                            <Col xs={24} md={10}>
+                                <Descriptions column={1} size="small" bordered className="bg-white">
+                                    <Descriptions.Item label="รหัสทรัพย์สิน">{lastScanned?.asset_code || '-'}</Descriptions.Item>
+                                    <Descriptions.Item label="ชื่อทรัพย์สิน">{lastScanned?.asset_detail || '-'}</Descriptions.Item>
+                                    <Descriptions.Item label="ประเภท">{lastScanned?.asset_type || '-'}</Descriptions.Item>
+                                    <Descriptions.Item label="รายละเอียด">{lastScanned?.asset_remark || '-'}</Descriptions.Item>
+                                </Descriptions>
+                            </Col>
+                            <Col xs={24} md={10}>
+                                <Descriptions column={2} size="small" bordered className="bg-white">
+                                    <Descriptions.Item label="กว้าง">{lastScanned?.asset_width}</Descriptions.Item>
+                                    <Descriptions.Item label="ยาว">{lastScanned?.asset_length}</Descriptions.Item>
+                                    <Descriptions.Item label="สูง">{lastScanned?.asset_height}</Descriptions.Item>
+                                    <Descriptions.Item label="ความจุ">{lastScanned?.asset_capacity}</Descriptions.Item>
+                                    <Descriptions.Item span={2} label="น้ำหนัก">{lastScanned?.asset_weight}</Descriptions.Item>
+                                </Descriptions>
+                            </Col>
+                            <Col span={24}>
+                                <div className="bg-white p-3 rounded border border-gray-100">
+                                    <Text strong className="mb-2 block text-gray-500 text-xs">ส่วนประกอบชิ้นส่วน (Drawings)</Text>
+                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                        {[1, 2, 3, 4, 5, 6].map(num => {
+                                            const imgName = lastScanned?.[`asset_dmg_00${num}`];
+                                            return (
+                                                <div key={num} className="w-24 h-24 border border-gray-200 rounded bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden bg-white">
+                                                    {imgName ? (
+                                                        <Image
+                                                            src={getFullImgUrl('material/drawing', imgName)}
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    ) : (
+                                                        <Text type="secondary" className="text-xs text-gray-300">No Img</Text>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            )}
+                            </Col>
+                        </Row>
+                    </Card>
+
+                    <Row gutter={16} className="flex-1">
+                        <Col xs={24} md={7}>
+                            <Card title="ข้อมูลจ่ายออก" className="h-full shadow-sm" size="small">
+                                <Form layout="vertical" form={form}>
+
+                                    <Form.Item label="" style={{ marginBottom: 0 }}>
+                                        <div className="bg-gray-100 border border-gray-300 rounded px-3 py-1 text-gray-500 select-none cursor-not-allowed">
+                                            System Auto Generated (Running)
+                                        </div>
+                                    </Form.Item>
+                                    <Form.Item name="draft_id" hidden><Input /></Form.Item>
+                                    <div className="mb-4"></div>
+
+                                    {/* ✅ ปรับปรุงส่วน Input */}
+                                    <Form.Item label="เลขรับเข้าของชำรุด" name="refID">
+                                        <Input
+                                            placeholder="กดปุ่มเพื่อสร้าง"
+                                            readOnly
+                                            className={refID ? "bg-orange-50 text-orange-700 font-bold border-orange-200" : ""}
+                                            style={refID ? { backgroundColor: '#fff7ed', color: '#c2410c' } : {}}
+                                            addonAfter={
+                                                <Button
+                                                    type="primary"
+                                                    size="small"
+                                                    onClick={handleGenerateRef}
+                                                    disabled={!!refID}
+                                                    icon={<FileAddOutlined />}
+                                                >
+                                                    สร้างเลขรับเข้าของชำรุด
+                                                </Button>
+                                            }
+                                        />
+                                    </Form.Item>
+
+                                    <Form.Item label="วัตถุประสงค์" name="objective"><Input readOnly className="bg-gray-100" /></Form.Item>
+                                    <Form.Item label="จำนวน (รายการ)" name="attendees">
+                                        <Input readOnly className="text-center font-bold text-blue-600" disabled={isEditingDisabled} />
+                                    </Form.Item>
+                                    <Form.Item label="หมายเหตุ" name="booking_remark">
+                                        <Input.TextArea rows={2} disabled={isEditingDisabled} />
+                                    </Form.Item>
+                                    <Divider />
+                                    <Form.Item label="ต้นทาง" name="origin" rules={[{ required: true }]}>
+                                        <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกต้นทาง" disabled={isEditingDisabled} />
+                                    </Form.Item>
+                                    <Form.Item label="ปลายทาง" name="destination" rules={[{ required: true }]}>
+                                        <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกปลายทาง" disabled={isEditingDisabled} />
+                                    </Form.Item>
+
+                                    <Row gutter={8} style={{ marginTop: 16 }}>
+                                        {showSaveCancel && (
+                                            <Col span={12}>
+                                                <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large">
+                                                    บันทึกข้อมูล
+                                                </Button>
+                                            </Col>
+                                        )}
+
+                                        {showCancelButton && (
+                                            <Col span={showSaveCancel ? 12 : 24}>
+                                                <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
+                                                    ยกเลิกใบเบิก
+                                                </Button>
+                                            </Col>
+                                        )}
+
+                                        {showConfirm && (
+                                            <Col span={24} className="mt-2">
+                                                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500">
+                                                    จ่ายออก (Confirm)
+                                                </Button>
+                                            </Col>
+                                        )}
+
+                                        {bookingStatus === '18' && canUse('system-out:unlock') && (
+                                            <Col span={24}>
+                                                <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
+                                                    ปลดล็อคเพื่อแก้ไข
+                                                </Button>
+                                            </Col>
+                                        )}
+                                    </Row>
+                                </Form>
+                            </Card>
                         </Col>
-                        <Col xs={24} md={10}>
-                            <Descriptions column={1} size="small" bordered className="bg-white">
-                                <Descriptions.Item label="รหัสทรัพย์สิน">{lastScanned?.asset_code || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="ชื่อทรัพย์สิน">{lastScanned?.asset_detail || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="ประเภท">{lastScanned?.asset_type || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="รายละเอียด">{lastScanned?.asset_remark || '-'}</Descriptions.Item>
-                            </Descriptions>
-                        </Col>
-                        <Col xs={24} md={10}>
-                            <Descriptions column={2} size="small" bordered className="bg-white">
-                                <Descriptions.Item label="กว้าง">{lastScanned?.asset_width}</Descriptions.Item>
-                                <Descriptions.Item label="ยาว">{lastScanned?.asset_length}</Descriptions.Item>
-                                <Descriptions.Item label="สูง">{lastScanned?.asset_height}</Descriptions.Item>
-                                <Descriptions.Item label="ความจุ">{lastScanned?.asset_capacity}</Descriptions.Item>
-                                <Descriptions.Item span={2} label="น้ำหนัก">{lastScanned?.asset_weight}</Descriptions.Item>
-                            </Descriptions>
-                        </Col>
-                        <Col span={24}>
-                            <div className="bg-white p-3 rounded border border-gray-100">
-                                <Text strong className="mb-2 block text-gray-500 text-xs">ส่วนประกอบชิ้นส่วน (Drawings)</Text>
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {[1, 2, 3, 4, 5, 6].map(num => {
-                                        const imgName = lastScanned?.[`asset_dmg_00${num}`];
-                                        return (
-                                            <div key={num} className="w-24 h-24 border border-gray-200 rounded bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden bg-white">
-                                                {imgName ? (
-                                                    <Image
-                                                        src={getFullImgUrl('material/drawing', imgName)}
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                ) : (
-                                                    <Text type="secondary" className="text-xs text-gray-300">No Img</Text>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+
+                        <Col xs={24} md={17}>
+                            <div className="bg-white p-4 rounded-lg shadow-sm h-full flex flex-col">
+                                <div className="flex justify-between items-center mb-2">
+                                    <Title level={5} style={{ margin: 0 }}>รายการในตะกร้า ({scannedList.length})</Title>
+                                    <Button
+                                        danger
+                                        icon={<ReloadOutlined />}
+                                        onClick={handleReturnToStock}
+                                        disabled={selectedIds.length === 0 || bookingStatus === '18'}
+                                    >
+                                        ยกเลิกจ่ายออก ({selectedIds.length})
+                                    </Button>
+                                </div>
+                                <div className="flex-1 overflow-auto">
+                                    <Table
+                                        columns={parentColumns}
+                                        dataSource={groupedData}
+                                        expandable={{
+                                            expandedRowRender,
+                                            expandIcon: customExpandIcon
+                                        }}
+                                        rowKey="key"
+                                        loading={loading}
+                                        pagination={false}
+                                        bordered
+                                        size="middle"
+                                        scroll={{ y: 400 }}
+                                    />
                                 </div>
                             </div>
                         </Col>
                     </Row>
-                </Card>
-
-                <Row gutter={16} className="flex-1">
-                    <Col xs={24} md={7}>
-                        <Card title="ข้อมูลจ่ายออก" className="h-full shadow-sm" size="small">
-                            <Form layout="vertical" form={form}>
-
-                                <Form.Item label="DRAFT-ID" style={{ marginBottom: 0 }}>
-                                    <div className="bg-gray-100 border border-gray-300 rounded px-3 py-1 text-gray-500 select-none cursor-not-allowed">
-                                        System Auto Generated (Running)
-                                    </div>
-                                </Form.Item>
-                                <Form.Item name="draft_id" hidden><Input /></Form.Item>
-                                <div className="mb-4"></div>
-
-                                <Form.Item label="เลขที่ใบเบิก" name="refID">
-                                    <Input
-                                        placeholder="กดปุ่มเพื่อสร้าง"
-                                        readOnly
-                                        className={refID ? "bg-green-50 text-green-700 font-bold" : ""}
-                                        addonAfter={
-                                            <Button
-                                                type="primary"
-                                                size="small"
-                                                onClick={handleGenerateRef}
-                                                disabled={!!refID}
-                                                icon={<FileAddOutlined />}
-                                            >
-                                                สร้างเลขที่ใบเบิก
-                                            </Button>
-                                        }
-                                    />
-                                </Form.Item>
-
-                                <Form.Item label="วัตถุประสงค์" name="objective"><Input readOnly className="bg-gray-100" /></Form.Item>
-                                <Form.Item label="จำนวน (รายการ)" name="attendees">
-                                    <Input readOnly className="text-center font-bold text-blue-600" disabled={isEditingDisabled} />
-                                </Form.Item>
-                                <Form.Item label="หมายเหตุ" name="booking_remark">
-                                    <Input.TextArea rows={2} disabled={isEditingDisabled} />
-                                </Form.Item>
-                                <Divider />
-                                <Form.Item label="ต้นทาง" name="origin" rules={[{ required: true }]}>
-                                    <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกต้นทาง" disabled={isEditingDisabled} />
-                                </Form.Item>
-                                <Form.Item label="ปลายทาง" name="destination" rules={[{ required: true }]}>
-                                    <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกปลายทาง" disabled={isEditingDisabled} />
-                                </Form.Item>
-
-                                <Row gutter={8} style={{ marginTop: 16 }}>
-                                    {showSaveCancel && (
-                                        <Col span={12}>
-                                            <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large">
-                                                บันทึกข้อมูล
-                                            </Button>
-                                        </Col>
-                                    )}
-
-                                    {showCancelButton && (
-                                        <Col span={showSaveCancel ? 12 : 24}>
-                                            <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
-                                                ยกเลิกใบเบิก
-                                            </Button>
-                                        </Col>
-                                    )}
-
-                                    {showConfirm && (
-                                        <Col span={24} className="mt-2">
-                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500">
-                                                จ่ายออก (Confirm)
-                                            </Button>
-                                        </Col>
-                                    )}
-
-                                    {bookingStatus === '18' && (
-                                        <Col span={24}>
-                                            <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
-                                                ปลดล็อคเพื่อแก้ไข
-                                            </Button>
-                                        </Col>
-                                    )}
-                                </Row>
-                            </Form>
-                        </Card>
-                    </Col>
-
-                    {/* ✅ New Table Implementation */}
-                    <Col xs={24} md={17}>
-                        <div className="bg-white p-4 rounded-lg shadow-sm h-full flex flex-col">
-                            <div className="flex justify-between items-center mb-2">
-                                <Title level={5} style={{ margin: 0 }}>รายการในตะกร้า ({scannedList.length})</Title>
-                                <Button
-                                    danger
-                                    icon={<ReloadOutlined />}
-                                    onClick={handleReturnToStock}
-                                    disabled={selectedIds.length === 0 || bookingStatus === '18'}
-                                >
-                                    ยกเลิกจ่ายออก ({selectedIds.length})
-                                </Button>
-                            </div>
-                            <div className="flex-1 overflow-auto">
-                                <Table
-                                    columns={parentColumns}
-                                    dataSource={groupedData}
-                                    expandable={{
-                                        expandedRowRender,
-                                        expandIcon: customExpandIcon
-                                    }}
-                                    rowKey="key"
-                                    loading={loading}
-                                    pagination={false}
-                                    bordered
-                                    size="middle"
-                                    scroll={{ y: 400 }}
-                                />
-                            </div>
-                        </div>
-                    </Col>
-                </Row>
-            </div>
-        </Modal>
+                </div>
+            </Modal>
+        </ConfigProvider>
     );
 }
-export default SystemOutList;
+export default SystemInDefective;

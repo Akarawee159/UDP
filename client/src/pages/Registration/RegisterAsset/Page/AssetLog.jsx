@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import {
     SearchOutlined, ArrowLeftOutlined, CloseOutlined,
-    ClockCircleOutlined, UserOutlined
+    ClockCircleOutlined, UserOutlined, CalendarOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -19,18 +19,17 @@ function AssetLog() {
 
     const containerStyle = useMemo(() => ({
         margin: isMd ? '-8px' : '0',
-        padding: 0, // ปรับ padding เป็น 0 เพื่อจัดการ layout เอง
-        height: '100vh', // เปลี่ยนจาก minHeight เป็น height
+        padding: 0,
+        height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden' // ซ่อน scroll bar ของ browser
+        overflow: 'hidden'
     }), [isMd]);
 
     const navigate = useNavigate();
     const location = useLocation();
     const { message } = App.useApp();
 
-    // รับ asset_code จากหน้าก่อนหน้า
     const { asset_code } = location.state || {};
 
     const [loading, setLoading] = useState(false);
@@ -47,7 +46,6 @@ function AssetLog() {
         const fetchHistory = async () => {
             setLoading(true);
             try {
-                // เรียก API ที่เราสร้างไว้
                 const res = await api.get(`/registration/registerasset/history/${asset_code}`);
                 if (res.data?.success) {
                     setRowData(res.data.data);
@@ -63,14 +61,15 @@ function AssetLog() {
         fetchHistory();
     }, [asset_code, navigate, message]);
 
-    // Format วันที่
     const formatDate = (date) => date ? dayjs(date).format('DD/MM/YYYY HH:mm:ss') : '-';
 
-    // Column Definitions สำหรับตาราง Log
+    // Helper: ตรวจสอบว่าเป็นกลุ่ม Print/Register หรือไม่ (20, 21, 22)
+    const isPrintOrRegister = (status) => ['20', '21', '22'].includes(String(status));
+
     const columnDefs = useMemo(() => [
-        { headerName: '#', valueGetter: "node.rowIndex + 1", width: 100, cellClass: "text-center" },
+        { headerName: '#', valueGetter: "node.rowIndex + 1", width: 80, cellClass: "text-center" },
         {
-            headerName: 'Action', field: 'asset_action', width: 120, pinned: 'left',
+            headerName: 'Action', field: 'asset_action', width: 100, pinned: 'left',
             cellRenderer: (params) => {
                 const action = params.value || '';
                 let color = 'default';
@@ -84,23 +83,13 @@ function AssetLog() {
             }
         },
         {
-            headerName: 'วันที่ทำรายการ', field: 'updated_at', width: 200, sort: 'desc',
-            cellRenderer: (params) => (
-                <div className="flex items-center gap-2">
-                    <ClockCircleOutlined className="text-gray-400" />
-                    {formatDate(params.value)}
-                </div>
-            )
-        },
-        {
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 200,
+            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.is_status_name,
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
-
                 return (
                     <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
@@ -109,32 +98,75 @@ function AssetLog() {
             }
         },
         {
-            headerName: 'ผู้พิมพ์สติ๊กเกอร์', field: 'updated_by', width: 200,
-            cellRenderer: (params) => (
-                <div className="flex items-center gap-2">
-                    <UserOutlined className="text-gray-400" />
-                    {params.value || 'System'}
-                </div>
-            )
-        },
-        {
-            headerName: 'พิมพ์ครั้งที่', field: 'print_status', width: 140,
+            headerName: 'พิมพ์ครั้งที่', field: 'print_status', width: 120,
             cellClass: "text-center",
             cellRenderer: (params) => (
                 <span className="font-medium text-blue-600">{params.value}</span>
             )
         },
         {
-            headerName: 'สถานะใช้งาน', field: 'asset_status', width: 200,
+            // === Logic 1: วันที่พิมพ์สติ๊กเกอร์ ===
+            headerName: 'วันที่พิมพ์สติ๊กเกอร์',
+            width: 200,
+            sort: 'desc',
+            cellRenderer: (params) => {
+                const status = String(params.data.is_status);
+                let dateToShow = null;
+
+                if (status === '20') {
+                    // สถานะ 20: ใช้ created_at
+                    dateToShow = params.data.created_at;
+                } else if (status === '21' || status === '22') {
+                    // สถานะ 21, 22: ใช้ updated_at
+                    dateToShow = params.data.updated_at;
+                } else {
+                    // สถานะอื่น: ไม่แสดง
+                    return <span className="text-gray-500">-</span>;
+                }
+
+                return (
+                    <div className="flex items-center gap-2">
+                        <ClockCircleOutlined className="text-blue-500" />
+                        {formatDate(dateToShow)}
+                    </div>
+                );
+            }
+        },
+        {
+            // === Logic 2: ผู้พิมพ์สติ๊กเกอร์ ===
+            headerName: 'ผู้พิมพ์สติ๊กเกอร์',
+            width: 200,
+            cellRenderer: (params) => {
+                const status = String(params.data.is_status);
+                let nameToShow = null;
+
+                if (status === '20') {
+                    // สถานะ 20: ผู้สร้าง (booking_created_by)
+                    nameToShow = params.data.booking_created_by;
+                } else if (status === '21' || status === '22') {
+                    // สถานะ 21, 22: ผู้แก้ไข (updated_by)
+                    nameToShow = params.data.updated_by;
+                } else {
+                    // สถานะอื่น: ไม่แสดง
+                    return <span className="text-gray-500">-</span>;
+                }
+
+                return (
+                    <div className="flex items-center gap-2">
+                        <UserOutlined className="text-blue-500" />
+                        {nameToShow || 'System'}
+                    </div>
+                );
+            }
+        },
+        {
+            headerName: 'สถานะใช้งาน', field: 'asset_status', width: 180,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.asset_status_name,
             cellRenderer: (params) => {
-                // ดึงชื่อและสีจากที่ backend join มาให้
                 const name = params.data.asset_status_name || params.value;
-                // ถ้าไม่มีสี ให้ใช้สีเทาเป็น default
                 const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
-
                 return (
                     <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
@@ -142,10 +174,76 @@ function AssetLog() {
                 );
             }
         },
-        { headerName: 'เลขที่เอกสาร', field: 'refID', width: 200 },
-        { headerName: 'ผู้ทำรายการ', field: 'booking_created_by', width: 200 },
-        { headerName: 'วันที่ทำรายการ', field: 'create_date', width: 200 },
-        { headerName: 'เวลาทำรายการ', field: 'create_time', width: 200 },
+        {
+            headerName: 'เลขที่เอกสาร',
+            field: 'refID',
+            width: 180,
+            cellRenderer: (params) => params.value || '-'
+        },
+        {
+            headerName: 'ต้นทาง',
+            field: 'asset_origin',
+            width: 180,
+            cellRenderer: (params) => params.value || '-'
+        },
+        {
+            headerName: 'ปลายทาง',
+            field: 'asset_destination',
+            width: 180,
+            cellRenderer: (params) => params.value || '-'
+        },
+        {
+            // === Logic 3: ผู้ทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            headerName: 'ผู้ทำรายการ',
+            field: 'booking_created_by',
+            width: 200,
+            cellRenderer: (params) => {
+                if (isPrintOrRegister(params.data.is_status)) {
+                    return <span className="text-gray-500">-</span>;
+                }
+                return (
+                    <div className="flex items-center gap-2">
+                        <UserOutlined className="text-blue-500" />
+                        {params.value || '-'}
+                    </div>
+                );
+            }
+        },
+        {
+            // === Logic 4: วันที่ทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            headerName: 'วันที่ทำรายการ',
+            field: 'create_date',
+            width: 160,
+            sort: 'desc',
+            cellRenderer: (params) => {
+                if (isPrintOrRegister(params.data.is_status)) {
+                    return <span className="text-gray-500">-</span>;
+                }
+                return (
+                    <div className="flex items-center gap-2">
+                        <CalendarOutlined className="text-blue-500" />
+                        {params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-'}
+                    </div>
+                );
+            }
+        },
+        {
+            // === Logic 5: เวลาทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            headerName: 'เวลาทำรายการ',
+            field: 'create_time',
+            width: 140,
+            cellRenderer: (params) => {
+                if (isPrintOrRegister(params.data.is_status)) {
+                    return <span className="text-gray-500">-</span>;
+                }
+                return (
+                    <div className="flex items-center gap-2">
+                        <ClockCircleOutlined className="text-blue-500" />
+                        {params.value || '-'}
+                    </div>
+                );
+            }
+        },
         { headerName: 'หมายเหตุ', field: 'asset_remark', width: 200 },
         { headerName: 'สถานที่', field: 'asset_location', width: 200 },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 200 },
@@ -156,7 +254,8 @@ function AssetLog() {
         const lower = searchTerm.toLowerCase();
         return rowData.filter(r =>
             String(r.asset_action).toLowerCase().includes(lower) ||
-            String(r.updated_by).toLowerCase().includes(lower)
+            String(r.updated_by).toLowerCase().includes(lower) ||
+            String(r.booking_created_by).toLowerCase().includes(lower)
         );
     }, [rowData, searchTerm]);
 
@@ -194,14 +293,14 @@ function AssetLog() {
             {/* --- Content --- */}
             <div className="p-2 flex-1 overflow-hidden flex flex-col">
                 <Card
-                    className="shadow-sm border-gray-200 rounded-md h-full flex flex-col" // เพิ่ม h-full และ flex-col
+                    className="shadow-sm border-gray-200 rounded-md h-full flex flex-col"
                     styles={{
                         body: {
                             padding: 0,
                             flex: 1,
                             display: 'flex',
                             flexDirection: 'column',
-                            overflow: 'hidden' // สำคัญ: เพื่อให้ Grid scroll อยู่ภายใน Body นี้
+                            overflow: 'hidden'
                         }
                     }}
                 >

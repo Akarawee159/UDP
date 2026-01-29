@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid, Tag } from 'antd';
-import { SearchOutlined, CaretRightOutlined, WarningOutlined } from '@ant-design/icons'; // เพิ่ม WarningOutlined หรือจะใช้ CaretRight เหมือนเดิมก็ได้
+import { SearchOutlined, CaretLeftOutlined, WarningOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
-import SystemOutList from './Page/SystemOutList';
+import SystemInList from './Page/SystemInList';
+import SystemInDefective from './Page/SystemInDefective';
 
 function SystemIn() {
     const screens = Grid.useBreakpoint();
@@ -16,15 +17,13 @@ function SystemIn() {
     const [searchTerm, setSearchTerm] = useState('');
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isModalDamagedOpen, setIsModalDamagedOpen] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState(null);
-
-    // ✅ เพิ่ม State เพื่อระบุประเภทการรับเข้า (normal = ของดี, damaged = ของชำรุด)
-    const [receiveType, setReceiveType] = useState('normal');
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/smartpackage/systemout');
+            const res = await api.get('/smartpackage/systemin');
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
@@ -42,6 +41,7 @@ function SystemIn() {
         const s = getSocket();
         if (!s) return;
         const onUpdate = (payload) => {
+            // refresh เมื่อมี action ต่างๆ
             const acts = ['confirm', 'header_update', 'finalized', 'unlocked', 'cancel'];
             if (acts.includes(payload?.action) || acts.includes(payload?.detail?.action)) {
                 fetchData();
@@ -51,30 +51,74 @@ function SystemIn() {
         return () => window.removeEventListener('hrms:systemout-update', onUpdate);
     }, [fetchData]);
 
+    // --- Logic สำหรับ รับเข้าของดี ---
     const handleCreate = () => {
-        setSelectedDraftId(null);
-        setReceiveType('normal'); // ✅ ระบุว่าเป็นของดี
+        const storedUser = localStorage.getItem('user');
+        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+        let foundDraft = null;
+
+        if (currentUser && currentUser.employee_id) {
+            foundDraft = rows.find(r =>
+                String(r.created_by) === String(currentUser.employee_id) &&
+                String(r.is_status) === '16' &&
+                (!r.refID || r.refID === '')
+            );
+        }
+
+        if (foundDraft) {
+            message.info('ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ');
+            setSelectedDraftId(foundDraft.draft_id);
+        } else {
+            setSelectedDraftId(null);
+        }
+
         setIsModalOpen(true);
     };
 
-    // ✅ เพิ่มฟังก์ชันสำหรับปุ่มของชำรุด
+    // --- Logic สำหรับ รับเข้าของชำรุด (ทำงานเหมือนของดี แต่เปิด Modal Damaged) ---
     const handleCreateDamaged = () => {
-        setSelectedDraftId(null);
-        setReceiveType('damaged'); // ✅ ระบุว่าเป็นของชำรุด
-        setIsModalOpen(true);
+        const storedUser = localStorage.getItem('user');
+        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+        let foundDraft = null;
+
+        if (currentUser && currentUser.employee_id) {
+            // ค้นหา Draft ของ User คนนี้
+            foundDraft = rows.find(r =>
+                String(r.created_by) === String(currentUser.employee_id) &&
+                String(r.is_status) === '16' &&
+                (!r.refID || r.refID === '')
+            );
+        }
+
+        if (foundDraft) {
+            message.info('ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ');
+            setSelectedDraftId(foundDraft.draft_id);
+        } else {
+            setSelectedDraftId(null);
+        }
+
+        setIsModalDamagedOpen(true);
     };
 
     const handleRowClick = (record) => {
         setSelectedDraftId(record.draft_id);
-        // กรณีแก้ไข อาจจะต้องเช็ค record ว่าเป็นแบบไหน หรือให้เป็น normal ไปก่อน
-        setReceiveType('normal');
+        // หมายเหตุ: ตรงนี้อาจจะต้องเช็คว่า record นี้เป็นของดีหรือของเสียเพื่อเปิด Modal ให้ถูกอัน
+        // แต่เบื้องต้นให้เปิด Modal หลัก (SystemInList) ตาม Logic เดิม
         setIsModalOpen(true);
     };
 
     const handleModalClose = () => {
         setIsModalOpen(false);
         setSelectedDraftId(null);
-        setReceiveType('normal'); // reset
+        fetchData();
+    };
+
+    // เพิ่มฟังก์ชันสำหรับปิด Modal ของชำรุด
+    const handleModalDamagedClose = () => {
+        setIsModalDamagedOpen(false);
+        setSelectedDraftId(null);
         fetchData();
     };
 
@@ -124,18 +168,14 @@ function SystemIn() {
                             className="w-full md:w-64 bg-transparent"
                         />
                         <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-
-                        {/* ปุ่มรับเข้าของดี (เดิม) */}
                         <Button
                             type="primary"
-                            icon={<CaretRightOutlined />}
+                            icon={<CaretLeftOutlined />}
                             onClick={handleCreate}
                             className="bg-green-600 hover:bg-green-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
                             รับเข้าของดี
                         </Button>
-
-                        {/* ✅ ปุ่มรับเข้าของชำรุด (ใหม่) */}
                         <Button
                             type="primary"
                             icon={<WarningOutlined />}
@@ -147,6 +187,7 @@ function SystemIn() {
                     </div>
                 </div>
 
+                {/* Table */}
                 <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
                     <DataTable
                         rowData={filteredRows}
@@ -157,11 +198,18 @@ function SystemIn() {
                     />
                 </div>
 
-                <SystemOutList
+                {/* Modal สำหรับของดี */}
+                <SystemInList
                     open={isModalOpen}
                     onCancel={handleModalClose}
                     targetDraftId={selectedDraftId}
-                    receiveType={receiveType} // ✅ ส่งประเภทรายการไปให้ Modal (ต้องไปรับ prop นี้ใน SystemOutList ด้วย)
+                />
+
+                {/* Modal สำหรับของชำรุด */}
+                <SystemInDefective
+                    open={isModalDamagedOpen}
+                    onCancel={handleModalDamagedClose}
+                    targetDraftId={selectedDraftId}
                 />
             </div>
         </ConfigProvider>
