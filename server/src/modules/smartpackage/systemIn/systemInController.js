@@ -31,7 +31,7 @@ async function generateBookingRef(req, res, next) {
 
     // Notify
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'ref_generated', draft_id });
+    if (io) io.emit('systemin:update', { action: 'ref_generated', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -47,7 +47,7 @@ async function confirmBooking(req, res, next) {
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'header_update', draft_id });
+    if (io) io.emit('systemin:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -63,7 +63,7 @@ async function finalizeBooking(req, res, next) {
     await model.finalizeBooking(draft_id, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'finalized', draft_id });
+    if (io) io.emit('systemin:update', { action: 'finalized', draft_id });
 
     res.json({ success: true, message: 'Finalized' });
   } catch (err) { next(err); }
@@ -79,7 +79,7 @@ async function unlockBooking(req, res, next) {
     await model.unlockBooking(draft_id, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'unlocked', draft_id });
+    if (io) io.emit('systemin:update', { action: 'unlocked', draft_id });
 
     res.json({ success: true, message: 'Unlocked' });
   } catch (err) { next(err); }
@@ -102,7 +102,7 @@ async function scanAsset(req, res, next) {
     if (result.success) {
       const io = req.app.get('io');
       if (io) {
-        io.emit('systemout:update', { action: 'scan', data: result.data, draft_id });
+        io.emit('systemin:update', { action: 'scan', data: result.data, draft_id });
         io.emit('registerasset:upsert', result.data);
       }
       res.json({ success: true, data: result.data });
@@ -121,7 +121,7 @@ async function returnSingle(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemout:update', { action: 'return', data: updatedItem, draft_id });
+      io.emit('systemin:update', { action: 'return', data: updatedItem, draft_id });
       io.emit('registerasset:upsert', updatedItem);
     }
     res.json({ success: true, message: 'Returned' });
@@ -137,7 +137,7 @@ async function returnAssets(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemout:update', { action: 'return', ids, draft_id });
+      io.emit('systemin:update', { action: 'return', ids, draft_id });
       updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
     res.json({ success: true, message: 'Returned to stock' });
@@ -178,7 +178,7 @@ async function cancelBooking(req, res, next) {
 
     await model.cancelBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'cancel', draft_id });
+    if (io) io.emit('systemin:update', { action: 'cancel', draft_id });
 
     res.json({ success: true, message: 'Booking cancelled' });
   } catch (err) { next(err); }

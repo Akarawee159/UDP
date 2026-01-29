@@ -25,11 +25,12 @@ async function createBooking(data) {
   return { draft_id };
 }
 
+// RC = Recieve
 async function generateRefID(draft_id, user_id) {
   const [countRes] = await db.query(`SELECT COUNT(*) as cnt FROM booking_asset_lists WHERE create_date = CURDATE()`);
   const seq = countRes[0].cnt + 1;
   const dateStr = dayjs().format('DDMMYY');
-  const refID = `RF${dateStr}${String(seq).padStart(4, '0')}`;
+  const refID = `RC${dateStr}${String(seq).padStart(4, '0')}`;
   const now = getThaiNow();
 
   await db.query(`
@@ -233,7 +234,7 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
                s1.G_NAME as asset_status_name, 
                s1.G_DESCRIPT as asset_status_color
         FROM tb_asset_lists a
-        LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
+        LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A2'
         WHERE a.asset_code = ?
     `;
   const [rows] = await db.query(sqlGet, [uniqueKey]);
@@ -332,7 +333,7 @@ async function getAssetWithStatus(assetCode) {
       SELECT a.*, 
              s1.G_NAME as asset_status_name, s1.G_DESCRIPT as asset_status_color
       FROM tb_asset_lists a
-      LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
+      LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A2'
       WHERE a.asset_code = ?
     `;
   const [rows] = await db.query(sql, [assetCode]);
@@ -347,7 +348,7 @@ async function getAssetsByDraft(draft_id) {
       s.G_DESCRIPT as status_class,
       CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
     FROM tb_asset_lists a
-    LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
+    LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A2'
     LEFT JOIN employees e ON a.scan_by = e.employee_id
     WHERE a.draft_id = ? 
     ORDER BY a.updated_at DESC
@@ -369,9 +370,9 @@ async function getAllBookings() {
         s.G_DESCRIPT as is_status_color,
         CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as created_by_name
     FROM booking_asset_lists b
-    LEFT JOIN tb_erp_status s ON b.is_status = s.G_CODE AND s.G_USE = 'A1'
+    LEFT JOIN tb_erp_status s ON b.is_status = s.G_CODE AND s.G_USE = 'A2'
     LEFT JOIN employees e ON b.created_by = e.employee_id
-    WHERE b.is_status != '19'
+    WHERE b.is_status != '16' AND b.is_status != '17' AND b.is_status != '18' AND b.is_status != '19'
     ORDER BY b.created_at DESC
   `;
   const [rows] = await db.query(sql);
@@ -438,7 +439,7 @@ async function returnToStock(ids) {
   const [updatedRows] = await db.query(`
       SELECT a.*, s1.G_NAME as asset_status_name, s1.G_DESCRIPT as asset_status_color
       FROM tb_asset_lists a
-      LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
+      LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A2'
       WHERE a.asset_code IN (?)
   `, [ids]);
   return updatedRows;

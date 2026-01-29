@@ -47,8 +47,8 @@ function SystemIn() {
                 fetchData();
             }
         };
-        window.addEventListener('hrms:systemout-update', onUpdate);
-        return () => window.removeEventListener('hrms:systemout-update', onUpdate);
+        window.addEventListener('hrms:systemin-update', onUpdate);
+        return () => window.removeEventListener('hrms:systemin-update', onUpdate);
     }, [fetchData]);
 
     // --- Logic สำหรับ รับเข้าของดี ---

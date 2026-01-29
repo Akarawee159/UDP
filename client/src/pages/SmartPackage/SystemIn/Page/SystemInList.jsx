@@ -162,8 +162,8 @@ function SystemInList({ open, onCancel, targetDraftId }) {
                 }
             }
         };
-        window.addEventListener('hrms:systemout-update', handleSocketUpdate);
-        return () => window.removeEventListener('hrms:systemout-update', handleSocketUpdate);
+        window.addEventListener('hrms:systemin-update', handleSocketUpdate);
+        return () => window.removeEventListener('hrms:systemin-update', handleSocketUpdate);
     }, [open, draftId, message, form]);
 
 
@@ -252,15 +252,15 @@ function SystemInList({ open, onCancel, targetDraftId }) {
     const handleCancelBooking = async () => {
         if (scannedList.length > 0) {
             modal.warning({
-                title: 'ไม่สามารถยกเลิกใบเบิกได้',
-                content: 'กรุณา "ยกเลิกจ่ายออก" (คืนคลัง) รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใบเบิก',
+                title: 'ไม่สามารถยกเลิกใบรับเข้าของดีได้',
+                content: 'กรุณา "ยกเลิกรับเข้าของดี" (คืนคลัง) รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใบรับเข้าของดี',
                 okText: 'รับทราบ'
             });
             return;
         }
         modal.confirm({
-            title: 'ยืนยันการยกเลิกใบเบิก',
-            content: 'ต้องการยกเลิกใบเบิกนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
+            title: 'ยืนยันการยกเลิกใบรับเข้าของดี',
+            content: 'ต้องการยกเลิกใบรับเข้าของดีนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
             cancelText: 'ยืนยัน',
             cancelButtonProps: { type: 'primary', danger: true },
             okText: 'ปิด',
@@ -268,7 +268,7 @@ function SystemInList({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemin/cancel', { draft_id: draftId });
-                    message.success('ยกเลิกใบเบิกเรียบร้อย');
+                    message.success('ยกเลิกใบรับเข้าของดีเรียบร้อย');
                     onCancel();
                 } catch (err) {
                     message.error(err.response?.data?.message || 'ยกเลิกไม่สำเร็จ');
@@ -285,7 +285,7 @@ function SystemInList({ open, onCancel, targetDraftId }) {
                 ids: selectedIds,
                 draft_id: draftId
             });
-            message.success('ยกเลิกจ่ายออกเรียบร้อย');
+            message.success('ยกเลิกรับเข้าของดีเรียบร้อย');
             setSelectedIds([]);
         } catch (err) { message.error('Error'); }
     };
@@ -329,10 +329,10 @@ function SystemInList({ open, onCancel, targetDraftId }) {
 
                 if (code === 'ALREADY_SCANNED') {
                     modal.confirm({
-                        title: 'ยืนยันการยกเลิกจ่ายออก',
+                        title: 'ยืนยันการยกเลิกรับเข้าของดี',
                         icon: <ExclamationCircleOutlined />,
-                        content: `ต้องการยกเลิกจ่ายออก ${data.asset_code} ใช่หรือไม่?`,
-                        cancelText: 'ยกเลิกจ่ายออก',
+                        content: `ต้องการยกเลิกรับเข้าของดี ${data.asset_code} ใช่หรือไม่?`,
+                        cancelText: 'ยกเลิกรับเข้าของดี',
                         cancelButtonProps: { danger: true, type: 'primary' },
                         okText: 'ปิด',
                         okButtonProps: { type: 'default' },
@@ -342,7 +342,7 @@ function SystemInList({ open, onCancel, targetDraftId }) {
                                     asset_code: data.asset_code,
                                     draft_id: draftId
                                 });
-                                message.success('ยกเลิกจ่ายออกเรียบร้อย');
+                                message.success('ยกเลิกรับเข้าของดีเรียบร้อย');
                             } catch (e) { message.error('Failed'); }
                             processingRef.current = false;
                         },
@@ -720,7 +720,7 @@ function SystemInList({ open, onCancel, targetDraftId }) {
                                         {showCancelButton && (
                                             <Col span={showSaveCancel ? 12 : 24}>
                                                 <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
-                                                    ยกเลิกใบเบิก
+                                                    ยกเลิกใบรับเข้าของดี
                                                 </Button>
                                             </Col>
                                         )}
@@ -755,7 +755,7 @@ function SystemInList({ open, onCancel, targetDraftId }) {
                                         onClick={handleReturnToStock}
                                         disabled={selectedIds.length === 0 || bookingStatus === '18'}
                                     >
-                                        ยกเลิกจ่ายออก ({selectedIds.length})
+                                        ยกเลิกรับเข้าของดี ({selectedIds.length})
                                     </Button>
                                 </div>
                                 <div className="flex-1 overflow-auto">

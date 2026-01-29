@@ -25,6 +25,7 @@ async function createBooking(data) {
   return { draft_id };
 }
 
+// RF 
 async function generateRefID(draft_id, user_id) {
   const [countRes] = await db.query(`SELECT COUNT(*) as cnt FROM booking_asset_lists WHERE create_date = CURDATE()`);
   const seq = countRes[0].cnt + 1;
