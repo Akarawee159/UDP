@@ -34,7 +34,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
     const [selectedIds, setSelectedIds] = useState([]);
 
     // Status Logic
-    const [bookingStatus, setBookingStatus] = useState('16');
+    const [bookingStatus, setBookingStatus] = useState('40');
     const processingRef = useRef(false);
     const { canUse } = usePermission();
 
@@ -99,13 +99,13 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
                 }
             } else {
                 const newId = generateDraftId();
-                await api.post('/smartpackage/systemin/init-booking', { draft_id: newId });
+                await api.post('/smartpackage/systemin/init-booking', { draft_id: newId, type: 'defective' });
 
                 setDraftId(newId);
                 setRefID(null);
                 setScannedList([]);
                 setLastScanned({});
-                setBookingStatus('16');
+                setBookingStatus('40');
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
@@ -193,7 +193,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
                 origin: values.origin,
                 destination: values.destination
             });
-            setBookingStatus('17');
+            setBookingStatus('41');
             message.success('บันทึกข้อมูลเรียบร้อย พร้อมสำหรับการสแกน');
         } catch (err) {
             message.error('กรุณาระบุข้อมูลให้ครบถ้วน');
@@ -205,7 +205,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
             title: 'ยืนยันการจ่ายออก',
             content: 'เมื่อยืนยันแล้วจะไม่สามารถแก้ไขหรือสแกนเพิ่มได้',
             cancelText: 'ยืนยันจ่ายออก',
-            cancelButtonProps: { type: 'primary', className: 'bg-green-600 hover:bg-green-500 border-green-600' },
+            cancelButtonProps: { type: 'primary', className: 'bg-orange-600 hover:bg-orange-500 border-orange-600' },
             okText: 'ยกเลิก',
             okButtonProps: { type: 'default', className: 'text-gray-500 border-gray-300 hover:text-gray-700' },
             maskClosable: false,
@@ -213,7 +213,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemin/finalize', { draft_id: draftId });
-                    setBookingStatus('18');
+                    setBookingStatus('43');
                     message.success('จ่ายออกเรียบร้อย');
                 } catch (e) {
                     message.error('Failed');
@@ -238,7 +238,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemin/unlock', { draft_id: draftId });
-                    setBookingStatus('26');
+                    setBookingStatus('42');
                     message.success('ปลดล็อคเรียบร้อย');
                 } catch (e) {
                     message.error('Failed');
@@ -295,7 +295,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
         if (processingRef.current) return;
         processingRef.current = true;
 
-        if (bookingStatus === '18') {
+        if (bookingStatus === '43') {
             modal.warning({ title: 'แจ้งเตือน', content: 'รายการนี้ถูกจ่ายออกแล้ว ไม่สามารถสแกนเพิ่มเติมได้', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
@@ -303,7 +303,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
             modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขรับเข้าของชำรุดก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
-        if (bookingStatus === '16') {
+        if (bookingStatus === '40') {
             modal.warning({
                 title: 'แจ้งเตือน',
                 content: 'กรุณาระบุ ต้นทาง-ปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
@@ -346,6 +346,15 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
                             } catch (e) { message.error('Failed'); }
                             processingRef.current = false;
                         },
+                        onOk: () => { processingRef.current = false; },
+                        afterClose: () => { processingRef.current = false; }
+                    });
+                } else if (code === 'INVALID_PRE_STATUS') {
+                    // ✅ เพิ่ม: กรณีสถานะไม่ถูกต้อง (ไม่ใช่ 11/18)
+                    modal.warning({
+                        title: 'แจ้งเตือน',
+                        content: msg, // ข้อความจาก Backend
+                        okText: 'รับทราบ',
                         onOk: () => { processingRef.current = false; },
                         afterClose: () => { processingRef.current = false; }
                     });
@@ -424,11 +433,11 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, draftId, refID, bookingStatus]);
 
-    const isEditingDisabled = !refID || bookingStatus === '18';
+    const isEditingDisabled = !refID || bookingStatus === '43';
     const hasScannedItems = scannedList.length > 0;
-    const showSaveCancel = refID && bookingStatus !== '18' && bookingStatus !== '26' && !hasScannedItems;
-    const showConfirm = (bookingStatus === '17' || bookingStatus === '26') && hasScannedItems;
-    const showCancelButton = bookingStatus !== '18' && !hasScannedItems;
+    const showSaveCancel = refID && bookingStatus !== '43' && bookingStatus !== '42' && !hasScannedItems;
+    const showConfirm = (bookingStatus === '41' || bookingStatus === '42') && hasScannedItems;
+    const showCancelButton = bookingStatus !== '43' && !hasScannedItems;
 
     // --- 2. Table Column Definitions ---
 
@@ -562,7 +571,7 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
                     selectedRowKeys: selectedIds,
                     onChange: (selectedKeys) => setSelectedIds(selectedKeys),
                     getCheckboxProps: (record) => ({
-                        disabled: bookingStatus === '18',
+                        disabled: bookingStatus === '43',
                     }),
                 }}
             />
@@ -727,13 +736,13 @@ function SystemInDefective({ open, onCancel, targetDraftId }) {
 
                                         {showConfirm && (
                                             <Col span={24} className="mt-2">
-                                                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500">
-                                                    จ่ายออก (Confirm)
+                                                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-orange-600 hover:bg-orange-500">
+                                                    รับเข้าของชำรุด (Confirm)
                                                 </Button>
                                             </Col>
                                         )}
 
-                                        {bookingStatus === '18' && canUse('system-out:unlock') && (
+                                        {bookingStatus === '43' && canUse('system-out:unlock') && (
                                             <Col span={24}>
                                                 <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
                                                     ปลดล็อคเพื่อแก้ไข

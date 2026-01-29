@@ -55,13 +55,12 @@ function SystemIn() {
     const handleCreate = () => {
         const storedUser = localStorage.getItem('user');
         const currentUser = storedUser ? JSON.parse(storedUser) : null;
-
         let foundDraft = null;
 
         if (currentUser && currentUser.employee_id) {
             foundDraft = rows.find(r =>
                 String(r.created_by) === String(currentUser.employee_id) &&
-                String(r.is_status) === '16' &&
+                String(r.is_status) === '30' && // ✅ เช็คสถานะ 30
                 (!r.refID || r.refID === '')
             );
         }
@@ -71,8 +70,10 @@ function SystemIn() {
             setSelectedDraftId(foundDraft.draft_id);
         } else {
             setSelectedDraftId(null);
+            // ✅ ส่ง type='good' ตอน init (ต้องแก้ SystemInList ให้รับ prop นี้ไปยิง API หรือยิงจากตรงนี้)
+            // แต่ SystemInList เดิมยิง init ใน useEffect
+            // วิธีแก้: เราส่งแค่ draftId=null เข้าไป SystemInList, แล้วใน SystemInList ส่ง {type: 'good'}
         }
-
         setIsModalOpen(true);
     };
 
@@ -80,14 +81,12 @@ function SystemIn() {
     const handleCreateDamaged = () => {
         const storedUser = localStorage.getItem('user');
         const currentUser = storedUser ? JSON.parse(storedUser) : null;
-
         let foundDraft = null;
 
         if (currentUser && currentUser.employee_id) {
-            // ค้นหา Draft ของ User คนนี้
             foundDraft = rows.find(r =>
                 String(r.created_by) === String(currentUser.employee_id) &&
-                String(r.is_status) === '16' &&
+                String(r.is_status) === '40' && // ✅ เช็คสถานะ 40
                 (!r.refID || r.refID === '')
             );
         }
@@ -98,7 +97,6 @@ function SystemIn() {
         } else {
             setSelectedDraftId(null);
         }
-
         setIsModalDamagedOpen(true);
     };
 

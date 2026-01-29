@@ -167,7 +167,7 @@ async function finalizeBooking(draft_id, user_id) {
             t.asset_dmg_004, t.asset_dmg_005, t.asset_dmg_006,
             t.asset_remark, t.asset_usedfor, t.asset_brand, t.asset_feature,
             t.asset_supplier_name, t.label_register, t.partCode, t.print_status,
-            t.asset_status, 'จ่ายออก', t.is_status, 
+            t.asset_status, 'เคลื่อนไหว', t.is_status, 
             t.create_date, t.created_by, t.created_at,
             t.updated_by, t.updated_at, t.scan_by, t.scan_at,
             b.origin, b.destination
@@ -197,7 +197,7 @@ async function insertSingleDetail(t, origin, destination) {
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, 'จ่ายออก', ?, ?, ?, ?,
+            ?, ?, ?, 'เคลื่อนไหว', ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?
         )
     `;
@@ -372,7 +372,7 @@ async function getAllBookings() {
     FROM booking_asset_lists b
     LEFT JOIN tb_erp_status s ON b.is_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON b.created_by = e.employee_id
-    WHERE b.is_status != '19'
+    WHERE b.is_status NOT IN ('19','30','31','32','33','34','40','41','42','43','44') 
     ORDER BY b.created_at DESC
   `;
   const [rows] = await db.query(sql);

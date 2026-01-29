@@ -2,13 +2,12 @@
 'use strict';
 const model = require('./systemInModel');
 
-
 async function initBooking(req, res, next) {
   try {
-    const { draft_id } = req.body;
+    const { draft_id, type } = req.body; // รับ type (good/defective)
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID required");
-    await model.createBooking({ draft_id, created_by: user_id });
+    await model.createBooking({ draft_id, created_by: user_id, type }); // ส่ง type ไป model
     res.json({ success: true, message: 'Draft initialized' });
   } catch (err) { next(err); }
 }
@@ -29,7 +28,6 @@ async function generateBookingRef(req, res, next) {
     if (!draft_id) throw new Error("Draft ID missing");
     const result = await model.generateRefID(draft_id, user_id);
 
-    // Notify
     const io = req.app.get('io');
     if (io) io.emit('systemin:update', { action: 'ref_generated', draft_id });
 
@@ -43,7 +41,6 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 17
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -53,7 +50,6 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: จ่ายออก (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     const { draft_id } = req.body;
@@ -69,7 +65,6 @@ async function finalizeBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: ปลดล็อค (Unlock)
 async function unlockBooking(req, res, next) {
   try {
     const { draft_id } = req.body;
@@ -85,7 +80,6 @@ async function unlockBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ... (scanAsset, returnSingle, returnAssets, getDropdowns, getBookingList, getBookingDetail, cancelBooking คงเดิม) ...
 async function scanAsset(req, res, next) {
   try {
     let { qrString, draft_id, refID } = req.body;
@@ -114,35 +108,36 @@ async function scanAsset(req, res, next) {
 
 async function returnSingle(req, res, next) {
   try {
-    // ✅ รับ draft_id มาด้วย เพื่อส่งกลับไปให้ Frontend รู้ว่าต้อง refresh ตะกร้าไหน
     const { asset_code, draft_id } = req.body;
 
+    // model จะ throw error ถ้าติด constraint unlock
     const updatedItem = await model.returnSingleAsset(asset_code);
+
     const io = req.app.get('io');
-    if (io) {
-      // ✅ ส่ง draft_id กลับไปใน socket payload
+    if (io && updatedItem) {
       io.emit('systemin:update', { action: 'return', data: updatedItem, draft_id });
       io.emit('registerasset:upsert', updatedItem);
     }
     res.json({ success: true, message: 'Returned' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    // ส่ง error message กลับไปให้ frontend alert
+    res.status(400).json({ success: false, message: err.message });
+  }
 }
 
 async function returnAssets(req, res, next) {
   try {
-    // ✅ รับ draft_id มาด้วย
     const { ids, draft_id } = req.body;
-
     const updatedItems = await model.returnToStock(ids);
     const io = req.app.get('io');
     if (io) {
-      // ✅ ส่ง draft_id กลับไปใน socket payload
       io.emit('systemin:update', { action: 'return', ids, draft_id });
       updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
     res.json({ success: true, message: 'Returned to stock' });
   } catch (err) { next(err); }
 }
+
 async function getDropdowns(req, res, next) {
   try {
     const zones = await model.getZones();
@@ -174,7 +169,9 @@ async function cancelBooking(req, res, next) {
     if (!draft_id) throw new Error("Draft ID missing");
 
     const assets = await model.getAssetsByDraft(draft_id);
-    if (assets && assets.length > 0) throw new Error("ไม่สามารถยกเลิกได้ เนื่องจากมีรายการสินค้าค้างอยู่ในใบเบิก");
+    // Logic change: Allow cancel even if assets exist? 
+    // Usually should force empty cart first, but if prompt says just status change:
+    if (assets && assets.length > 0) throw new Error("กรุณายกเลิกรับเข้า (คืนค่า) รายการสินค้าทั้งหมดในตะกร้าก่อน");
 
     await model.cancelBooking(draft_id, user_id);
     const io = req.app.get('io');
@@ -196,6 +193,6 @@ module.exports = {
   getBookingDetail,
   generateBookingRef,
   cancelBooking,
-  finalizeBooking, // New
-  unlockBooking // New
+  finalizeBooking,
+  unlockBooking
 };
