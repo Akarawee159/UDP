@@ -38,13 +38,24 @@ function SystemOut() {
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
-        const onUpdate = (payload) => {
-            // refresh เมื่อมี action ต่างๆ
-            const acts = ['confirm', 'header_update', 'finalized', 'unlocked', 'cancel'];
-            if (acts.includes(payload?.action) || acts.includes(payload?.detail?.action)) {
+
+        const onUpdate = (event) => {
+            // แกะ payload จาก event.detail
+            const payload = event.detail;
+            const action = payload?.action;
+
+            // รายการ Action ที่ควรสั่งให้ Refresh ตารางหลัก
+            // 'ref_generated' คือตอนที่กดสร้างเลขใบเบิก (Generate Ref)
+            // 'header_update' คือตอนที่กดบันทึก ต้นทาง-ปลายทาง (Save Header)
+            // 'finalized' คือตอนกดยืนยันจ่ายออก
+            const acts = ['ref_generated', 'header_update', 'finalized', 'unlocked', 'cancel', 'scan', 'return'];
+
+            if (acts.includes(action)) {
+                console.log("Socket Refreshing Data:", action);
                 fetchData();
             }
         };
+
         window.addEventListener('hrms:systemout-update', onUpdate);
         return () => window.removeEventListener('hrms:systemout-update', onUpdate);
     }, [fetchData]);

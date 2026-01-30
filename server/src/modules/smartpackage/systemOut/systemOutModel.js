@@ -358,7 +358,14 @@ async function getAssetsByDraft(draft_id) {
 }
 
 async function getZones() {
-  const [rows] = await db.query(`SELECT G_NAME as name FROM tb_zone ORDER BY G_NAME ASC`);
+  // ดึงทั้ง code และ name เพื่อนำไปแสดงผลและค้นหา
+  const [rows] = await db.query(`
+    SELECT 
+      supplier_code as code, 
+      supplier_name as name 
+    FROM suppliers 
+    ORDER BY supplier_code ASC
+  `);
   return rows;
 }
 
@@ -452,6 +459,40 @@ async function cancelBooking(draft_id, user_id) {
   return true;
 }
 
+async function getAssetsDetailByRefID(refID) {
+  const sql = `
+    SELECT 
+      d.*,
+      s.G_NAME as status_name,
+      s.G_DESCRIPT as status_class,
+      CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+    FROM tb_asset_lists_detail d
+    LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
+    LEFT JOIN employees e ON d.scan_by = e.employee_id
+    WHERE d.refID = ? AND d.asset_status = '11'
+    ORDER BY d.asset_code ASC
+  `;
+  const [rows] = await db.query(sql, [refID]);
+  return rows;
+}
+
+async function getAssetsByMasterRefID(refID) {
+  const sql = `
+    SELECT 
+      a.*,
+      s.G_NAME as status_name,
+      s.G_DESCRIPT as status_class,
+      CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+    FROM tb_asset_lists a
+    LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
+    LEFT JOIN employees e ON a.scan_by = e.employee_id
+    WHERE a.refID = ? AND a.asset_status = '11'
+    ORDER BY a.updated_at DESC
+  `;
+  const [rows] = await db.query(sql, [refID]);
+  return rows;
+}
+
 module.exports = {
   createBooking,
   generateRefID,
@@ -466,5 +507,7 @@ module.exports = {
   getAllBookings,
   getBookingDetail,
   returnToStock,
-  cancelBooking
+  cancelBooking,
+  getAssetsDetailByRefID,
+  getAssetsByMasterRefID
 };

@@ -43,6 +43,7 @@ import SystemOutList from "./pages/SmartPackage/SystemOut/Page/SystemOutList";
 import SystemOutRepair from "./pages/SmartPackage/SystemOut/Page/SystemOutRepair";
 import SystemIn from "./pages/SmartPackage/SystemIn/SystemIn";
 import SystemRepair from "./pages/SmartPackage/SystemRepair/SystemRepair";
+import SystemDefective from "./pages/SmartPackage/SystemDefective/SystemDefective";
 
 // รายงาน
 import EmployeeReport from "./pages/Reports/EmployeeReport/EmployeeReport";
@@ -301,9 +302,20 @@ export default function App() {
           />
 
           <Route
-            path="/smart-package/system-repair"
+            path="/smart-package/system-defective"
             element={
               <ProtectedRoute mainId="60" subId="603">
+                <AdminLayout>
+                  <SystemDefective />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/smart-package/system-repair"
+            element={
+              <ProtectedRoute mainId="60" subId="604">
                 <AdminLayout>
                   <SystemRepair />
                 </AdminLayout>

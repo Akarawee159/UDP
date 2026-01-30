@@ -9,6 +9,10 @@ async function initBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID required");
     await model.createBooking({ draft_id, created_by: user_id });
+
+    const io = req.app.get('io');
+    if (io) io.emit('systemout:update', { action: 'header_update', draft_id });
+
     res.json({ success: true, message: 'Draft initialized' });
   } catch (err) { next(err); }
 }
@@ -161,8 +165,26 @@ async function getBookingDetail(req, res, next) {
   try {
     const { draft_id } = req.query;
     if (!draft_id) throw new Error("Draft ID required");
+
     const booking = await model.getBookingDetail(draft_id);
-    const assets = await model.getAssetsByDraft(draft_id);
+    let assets = [];
+
+    if (booking) {
+      const status = String(booking.is_status);
+
+      if (status === '18') {
+        // 18 = จ่ายออกแล้ว (History) -> ดึงจาก Detail
+        assets = await model.getAssetsDetailByRefID(booking.refID);
+      } else if (status === '26') {
+        // 26 = ปลดล็อคแก้ไข (Live Editing) -> ดึงจาก Master ด้วย RefID
+        // ตามโจทย์: "ดึงข้อมูลที่ tb_asset_lists.refID = booking_asset_lists.refID"
+        assets = await model.getAssetsByMasterRefID(booking.refID);
+      } else {
+        // 16, 17 = Draft -> ดึงจาก Master ด้วย DraftID
+        assets = await model.getAssetsByDraft(draft_id);
+      }
+    }
+
     res.json({ success: true, booking, assets });
   } catch (err) { next(err); }
 }

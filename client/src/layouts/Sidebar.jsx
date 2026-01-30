@@ -83,8 +83,9 @@ export const menuItems = [
     type: "dropdown",
     children: [
       { id: "601", label: "ระบบจ่ายออก", path: "/smart-package/system-out" },
-      { id: "602", label: "ระบบรับคืน", path: "/smart-package/system-in" },
-      { id: "603", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
+      { id: "602", label: "ระบบรับเข้าของดี", path: "/smart-package/system-in" },
+      { id: "603", label: "ระบบรับเข้าของชำรุด", path: "/smart-package/system-defective" },
+      { id: "604", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
     ]
   },
   {

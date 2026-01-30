@@ -145,10 +145,21 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             const { action, draft_id: incomingDraftId, data } = event.detail || {};
 
             if (incomingDraftId === draftId) {
-                if (action === 'header_update' || action === 'finalized' || action === 'unlocked' || action === 'cancel') {
+                // ✅ รวมเคส 'unlocked' เข้าไป และสั่งอัปเดตทั้ง Status และ ScannedList
+                const refreshActions = ['header_update', 'finalized', 'unlocked', 'cancel'];
+
+                if (refreshActions.includes(action)) {
                     api.get(`/smartpackage/systemout/detail?draft_id=${draftId}`).then(res => {
-                        const { booking } = res.data;
+                        const { booking, assets } = res.data;
+
+                        // 1. อัปเดตสถานะ
                         if (booking) setBookingStatus(String(booking.is_status));
+
+                        // 2. ✅ สำคัญ: อัปเดตรายการสินค้าใหม่ทันที (กรณี Unlock รายการจะกลายเป็นว่าง หรือตามที่มีใน Master)
+                        setScannedList(assets || []);
+
+                        // 3. ถ้าจำนวนเปลี่ยน ให้อัปเดตตัวเลขใน Form ด้วย
+                        form.setFieldValue('attendees', (assets || []).length);
                     });
                 }
 
@@ -168,7 +179,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         window.addEventListener('hrms:systemout-update', handleSocketUpdate);
         return () => window.removeEventListener('hrms:systemout-update', handleSocketUpdate);
     }, [open, draftId, message, form]);
-
 
     // --- Actions ---
 
@@ -241,7 +251,11 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemout/unlock', { draft_id: draftId });
-                    setBookingStatus('26');
+
+                    // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
+                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 26 -> Master RefID)
+                    fetchData();
+
                     message.success('ปลดล็อคเรียบร้อย');
                 } catch (e) {
                     message.error('Failed');
@@ -291,6 +305,23 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             message.success('ยกเลิกจ่ายออกเรียบร้อย');
             setSelectedIds([]);
         } catch (err) { message.error('Error'); }
+    };
+
+    const handleModalClose = async () => {
+        // ถ้าสถานะเป็น 26 และ "ไม่มีรายการ" (scannedList ว่างเปล่า)
+        if (bookingStatus === '26' && scannedList.length === 0) {
+            try {
+                console.log("Auto-Finalizing empty unlocked booking...");
+                // เรียก Finalize เพื่อตบกลับเป็น 18 อัตโนมัติ
+                await api.post('/smartpackage/systemout/finalize', { draft_id: targetDraftId || draftId });
+                message.info('ระบบบันทึกสถานะอัตโนมัติ (เนื่องจากไม่มีการแก้ไขข้อมูล)');
+            } catch (err) {
+                console.error("Auto-finalize failed", err);
+            }
+        }
+
+        // เรียก onCancel เดิมเพื่อปิด Modal และเคลียร์ค่า
+        onCancel();
     };
 
     const handleScanProcess = async (qrString) => {
@@ -597,7 +628,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         <Modal
             title={<Title level={4} style={{ margin: 0 }}>{targetDraftId ? 'แก้ไขรายการจ่ายออก' : 'สร้างรายการจ่ายออก (System Out)'}</Title>}
             open={open}
-            onCancel={onCancel}
+            onCancel={handleModalClose}
             width="95%"
             style={{ top: 20 }}
             footer={null}
@@ -707,11 +738,38 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     <Input.TextArea rows={2} disabled={isEditingDisabled} />
                                 </Form.Item>
                                 <Divider />
+                                {/* ต้นทาง */}
                                 <Form.Item label="ต้นทาง" name="origin" rules={[{ required: true }]}>
-                                    <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกต้นทาง" disabled={isEditingDisabled} />
+                                    <Select
+                                        showSearch // เปิดให้พิมพ์ค้นหาได้
+                                        optionFilterProp="label" // ให้ค้นหาจาก label (เราจะรวม code + name ไว้ในนี้)
+                                        filterOption={(input, option) =>
+                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
+                                        options={zones.map(s => ({
+                                            label: `${s.code} - ${s.name}`, // แสดงทั้งรหัสและชื่อ
+                                            value: s.code // เก็บค่าเป็นรหัส supplier
+                                        }))}
+                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
+                                        disabled={isEditingDisabled}
+                                    />
                                 </Form.Item>
+
+                                {/* ปลายทาง */}
                                 <Form.Item label="ปลายทาง" name="destination" rules={[{ required: true }]}>
-                                    <Select options={zones.map(z => ({ label: z.name, value: z.name }))} placeholder="เลือกปลายทาง" disabled={isEditingDisabled} />
+                                    <Select
+                                        showSearch
+                                        optionFilterProp="label"
+                                        filterOption={(input, option) =>
+                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
+                                        options={zones.map(s => ({
+                                            label: `${s.code} - ${s.name}`,
+                                            value: s.code
+                                        }))}
+                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
+                                        disabled={isEditingDisabled}
+                                    />
                                 </Form.Item>
 
                                 <Row gutter={8} style={{ marginTop: 16 }}>
@@ -723,7 +781,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {showCancelButton && (
+                                    {/* ✅ ซ่อนปุ่ม "ยกเลิกใบเบิก" ถ้าสถานะเป็น 26 */}
+                                    {showCancelButton && bookingStatus !== '26' && (
                                         <Col span={showSaveCancel ? 12 : 24}>
                                             <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
                                                 ยกเลิกใบเบิก
@@ -731,10 +790,18 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {showConfirm && (
+                                    {/* สถานะ 26 ให้แสดงปุ่ม Confirm (Finalize) เหมือนเดิม เพื่อบันทึกการแก้ไข */}
+                                    {(showConfirm || (bookingStatus === '26' && hasScannedItems)) && (
                                         <Col span={24} className="mt-2">
-                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500">
-                                                จ่ายออก (Confirm)
+                                            <Button
+                                                type="primary"
+                                                block
+                                                icon={<CheckCircleOutlined />}
+                                                onClick={handleFinalize}
+                                                size="large"
+                                                className="bg-green-600 hover:bg-green-500"
+                                            >
+                                                {bookingStatus === '26' ? 'บันทึกการแก้ไข (จ่ายออก)' : 'จ่ายออก (Confirm)'}
                                             </Button>
                                         </Col>
                                     )}
@@ -754,6 +821,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     {/* ✅ New Table Implementation */}
                     <Col xs={24} md={17}>
                         <div className="bg-white p-4 rounded-lg shadow-sm h-full flex flex-col">
+                            {/* ส่วนหัวตาราง */}
                             <div className="flex justify-between items-center mb-2">
                                 <Title level={5} style={{ margin: 0 }}>รายการในตะกร้า ({scannedList.length})</Title>
                                 <Button
@@ -765,21 +833,86 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     ยกเลิกจ่ายออก ({selectedIds.length})
                                 </Button>
                             </div>
-                            <div className="flex-1 overflow-auto">
-                                <Table
-                                    columns={parentColumns}
-                                    dataSource={groupedData}
-                                    expandable={{
-                                        expandedRowRender,
-                                        expandIcon: customExpandIcon
-                                    }}
-                                    rowKey="key"
-                                    loading={loading}
-                                    pagination={false}
-                                    bordered
-                                    size="middle"
-                                    scroll={{ y: 400 }}
-                                />
+
+                            <div className="flex-1 overflow-auto flex flex-col">
+                                {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
+                                {bookingStatus === '26' && !hasScannedItems ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
+                                        <div className="text-orange-500 mb-4">
+                                            <ExclamationCircleOutlined style={{ fontSize: 48 }} />
+                                        </div>
+                                        <Title level={5} className="text-gray-700">
+                                            รายการเบิกปัจจุบัน
+                                        </Title>
+                                        <Text type="secondary">
+                                            ไม่พบรายการสินค้าในสถานะกำลังแก้ไข
+                                            <br />
+                                            (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
+                                        </Text>
+                                        <div className="mt-4">
+                                            <Tag color="orange">Status: Unlocked (26)</Tag>
+                                        </div>
+                                        <div className="mt-6 text-xs text-gray-400">
+                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "จ่ายออก" โดยอัตโนมัติ
+                                        </div>
+                                    </div>
+                                ) : !hasScannedItems ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-8">
+                                        <div className="flex flex-col gap-6 w-full max-w-sm">
+
+                                            {/* เงื่อนไขที่ 1: การสร้างเลขที่ใบเบิก */}
+                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${refID ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${refID ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                    {refID ? <UnlockOutlined style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
+                                                </div>
+                                                <div>
+                                                    <Text strong className={refID ? 'text-green-700' : 'text-gray-600'}>
+                                                        {refID ? 'สร้างเลขที่ใบเบิกแล้ว' : 'กรุณาสร้างเลขที่ใบเบิก'}
+                                                    </Text>
+                                                    <br />
+                                                    <Text type="secondary" size="small">{refID ? `เลขที่: ${refID}` : 'กดปุ่ม "สร้างเลขที่ใบเบิก" ฝั่งซ้าย'}</Text>
+                                                </div>
+                                            </div>
+
+                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-ปลายทาง (Status 17) */}
+                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '16' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '16' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                    {bookingStatus !== '16' ? <UnlockOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
+                                                </div>
+                                                <div>
+                                                    <Text strong className={bookingStatus !== '16' ? 'text-green-700' : 'text-gray-600'}>
+                                                        {bookingStatus !== '16' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-ปลายทาง'}
+                                                    </Text>
+                                                    <br />
+                                                    <Text type="secondary" size="small">{bookingStatus !== '16' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
+                                                </div>
+                                            </div>
+
+                                            {/* ข้อความแนะนำด้านล่าง */}
+                                            {bookingStatus !== '16' && refID && (
+                                                <div className="text-center animate-pulse mt-4">
+                                                    <Tag color="blue" icon={<SearchOutlined />}>ระบบพร้อมสแกนแล้ว สามารถเริ่มสแกน QR Code ได้ทันที</Tag>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    /* ✅ เมื่อเริ่มสแกนแล้ว (มีข้อมูล) ให้แสดงตารางตามเดิม */
+                                    <Table
+                                        columns={parentColumns}
+                                        dataSource={groupedData}
+                                        expandable={{
+                                            expandedRowRender,
+                                            expandIcon: customExpandIcon
+                                        }}
+                                        rowKey="key"
+                                        loading={loading}
+                                        pagination={false}
+                                        bordered
+                                        size="middle"
+                                        scroll={{ y: 400 }}
+                                    />
+                                )}
                             </div>
                         </div>
                     </Col>
