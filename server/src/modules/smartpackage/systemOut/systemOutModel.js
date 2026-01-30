@@ -369,10 +369,34 @@ async function getZones() {
   return rows;
 }
 
+// ค้นหาฟังก์ชันนี้และแทนที่ด้วย Code ด้านล่าง
 async function getAllBookings() {
   const sql = `
     SELECT 
         b.*, 
+        -- ✅ แก้ไข Logic การนับจำนวน (attendees)
+        (
+          CASE 
+            -- กรณี Status 18 (Finalized/History) 
+            -- ให้นับจาก Detail โดยเอาเฉพาะรายการที่ "สถานะล่าสุด" ยังเป็น 11 อยู่
+            WHEN b.is_status = '18' THEN 
+              (
+                SELECT COUNT(*)
+                FROM tb_asset_lists_detail d1
+                WHERE d1.refID = b.refID 
+                AND d1.asset_status = '11' -- ต้องเป็นสถานะจ่ายออก
+                AND d1.scan_at = (         -- และต้องเป็นรายการล่าสุด (เวลาล่าสุด) ของสินค้านั้น
+                    SELECT MAX(d2.scan_at)
+                    FROM tb_asset_lists_detail d2
+                    WHERE d2.refID = d1.refID
+                    AND d2.asset_code = d1.asset_code
+                )
+              )
+            -- กรณีอื่นๆ (Draft/กำลังแก้ไข) ให้นับจากตาราง Master ปัจจุบัน
+            ELSE 
+              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '11')
+          END
+        ) as attendees,
         s.G_NAME as is_status_name, 
         s.G_DESCRIPT as is_status_color,
         CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as created_by_name
@@ -460,6 +484,7 @@ async function cancelBooking(draft_id, user_id) {
 }
 
 async function getAssetsDetailByRefID(refID) {
+  // แก้ไข SQL: เลือกเฉพาะ Asset ที่สถานะ 'ล่าสุด' (ตามเวลา scan_at) เป็น 11 เท่านั้น
   const sql = `
     SELECT 
       d.*,
@@ -467,12 +492,28 @@ async function getAssetsDetailByRefID(refID) {
       s.G_DESCRIPT as status_class,
       CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
     FROM tb_asset_lists_detail d
+    
+    -- [Logic ใหม่] Join กับ Subquery เพื่อหาเวลาล่าสุด (MAX scan_at) ของแต่ละ asset_code ใน refID นี้
+    INNER JOIN (
+        SELECT asset_code, MAX(scan_at) as max_scan_at
+        FROM tb_asset_lists_detail
+        WHERE refID = ? 
+        GROUP BY asset_code
+    ) latest ON d.asset_code = latest.asset_code AND d.scan_at = latest.max_scan_at
+
     LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON d.scan_by = e.employee_id
-    WHERE d.refID = ? AND d.asset_status = '11'
+    
+    -- [Filter] เลือกเฉพาะ refID นี้ และ สถานะล่าสุดต้องเป็น 11 (จ่ายออก) เท่านั้น
+    -- ถ้าล่าสุดเป็น 10 (คืนของ) หรืออื่นๆ จะไม่ถูกดึงมาแสดง
+    WHERE d.refID = ? 
+      AND d.asset_status = '11'
+      
     ORDER BY d.asset_code ASC
   `;
-  const [rows] = await db.query(sql, [refID]);
+
+  // ส่ง refID เข้าไป 2 ครั้ง (สำหรับ Subquery และ Main Query)
+  const [rows] = await db.query(sql, [refID, refID]);
   return rows;
 }
 

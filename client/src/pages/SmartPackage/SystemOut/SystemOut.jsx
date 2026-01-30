@@ -46,7 +46,7 @@ function SystemOut() {
 
             // รายการ Action ที่ควรสั่งให้ Refresh ตารางหลัก
             // 'ref_generated' คือตอนที่กดสร้างเลขใบเบิก (Generate Ref)
-            // 'header_update' คือตอนที่กดบันทึก ต้นทาง-ปลายทาง (Save Header)
+            // 'header_update' คือตอนที่กดบันทึก ต้นทาง-ไปยังปลายทาง (Save Header)
             // 'finalized' คือตอนกดยืนยันจ่ายออก
             const acts = ['ref_generated', 'header_update', 'finalized', 'unlocked', 'cancel', 'scan', 'return'];
 
@@ -109,7 +109,7 @@ function SystemOut() {
     }, [rows, searchTerm]);
 
     const columnDefs = useMemo(() => [
-        { headerName: 'ลำดับ', width: 60, valueGetter: "node.rowIndex + 1", cellClass: "text-center" },
+        { headerName: 'ลำดับ', width: 60, valueGetter: "node.rowIndex + 1", cellClass: "flex items-center justify-center py-1" },
         { headerName: 'เลขที่เอกสาร', field: 'refID', width: 180, cellClass: "font-bold text-blue-600" },
         {
             headerName: 'สถานะ', field: 'is_status_name', width: 150, cellClass: "text-center",
@@ -122,7 +122,29 @@ function SystemOut() {
                 );
             }
         },
-        { headerName: 'จำนวน', field: 'attendees', width: 100, cellClass: "text-center" },
+        {
+            headerName: 'สถานที่จ่ายออก',
+            field: 'origin',
+            width: 160,
+            cellClass: "text-center text-gray-600"
+        },
+        {
+            headerName: 'ไปยังปลายทาง',
+            field: 'destination',
+            width: 160,
+            cellClass: "text-center text-gray-600"
+        },
+        {
+            headerName: 'จำนวน',
+            field: 'attendees',
+            width: 100,
+            cellClass: "flex items-center justify-center py-1",
+            cellRenderer: (params) => (
+                <Tag color="blue" className="text-sm px-2">
+                    {params.value || 0}
+                </Tag>
+            )
+        },
         { headerName: 'หมายเหตุ', field: 'booking_remark', flex: 1 },
         { headerName: 'ผู้ทำรายการ', field: 'created_by_name', width: 180 }, // ✅ Show Joined Name
         {

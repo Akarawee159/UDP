@@ -218,6 +218,6 @@ module.exports = {
   getBookingDetail,
   generateBookingRef,
   cancelBooking,
-  finalizeBooking, // New
-  unlockBooking // New
+  finalizeBooking,
+  unlockBooking
 };

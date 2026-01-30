@@ -155,7 +155,7 @@ const DataTable = ({
         }}
 
         animateRows={true}
-        rowHeight={24}
+        rowHeight={26}
         headerHeight={40}
 
         // Responsive Logic (มือถือเลื่อนซ้ายขวาได้ Desktop บีบเต็มจอ)

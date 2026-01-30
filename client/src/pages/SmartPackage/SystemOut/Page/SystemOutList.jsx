@@ -340,7 +340,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (bookingStatus === '16') {
             modal.warning({
                 title: 'แจ้งเตือน',
-                content: 'กรุณาระบุ ต้นทาง-ปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
+                content: 'กรุณาระบุ สถานที่จ่ายออก-ไปยังปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
                 okText: 'รับทราบ',
                 onOk: () => processingRef.current = false
             });
@@ -738,8 +738,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     <Input.TextArea rows={2} disabled={isEditingDisabled} />
                                 </Form.Item>
                                 <Divider />
-                                {/* ต้นทาง */}
-                                <Form.Item label="ต้นทาง" name="origin" rules={[{ required: true }]}>
+                                {/* สถานที่จ่ายออก */}
+                                <Form.Item label="สถานที่จ่ายออก" name="origin" rules={[{ required: true }]}>
                                     <Select
                                         showSearch // เปิดให้พิมพ์ค้นหาได้
                                         optionFilterProp="label" // ให้ค้นหาจาก label (เราจะรวม code + name ไว้ในนี้)
@@ -755,8 +755,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     />
                                 </Form.Item>
 
-                                {/* ปลายทาง */}
-                                <Form.Item label="ปลายทาง" name="destination" rules={[{ required: true }]}>
+                                {/* ไปยังปลายทาง */}
+                                <Form.Item label="ไปยังปลายทาง" name="destination" rules={[{ required: true }]}>
                                     <Select
                                         showSearch
                                         optionFilterProp="label"
@@ -874,14 +874,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                 </div>
                                             </div>
 
-                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-ปลายทาง (Status 17) */}
+                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-ไปยังปลายทาง (Status 17) */}
                                             <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '16' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '16' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                                     {bookingStatus !== '16' ? <UnlockOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
                                                     <Text strong className={bookingStatus !== '16' ? 'text-green-700' : 'text-gray-600'}>
-                                                        {bookingStatus !== '16' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-ปลายทาง'}
+                                                        {bookingStatus !== '16' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-ไปยังปลายทาง'}
                                                     </Text>
                                                     <br />
                                                     <Text type="secondary" size="small">{bookingStatus !== '16' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
