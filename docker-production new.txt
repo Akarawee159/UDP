@@ -7,7 +7,7 @@ services:
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: udp-client  # ชื่อสำหรับอ้างอิงใน Nginx Proxy
     restart: always
     ports:
@@ -29,7 +29,7 @@ services:
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     container_name: udp-server  # ชื่อสำหรับอ้างอิงใน Nginx Proxy
     restart: always
     ports:
