@@ -863,7 +863,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             {/* เงื่อนไขที่ 1: การสร้างเลขที่ใบเบิก */}
                                             <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${refID ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${refID ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {refID ? <UnlockOutlined style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
+                                                    {refID ? <CheckCircleOutlined  style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
                                                     <Text strong className={refID ? 'text-green-700' : 'text-gray-600'}>
@@ -877,7 +877,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             {/* เงื่อนไขที่ 2: การระบุต้นทาง-ไปยังปลายทาง (Status 17) */}
                                             <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '16' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '16' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {bookingStatus !== '16' ? <UnlockOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
+                                                    {bookingStatus !== '16' ? <CheckCircleOutlined  style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
                                                     <Text strong className={bookingStatus !== '16' ? 'text-green-700' : 'text-gray-600'}>
