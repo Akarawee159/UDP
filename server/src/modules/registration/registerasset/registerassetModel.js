@@ -83,11 +83,11 @@ async function incrementPrintStatus(assetCode, user) {
   if (isNaN(currentStatus)) currentStatus = 0;
   const newPrintStatus = currentStatus + 1;
 
-  let newIsStatus = '20';
+  let newIsStatus = '120';
   if (newPrintStatus === 1) {
-    newIsStatus = '21';
+    newIsStatus = '121';
   } else if (newPrintStatus > 1) {
-    newIsStatus = '22';
+    newIsStatus = '122';
   }
 
   // [Timezone Fix] ใช้เวลา Bangkok
@@ -239,11 +239,11 @@ async function updateStatusCancel(assetCodes, user) {
 
   if (rows.length === 0) return { success: false, message: 'ไม่พบข้อมูล' };
 
-  // 2. ตรวจสอบเงื่อนไข: ต้องเป็น asset_status = '10' ทุกรายการ
-  const invalidItem = rows.find(r => r.asset_status !== '10');
+  // 2. ตรวจสอบเงื่อนไข: ต้องเป็น asset_status = '100' ทุกรายการ
+  const invalidItem = rows.find(r => r.asset_status !== '100');
 
   if (invalidItem) {
-    // เจอรายการที่สถานะไม่ใช่ 10 -> ห้ามยกเลิก ส่งข้อมูลกลับไปแจ้งเตือน
+    // เจอรายการที่สถานะไม่ใช่ 100 -> ห้ามยกเลิก ส่งข้อมูลกลับไปแจ้งเตือน
     return {
       success: false,
       errorType: 'INVALID_STATUS',

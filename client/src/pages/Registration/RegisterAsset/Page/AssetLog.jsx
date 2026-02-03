@@ -63,8 +63,8 @@ function AssetLog() {
 
     const formatDate = (date) => date ? dayjs(date).format('DD/MM/YYYY HH:mm:ss') : '-';
 
-    // Helper: ตรวจสอบว่าเป็นกลุ่ม Print/Register หรือไม่ (20, 21, 22)
-    const isPrintOrRegister = (status) => ['20', '21', '22'].includes(String(status));
+    // Helper: ตรวจสอบว่าเป็นกลุ่ม Print/Register หรือไม่ (120, 121, 122)
+    const isPrintOrRegister = (status) => ['120', '121', '122'].includes(String(status));
 
     const columnDefs = useMemo(() => [
         { headerName: '#', valueGetter: "node.rowIndex + 1", width: 80, cellClass: "text-center" },
@@ -113,11 +113,11 @@ function AssetLog() {
                 const status = String(params.data.is_status);
                 let dateToShow = null;
 
-                if (status === '20') {
-                    // สถานะ 20: ใช้ created_at
+                if (status === '120') {
+                    // สถานะ 120: ใช้ created_at
                     dateToShow = params.data.created_at;
-                } else if (status === '21' || status === '22') {
-                    // สถานะ 21, 22: ใช้ updated_at
+                } else if (status === '121' || status === '122') {
+                    // สถานะ 121, 122: ใช้ updated_at
                     dateToShow = params.data.updated_at;
                 } else {
                     // สถานะอื่น: ไม่แสดง
@@ -140,11 +140,11 @@ function AssetLog() {
                 const status = String(params.data.is_status);
                 let nameToShow = null;
 
-                if (status === '20') {
-                    // สถานะ 20: ผู้สร้าง (booking_created_by)
+                if (status === '120') {
+                    // สถานะ 120: ผู้สร้าง (booking_created_by)
                     nameToShow = params.data.booking_created_by;
-                } else if (status === '21' || status === '22') {
-                    // สถานะ 21, 22: ผู้แก้ไข (updated_by)
+                } else if (status === '121' || status === '122') {
+                    // สถานะ 121, 122: ผู้แก้ไข (updated_by)
                     nameToShow = params.data.updated_by;
                 } else {
                     // สถานะอื่น: ไม่แสดง
@@ -193,7 +193,7 @@ function AssetLog() {
             cellRenderer: (params) => params.value || '-'
         },
         {
-            // === Logic 3: ผู้ทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            // === Logic 3: ผู้ทำรายการ (ซ่อนถ้าเป็น 120,121,122) ===
             headerName: 'ผู้ทำรายการ',
             field: 'booking_created_by',
             width: 200,
@@ -210,7 +210,7 @@ function AssetLog() {
             }
         },
         {
-            // === Logic 4: วันที่ทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            // === Logic 4: วันที่ทำรายการ (ซ่อนถ้าเป็น 120,121,122) ===
             headerName: 'วันที่ทำรายการ',
             field: 'create_date',
             width: 160,
@@ -228,7 +228,7 @@ function AssetLog() {
             }
         },
         {
-            // === Logic 5: เวลาทำรายการ (ซ่อนถ้าเป็น 20,21,22) ===
+            // === Logic 5: เวลาทำรายการ (ซ่อนถ้าเป็น 120,121,122) ===
             headerName: 'เวลาทำรายการ',
             field: 'create_time',
             width: 140,

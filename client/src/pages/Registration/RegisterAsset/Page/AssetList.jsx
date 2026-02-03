@@ -90,7 +90,7 @@ function AssetList() {
                         ? {
                             ...item,
                             print_status,           // อัปเดตเลขจำนวนครั้ง
-                            is_status,              // อัปเดตรหัสสถานะ (21/22)
+                            is_status,              // อัปเดตรหัสสถานะ (121/122)
                             is_status_name,         // อัปเดตชื่อสถานะ
                             is_status_color         // อัปเดตสี
                         }
@@ -118,7 +118,7 @@ function AssetList() {
 
         setIsPrinting(true);
         try {
-            // เรียก API (Backend จะเปลี่ยน is_status เป็น 21 หรือ 22 ให้เอง)
+            // เรียก API (Backend จะเปลี่ยน is_status เป็น 121 หรือ 122 ให้เอง)
             // และ map promise เพื่อรอผลลัพธ์ทั้งหมด
             const updatePromises = selectedRows.map(row =>
                 api.patch(`/registration/registerasset/print/${row.asset_code}`)
@@ -146,7 +146,7 @@ function AssetList() {
                     return {
                         ...item,
                         print_status: newData.print_status,           // จำนวนครั้งที่พิมพ์
-                        is_status: newData.is_status,                 // รหัสสถานะ (21/22)
+                        is_status: newData.is_status,                 // รหัสสถานะ (121/122)
                         is_status_name: newData.is_status_name,       // ชื่อสถานะ (ดึงจาก Master Data)
                         is_status_color: newData.is_status_color      // สีสถานะ (ดึงจาก Master Data)
                     };

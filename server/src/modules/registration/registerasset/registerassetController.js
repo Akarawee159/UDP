@@ -42,8 +42,8 @@ async function create(req, res, next) {
     }
 
     // 3. Prepare Status
-    const defaultAssetStatus = '10';
-    const defaultIsStatus = '20';
+    const defaultAssetStatus = '100';
+    const defaultIsStatus = '120';
     const assetStatusInfo = await model.getErpStatus('A1', defaultAssetStatus);
     const isStatusInfo = await model.getErpStatus('A1', defaultIsStatus);
 
@@ -197,7 +197,7 @@ async function cancelBulk(req, res, next) {
     // เรียก Model
     const result = await model.updateStatusCancel(assetCodes, user);
 
-    // กรณีติด Validation (Status != 10)
+    // กรณีติด Validation (Status != 100)
     if (!result.success && result.errorType === 'INVALID_STATUS') {
       return res.status(400).json({
         success: false,

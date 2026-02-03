@@ -18,6 +18,7 @@ router.post('/confirm', auth, controller.confirmBooking);     // Save/Gen RefID
 router.post('/cancel', auth, controller.cancelBooking);       // Cancel Booking
 router.post('/finalize', auth, controller.finalizeBooking);   //  จ่ายออก
 router.post('/unlock', auth, controller.unlockBooking);       //  ปลดล็อค
+router.post('/confirm-output', auth, controller.confirmOutput); // ยืนยันการจ่ายออก (112 -> 115)
 router.get('/dropdowns', auth, controller.getDropdowns);      // Dropdowns
 
 module.exports = router;

@@ -6,7 +6,7 @@ import {
 import {
     ReloadOutlined, SaveOutlined, ExclamationCircleOutlined,
     InfoCircleOutlined, PictureOutlined, FileAddOutlined,
-    CloseOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined
+    CloseOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined, QrcodeOutlined, CheckCircleFilled
 } from '@ant-design/icons';
 import api from "../../../../api";
 import { usePermission } from '../../../../hooks/usePermission';
@@ -34,7 +34,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const [selectedIds, setSelectedIds] = useState([]);
 
     // Status Logic
-    const [bookingStatus, setBookingStatus] = useState('16');
+    const [bookingStatus, setBookingStatus] = useState('110');
     const processingRef = useRef(false);
     const { canUse } = usePermission();
 
@@ -108,7 +108,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 setRefID(null);
                 setScannedList([]);
                 setLastScanned({});
-                setBookingStatus('16');
+                setBookingStatus('110');
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
@@ -206,7 +206,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 origin: values.origin,
                 destination: values.destination
             });
-            setBookingStatus('17');
+            setBookingStatus('111');
             message.success('บันทึกข้อมูลเรียบร้อย พร้อมสำหรับการสแกน');
         } catch (err) {
             message.error('กรุณาระบุข้อมูลให้ครบถ้วน');
@@ -214,6 +214,15 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     };
 
     const handleFinalize = async () => {
+        // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน
+        let values;
+        try {
+            values = await form.validateFields(['origin', 'destination', 'booking_remark']);
+        } catch (error) {
+            message.error('กรุณาระบุสถานที่จ่ายออกและปลายทางให้ครบถ้วน');
+            return;
+        }
+
         modal.confirm({
             title: 'ยืนยันการจ่ายออก',
             content: 'เมื่อยืนยันแล้วจะไม่สามารถแก้ไขหรือสแกนเพิ่มได้',
@@ -225,11 +234,18 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             keyboard: false,
             onCancel: async () => {
                 try {
-                    await api.post('/smartpackage/systemout/finalize', { draft_id: draftId });
-                    setBookingStatus('18');
+                    // 2. ส่งค่า draft_id พร้อมข้อมูล Header ไปที่ API
+                    await api.post('/smartpackage/systemout/finalize', {
+                        draft_id: draftId,
+                        origin: values.origin,
+                        destination: values.destination,
+                        booking_remark: values.booking_remark
+                    });
+
+                    setBookingStatus('112');
                     message.success('จ่ายออกเรียบร้อย');
                 } catch (e) {
-                    message.error('Failed');
+                    message.error('Failed: ' + (e.response?.data?.message || e.message));
                     return Promise.reject();
                 }
             },
@@ -253,7 +269,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     await api.post('/smartpackage/systemout/unlock', { draft_id: draftId });
 
                     // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
-                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 26 -> Master RefID)
+                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 114 -> Master RefID)
                     fetchData();
 
                     message.success('ปลดล็อคเรียบร้อย');
@@ -308,19 +324,63 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     };
 
     const handleModalClose = async () => {
-        // ถ้าสถานะเป็น 26 และ "ไม่มีรายการ" (scannedList ว่างเปล่า)
-        if (bookingStatus === '26' && scannedList.length === 0) {
+        // ✅ กรณี Status 114 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันจ่ายออก
+        if (bookingStatus === '114') {
+            // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน (เหมือน handleFinalize)
+            let values;
             try {
-                console.log("Auto-Finalizing empty unlocked booking...");
-                // เรียก Finalize เพื่อตบกลับเป็น 18 อัตโนมัติ
-                await api.post('/smartpackage/systemout/finalize', { draft_id: targetDraftId || draftId });
-                message.info('ระบบบันทึกสถานะอัตโนมัติ (เนื่องจากไม่มีการแก้ไขข้อมูล)');
-            } catch (err) {
-                console.error("Auto-finalize failed", err);
+                values = await form.validateFields(['origin', 'destination', 'booking_remark']);
+            } catch (error) {
+                message.error('กรุณาระบุสถานที่จ่ายออกและปลายทางให้ครบถ้วน');
+                return;
             }
+
+            // 2. แสดง Modal ยืนยัน (ใช้ Logic เดียวกับ handleFinalize)
+            modal.confirm({
+                title: 'ยืนยันการจ่ายออก',
+                content: 'เมื่อยืนยันแล้วจะไม่สามารถแก้ไขหรือสแกนเพิ่มได้ (ระบบจะบันทึกและปิดหน้าต่าง)',
+
+                // ⚠️ หมายเหตุ: ตาม Code ของคุณ ปุ่ม 'cancelText' คือปุ่ม Action หลัก (สีเขียว)
+                cancelText: 'ยืนยันจ่ายออก',
+                cancelButtonProps: { type: 'primary', className: 'bg-green-600 hover:bg-green-500 border-green-600' },
+
+                // ปุ่ม 'okText' คือปุ่มยกเลิก (สีเทา)
+                okText: 'ยกเลิก',
+                okButtonProps: { type: 'default', className: 'text-gray-500 border-gray-300 hover:text-gray-700' },
+
+                maskClosable: false,
+                keyboard: false,
+
+                // 🔥 Action หลัก: เมื่อกด "ยืนยันจ่ายออก"
+                onCancel: async () => {
+                    try {
+                        // เรียก API Finalize
+                        await api.post('/smartpackage/systemout/finalize', {
+                            draft_id: draftId,
+                            origin: values.origin,
+                            destination: values.destination,
+                            booking_remark: values.booking_remark
+                        });
+
+                        setBookingStatus('112');
+                        message.success('จ่ายออกเรียบร้อย');
+
+                        // ✅ เมื่อสำเร็จ ให้สั่งปิด Modal หลัก (onCancel ของ SystemOutList)
+                        onCancel();
+                    } catch (e) {
+                        message.error('Failed: ' + (e.response?.data?.message || e.message));
+                        // Return Promise.reject เพื่อให้ Modal confirm ไม่ปิดถ้า Error
+                        return Promise.reject();
+                    }
+                },
+
+                // Action รอง: เมื่อกด "ยกเลิก" (ไม่ทำอะไร ให้หน้าต่างเปิดค้างไว้แก้ไขต่อ)
+                onOk: () => { }
+            });
+            return; // หยุดการทำงาน ไม่ให้ปิด Modal หลักทันที
         }
 
-        // เรียก onCancel เดิมเพื่อปิด Modal และเคลียร์ค่า
+        // กรณีสถานะอื่นๆ (เช่น 112 หรือ 110) ให้ปิดหน้าต่างได้ตามปกติ
         onCancel();
     };
 
@@ -329,7 +389,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (processingRef.current) return;
         processingRef.current = true;
 
-        if (bookingStatus === '18') {
+        if (bookingStatus === '112') {
             modal.warning({ title: 'แจ้งเตือน', content: 'รายการนี้ถูกจ่ายออกแล้ว ไม่สามารถสแกนเพิ่มเติมได้', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
@@ -337,7 +397,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขที่ใบเบิกก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
-        if (bookingStatus === '16') {
+        if (bookingStatus === '110') {
             modal.warning({
                 title: 'แจ้งเตือน',
                 content: 'กรุณาระบุ สถานที่จ่ายออก-ไปยังปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
@@ -458,11 +518,11 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, draftId, refID, bookingStatus]);
 
-    const isEditingDisabled = !refID || bookingStatus === '18';
+    const isEditingDisabled = !refID || bookingStatus === '112';
     const hasScannedItems = scannedList.length > 0;
-    const showSaveCancel = refID && bookingStatus !== '18' && bookingStatus !== '26' && !hasScannedItems;
-    const showConfirm = (bookingStatus === '17' || bookingStatus === '26') && hasScannedItems;
-    const showCancelButton = bookingStatus !== '18' && !hasScannedItems;
+    const showSaveCancel = refID && bookingStatus !== '112' && bookingStatus !== '114' && !hasScannedItems;
+    const showConfirm = (bookingStatus === '111' || bookingStatus === '114') && hasScannedItems;
+    const showCancelButton = bookingStatus !== '112' && !hasScannedItems;
 
     // --- 2. Table Column Definitions ---
 
@@ -601,7 +661,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     selectedRowKeys: selectedIds,
                     onChange: (selectedKeys) => setSelectedIds(selectedKeys),
                     getCheckboxProps: (record) => ({
-                        disabled: bookingStatus === '18', // Disable selection if finalized
+                        disabled: bookingStatus === '112', // Disable selection if finalized
                     }),
                 }}
             />
@@ -781,8 +841,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* ✅ ซ่อนปุ่ม "ยกเลิกใบเบิก" ถ้าสถานะเป็น 26 */}
-                                    {showCancelButton && bookingStatus !== '26' && (
+                                    {/* ✅ ซ่อนปุ่ม "ยกเลิกใบเบิก" ถ้าสถานะเป็น 114 */}
+                                    {showCancelButton && bookingStatus !== '114' && (
                                         <Col span={showSaveCancel ? 12 : 24}>
                                             <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
                                                 ยกเลิกใบเบิก
@@ -790,8 +850,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* สถานะ 26 ให้แสดงปุ่ม Confirm (Finalize) เหมือนเดิม เพื่อบันทึกการแก้ไข */}
-                                    {(showConfirm || (bookingStatus === '26' && hasScannedItems)) && (
+                                    {/* สถานะ 114 ให้แสดงปุ่ม Confirm (Finalize) เหมือนเดิม เพื่อบันทึกการแก้ไข */}
+                                    {(showConfirm || (bookingStatus === '114' && hasScannedItems)) && (
                                         <Col span={24} className="mt-2">
                                             <Button
                                                 type="primary"
@@ -801,12 +861,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                 size="large"
                                                 className="bg-green-600 hover:bg-green-500"
                                             >
-                                                {bookingStatus === '26' ? 'บันทึกการแก้ไข (จ่ายออก)' : 'จ่ายออก (Confirm)'}
+                                                {bookingStatus === '114' ? 'บันทึกการแก้ไข (จ่ายออก)' : 'จ่ายออก (Confirm)'}
                                             </Button>
                                         </Col>
                                     )}
 
-                                    {bookingStatus === '18' && canUse('system-out:unlock') && (
+                                    {bookingStatus === '112' && canUse('system-out:unlock') && (
                                         <Col span={24}>
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
                                                 ปลดล็อคเพื่อแก้ไข
@@ -828,7 +888,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     danger
                                     icon={<ReloadOutlined />}
                                     onClick={handleReturnToStock}
-                                    disabled={selectedIds.length === 0 || bookingStatus === '18'}
+                                    disabled={selectedIds.length === 0 || bookingStatus === '112'}
                                 >
                                     ยกเลิกจ่ายออก ({selectedIds.length})
                                 </Button>
@@ -836,7 +896,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
                             <div className="flex-1 overflow-auto flex flex-col">
                                 {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
-                                {bookingStatus === '26' && !hasScannedItems ? (
+                                {bookingStatus === '114' && !hasScannedItems ? (
                                     <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
                                         <div className="text-orange-500 mb-4">
                                             <ExclamationCircleOutlined style={{ fontSize: 48 }} />
@@ -850,7 +910,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
                                         </Text>
                                         <div className="mt-4">
-                                            <Tag color="orange">Status: Unlocked (26)</Tag>
+                                            <Tag color="orange">Status: Unlocked (114)</Tag>
                                         </div>
                                         <div className="mt-6 text-xs text-gray-400">
                                             * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "จ่ายออก" โดยอัตโนมัติ
@@ -863,7 +923,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             {/* เงื่อนไขที่ 1: การสร้างเลขที่ใบเบิก */}
                                             <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${refID ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${refID ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {refID ? <CheckCircleOutlined  style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
+                                                    {refID ? <CheckCircleOutlined style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
                                                     <Text strong className={refID ? 'text-green-700' : 'text-gray-600'}>
@@ -874,24 +934,44 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                 </div>
                                             </div>
 
-                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-ไปยังปลายทาง (Status 17) */}
-                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '16' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
-                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '16' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {bookingStatus !== '16' ? <CheckCircleOutlined  style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
+                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-ไปยังปลายทาง (Status 111) */}
+                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '110' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '110' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                    {bookingStatus !== '110' ? <CheckCircleOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
-                                                    <Text strong className={bookingStatus !== '16' ? 'text-green-700' : 'text-gray-600'}>
-                                                        {bookingStatus !== '16' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-ไปยังปลายทาง'}
+                                                    <Text strong className={bookingStatus !== '110' ? 'text-green-700' : 'text-gray-600'}>
+                                                        {bookingStatus !== '110' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-ไปยังปลายทาง'}
                                                     </Text>
                                                     <br />
-                                                    <Text type="secondary" size="small">{bookingStatus !== '16' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
+                                                    <Text type="secondary" size="small">{bookingStatus !== '110' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
                                                 </div>
                                             </div>
 
                                             {/* ข้อความแนะนำด้านล่าง */}
-                                            {bookingStatus !== '16' && refID && (
-                                                <div className="text-center animate-pulse mt-4">
-                                                    <Tag color="blue" icon={<SearchOutlined />}>ระบบพร้อมสแกนแล้ว สามารถเริ่มสแกน QR Code ได้ทันที</Tag>
+                                            {bookingStatus !== '110' && refID && (
+                                                <div className="mt-6 bg-white border border-green-100 shadow-sm rounded-lg p-4 flex items-center gap-4 relative overflow-hidden">
+                                                    {/* Decorative Circle */}
+                                                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 rounded-full blur-xl"></div>
+
+                                                    <div className="flex-shrink-0 w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
+                                                        <QrcodeOutlined style={{ fontSize: '24px' }} />
+                                                    </div>
+
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <h4 className="text-base font-bold text-gray-700 m-0">ระบบพร้อมสแกน</h4>
+                                                            <span className="flex h-2 w-2 relative">
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-gray-400 text-sm m-0">สามารถยิงบาร์โค้ดได้เลย</p>
+                                                    </div>
+
+                                                    <div className="hidden sm:block">
+                                                        <CheckCircleFilled className="text-green-500/20 text-4xl" />
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

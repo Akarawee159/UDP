@@ -131,27 +131,27 @@ function RegisterAsset() {
             // 2. แยกสถานะตาม asset_status
             const status = String(row.asset_status);
 
-            // asset_status = 10 (ว่าง/ปกติ) หรือ 11 (เบิกใช้/ปกติ) -> นับเป็น "ปกติ"
-            if (status === '10' || status === '11') {
+            // asset_status = 100 (ว่าง/ปกติ) หรือ 101 (เบิกใช้/ปกติ) -> นับเป็น "ปกติ"
+            if (status === '100' || status === '101') {
                 groups[key].count_normal++;
             }
 
-            // แยกนับ "เบิกใช้" เฉพาะ 11 ด้วย
-            if (status === '11') {
+            // แยกนับ "เบิกใช้" เฉพาะ 101 ด้วย
+            if (status === '101') {
                 groups[key].count_use++;
             }
 
-            // แยกนับ "เบิกใช้" เฉพาะ 16 ด้วย
-            if (status === '16') {
+            // แยกนับ "เบิกใช้" เฉพาะ 110 ด้วย
+            if (status === '110') {
                 groups[key].count_prepare++;
             }
 
             // สถานะอื่นๆ
-            if (status === '13') {
+            if (status === '103') {
                 groups[key].count_damaged++;
-            } else if (status === '14') {
+            } else if (status === '104') {
                 groups[key].count_repair++;
-            } else if (status === '15') {
+            } else if (status === '105') {
                 groups[key].count_broken++;
             }
         });
@@ -214,42 +214,42 @@ function RegisterAsset() {
                     cellClass: "text-center font-bold cursor-pointer"
                 },
                 {
-                    headerName: 'ปกติ', // Status 10 + 11
+                    headerName: 'ปกติ', // Status 100 + 101
                     width: 100,
                     field: 'count_normal',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-blue-bold cursor-pointer"
                 },
                 {
-                    headerName: 'เตรียมเบิก', // Status 16
+                    headerName: 'เตรียมเบิก', // Status 110
                     width: 100,
                     field: 'count_prepare',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-blue-bold cursor-pointer"
                 },
                 {
-                    headerName: 'เบิกใช้', // Status 11
+                    headerName: 'เบิกใช้', // Status 101
                     width: 100,
                     field: 'count_use',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-green-bold cursor-pointer"
                 },
                 {
-                    headerName: 'ชำรุด', // Status 13
+                    headerName: 'ชำรุด', // Status 103
                     width: 100,
                     field: 'count_damaged',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-orange-bold cursor-pointer"
                 },
                 {
-                    headerName: 'รอซ่อม', // Status 14
+                    headerName: 'รอซ่อม', // Status 104
                     width: 100,
                     field: 'count_repair',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-orange-bold cursor-pointer"
                 },
                 {
-                    headerName: 'เสีย', // Status 15
+                    headerName: 'เสีย', // Status 105
                     width: 100,
                     field: 'count_broken',
                     cellRenderer: p => valUnit(p.value),

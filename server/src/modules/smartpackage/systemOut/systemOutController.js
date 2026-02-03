@@ -47,7 +47,7 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 17
+    // บันทึกและเปลี่ยน status -> 111
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -60,11 +60,14 @@ async function confirmBooking(req, res, next) {
 // ✅ ใหม่: จ่ายออก (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
-    const { draft_id } = req.body;
+    // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
+    const { draft_id, booking_remark, origin, destination } = req.body;
     const user_id = req.user?.employee_id;
+
     if (!draft_id) throw new Error("Draft ID missing");
 
-    await model.finalizeBooking(draft_id, user_id);
+    // ส่ง object ข้อมูล header ไปที่ model
+    await model.finalizeBooking(draft_id, user_id, { booking_remark, origin, destination });
 
     const io = req.app.get('io');
     if (io) io.emit('systemout:update', { action: 'finalized', draft_id });
@@ -172,15 +175,15 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      if (status === '18') {
-        // 18 = จ่ายออกแล้ว (History) -> ดึงจาก Detail
+      if (status === '112') {
+        // 112 = จ่ายออกแล้ว (History) -> ดึงจาก Detail
         assets = await model.getAssetsDetailByRefID(booking.refID);
-      } else if (status === '26') {
-        // 26 = ปลดล็อคแก้ไข (Live Editing) -> ดึงจาก Master ด้วย RefID
+      } else if (status === '114') {
+        // 114 = ปลดล็อคแก้ไข (Live Editing) -> ดึงจาก Master ด้วย RefID
         // ตามโจทย์: "ดึงข้อมูลที่ tb_asset_lists.refID = booking_asset_lists.refID"
         assets = await model.getAssetsByMasterRefID(booking.refID);
       } else {
-        // 16, 17 = Draft -> ดึงจาก Master ด้วย DraftID
+        // 110, 111 = Draft -> ดึงจาก Master ด้วย DraftID
         assets = await model.getAssetsByDraft(draft_id);
       }
     }
@@ -206,6 +209,23 @@ async function cancelBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function confirmOutput(req, res, next) {
+  try {
+    const { draft_id } = req.body;
+    const user_id = req.user?.employee_id;
+
+    if (!draft_id) throw new Error("Draft ID missing");
+
+    await model.confirmOutput(draft_id, user_id);
+
+    // ส่ง Socket บอกให้หน้าจอร Refesh
+    const io = req.app.get('io');
+    if (io) io.emit('systemout:update', { action: 'output_confirmed', draft_id });
+
+    res.json({ success: true, message: 'Confirmed Output (Status 115)' });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   initBooking,
   getScannedList,
@@ -219,5 +239,6 @@ module.exports = {
   generateBookingRef,
   cancelBooking,
   finalizeBooking,
-  unlockBooking
+  unlockBooking,
+  confirmOutput
 };
