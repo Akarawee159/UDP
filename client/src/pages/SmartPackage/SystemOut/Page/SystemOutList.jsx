@@ -6,7 +6,9 @@ import {
 import {
     ReloadOutlined, SaveOutlined, ExclamationCircleOutlined,
     InfoCircleOutlined, PictureOutlined, FileAddOutlined,
-    CloseOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined, QrcodeOutlined, CheckCircleFilled
+    CloseOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined, QrcodeOutlined, CheckCircleFilled,
+    ColumnWidthOutlined, ExpandAltOutlined, VerticalAlignTopOutlined, GoldOutlined, DatabaseOutlined, ApartmentOutlined,
+    CopyOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 import { usePermission } from '../../../../hooks/usePermission';
@@ -32,6 +34,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
     // Selection for Return (Using Asset Codes)
     const [selectedIds, setSelectedIds] = useState([]);
+
+    const [expandedKeys, setExpandedKeys] = useState([]);
 
     // Status Logic
     const [bookingStatus, setBookingStatus] = useState('110');
@@ -68,6 +72,16 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         });
         return Object.values(groups);
     }, [scannedList]);
+
+    // เมื่อ groupedData เปลี่ยน (มีของใหม่เข้ามา) ให้กางตารางออกอัตโนมัติ
+    useEffect(() => {
+        if (groupedData.length > 0) {
+            const allKeys = groupedData.map(group => group.key);
+            setExpandedKeys(allKeys);
+        } else {
+            setExpandedKeys([]);
+        }
+    }, [groupedData]);
 
     const fetchData = useCallback(async () => {
         if (!open) return;
@@ -389,6 +403,15 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (processingRef.current) return;
         processingRef.current = true;
 
+        if (bookingStatus === '115') {
+            modal.warning({
+                title: 'ไม่สามารถทำรายการได้',
+                content: 'ใบเบิกนี้ยืนยันการจ่ายออกเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
+                okText: 'รับทราบ',
+                onOk: () => processingRef.current = false
+            });
+            return;
+        }
         if (bookingStatus === '112') {
             modal.warning({ title: 'แจ้งเตือน', content: 'รายการนี้ถูกจ่ายออกแล้ว ไม่สามารถสแกนเพิ่มเติมได้', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
@@ -518,11 +541,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, draftId, refID, bookingStatus]);
 
-    const isEditingDisabled = !refID || bookingStatus === '112';
+    const isEditingDisabled = !refID || bookingStatus === '112' || bookingStatus === '115';
     const hasScannedItems = scannedList.length > 0;
     const showSaveCancel = refID && bookingStatus !== '112' && bookingStatus !== '114' && !hasScannedItems;
     const showConfirm = (bookingStatus === '111' || bookingStatus === '114') && hasScannedItems;
     const showCancelButton = bookingStatus !== '112' && !hasScannedItems;
+    const isFinalized = bookingStatus === '112' || bookingStatus === '115';
 
     // --- 2. Table Column Definitions ---
 
@@ -661,7 +685,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     selectedRowKeys: selectedIds,
                     onChange: (selectedKeys) => setSelectedIds(selectedKeys),
                     getCheckboxProps: (record) => ({
-                        disabled: bookingStatus === '112', // Disable selection if finalized
+                        disabled: bookingStatus === '112' || bookingStatus === '115',
                     }),
                 }}
             />
@@ -698,64 +722,236 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         >
             <div className="flex flex-col gap-4 bg-slate-50 p-4 rounded-lg" style={{ minHeight: '80vh' }}>
                 <Card
-                    className="shadow-sm border-blue-200 bg-blue-50/30"
-                    title={<Space><InfoCircleOutlined className="text-blue-600" /> รายละเอียดทรัพย์สิน ({lastScanned?.asset_code || 'กรุณาสแกนหรือเลือกรายการ'})</Space>}
-                    size="small"
+                    className="shadow-md border-0 bg-white overflow-hidden"
+                    bodyStyle={{ padding: 0 }} // Custom padding เพื่อจัด Layout เอง
                 >
-                    <Row gutter={[16, 16]}>
-                        <Col xs={24} md={4} className="flex justify-center items-start">
-                            {lastScanned?.asset_img ? (
-                                <Image
-                                    src={getFullImgUrl('material', lastScanned.asset_img)}
-                                    className="rounded-lg border object-cover"
-                                    style={{ maxHeight: 200, width: '100%' }}
-                                />
-                            ) : (
-                                <div className="w-full h-40 bg-gray-200 rounded flex items-center justify-center text-gray-400">
-                                    <PictureOutlined style={{ fontSize: 40 }} />
-                                </div>
-                            )}
-                        </Col>
-                        <Col xs={24} md={10}>
-                            <Descriptions column={1} size="small" bordered className="bg-white">
-                                <Descriptions.Item label="รหัสทรัพย์สิน">{lastScanned?.asset_code || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="ชื่อทรัพย์สิน">{lastScanned?.asset_detail || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="ประเภท">{lastScanned?.asset_type || '-'}</Descriptions.Item>
-                                <Descriptions.Item label="รายละเอียด">{lastScanned?.asset_remark || '-'}</Descriptions.Item>
-                            </Descriptions>
-                        </Col>
-                        <Col xs={24} md={10}>
-                            <Descriptions column={2} size="small" bordered className="bg-white">
-                                <Descriptions.Item label="กว้าง">{lastScanned?.asset_width}</Descriptions.Item>
-                                <Descriptions.Item label="ยาว">{lastScanned?.asset_length}</Descriptions.Item>
-                                <Descriptions.Item label="สูง">{lastScanned?.asset_height}</Descriptions.Item>
-                                <Descriptions.Item label="ความจุ">{lastScanned?.asset_capacity}</Descriptions.Item>
-                                <Descriptions.Item span={2} label="น้ำหนัก">{lastScanned?.asset_weight}</Descriptions.Item>
-                            </Descriptions>
-                        </Col>
-                        <Col span={24}>
-                            <div className="bg-white p-3 rounded border border-gray-100">
-                                <Text strong className="mb-2 block text-gray-500 text-xs">ส่วนประกอบชิ้นส่วน (Drawings)</Text>
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {[1, 2, 3, 4, 5, 6].map(num => {
-                                        const imgName = lastScanned?.[`asset_dmg_00${num}`];
-                                        return (
-                                            <div key={num} className="w-24 h-24 border border-gray-200 rounded bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden bg-white">
-                                                {imgName ? (
-                                                    <Image
-                                                        src={getFullImgUrl('material/drawing', imgName)}
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                ) : (
-                                                    <Text type="secondary" className="text-xs text-gray-300">No Img</Text>
-                                                )}
+                    {!lastScanned?.asset_code ? (
+                        // --- UX: Empty State เมื่อยังไม่ได้สแกน ---
+                        <div className="flex flex-col items-center justify-center py-12 bg-slate-50/50">
+                            <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 animate-pulse">
+                                <QrcodeOutlined className="text-4xl text-blue-500" />
+                            </div>
+                            <Title level={4} type="secondary" style={{ margin: 0 }}>รอรับข้อมูล</Title>
+                            <Text type="secondary">กรุณาสแกน QR Code หรือเลือกรายการจากตาราง</Text>
+                        </div>
+                    ) : (
+                        // --- UX: ข้อมูลทรัพย์สิน ---
+                        <div className="flex flex-col">
+                            {/* Header Strip: Modern Gradient & Glass Effect */}
+                            <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 px-6 py-4 shadow-sm">
+                                {/* Decorative Background Elements (ช่วยเพิ่มมิติ) */}
+                                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl pointer-events-none"></div>
+                                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-blue-400 opacity-20 rounded-full blur-lg pointer-events-none"></div>
+
+                                <div className="relative flex justify-between items-center z-10">
+                                    {/* Left Side: Title & Icon */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
+                                            <InfoCircleOutlined className="text-white text-xl" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-white font-bold text-lg leading-tight tracking-wide shadow-black drop-shadow-sm">
+                                                รายละเอียดทรัพย์สิน
+                                            </span>
+                                            <span className="text-blue-100 text-xs font-light tracking-wider opacity-90">
+                                                Asset Information Details
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Side: Asset Code Badge with Copy Action */}
+                                    <div className="flex items-center gap-2">
+                                        <Tooltip title="คลิกเพื่อคัดลอกรหัส">
+                                            <div
+                                                className="group flex items-center gap-2 bg-white text-blue-700 px-3 py-1.5 rounded-lg border border-blue-200 shadow-md cursor-pointer hover:bg-blue-50 transition-all active:scale-95"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(lastScanned.partCode);
+                                                    message.success('คัดลอกรหัสเรียบร้อย');
+                                                }}
+                                            >
+                                                <span className="font-mono font-bold text-base tracking-wide select-all">
+                                                    {lastScanned.partCode}
+                                                </span>
+                                                <div className="h-4 w-px bg-blue-200 mx-1"></div>
+                                                <CopyOutlined className="text-blue-400 group-hover:text-blue-600 transition-colors" />
                                             </div>
-                                        );
-                                    })}
+                                        </Tooltip>
+                                    </div>
                                 </div>
                             </div>
-                        </Col>
-                    </Row>
+
+                            <div className="p-6">
+                                <Row gutter={[24, 24]}>
+                                    {/* 1. รูปภาพหลัก */}
+                                    <Col xs={24} md={6}>
+                                        <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-100 shadow-inner flex items-center justify-center relative group">
+                                            {lastScanned.asset_img ? (
+                                                <>
+                                                    <Image
+                                                        src={getFullImgUrl('material', lastScanned.asset_img)}
+                                                        className="object-cover w-full h-full"
+                                                        style={{ height: '100%', width: '100%' }}
+                                                        preview={{ mask: <div className="text-white"><EyeOutlined /> ดูภาพขยาย</div> }}
+                                                    />
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-gray-300">
+                                                    <PictureOutlined style={{ fontSize: 48 }} />
+                                                    <span className="text-xs mt-2">ไม่มีรูปภาพ</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </Col>
+
+                                    {/* 2. ข้อมูลทั่วไป (Text) */}
+                                    <Col xs={24} md={10}>
+                                        <div className="flex flex-col h-full justify-start gap-4">
+                                            <div>
+                                                <Text type="secondary" className="text-xs uppercase tracking-wider">ชื่อทรัพย์สิน</Text>
+                                                <Title level={4} style={{ margin: 0, color: '#1f2937' }}>
+                                                    {lastScanned.asset_detail || '-'}
+                                                </Title>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                    <Text type="secondary" className="text-xs block">ประเภท</Text>
+                                                    <span className="font-medium text-slate-700">{lastScanned.asset_type || '-'}</span>
+                                                </div>
+                                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                    <Text type="secondary" className="text-xs block">Part Code</Text>
+                                                    <span className="font-medium text-slate-700">{lastScanned.partCode || '-'}</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <Text type="secondary" className="text-xs block mb-1">รายละเอียดเพิ่มเติม</Text>
+                                                <div className="bg-white p-3 rounded-lg border border-gray-200 text-gray-600 text-sm min-h-[80px]">
+                                                    {lastScanned.asset_remark || <span className="text-gray-300 italic">ไม่ระบุรายละเอียด</span>}
+                                                </div>
+                                            </div>
+                                            {/* 4. Drawings Section */}
+                                            <div className="mt-2 pt-4 border-t border-gray-100">
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <FileAddOutlined className="text-blue-500" />
+                                                    <Text strong className="text-gray-600 text-sm">ส่วนประกอบชิ้นส่วน (Drawings)</Text>
+                                                </div>
+
+                                                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                                                    {[1, 2, 3, 4, 5, 6].map(num => {
+                                                        const imgName = lastScanned?.[`asset_dmg_00${num}`];
+                                                        // UX: ถ้าไม่มีรูป ให้ไม่แสดงเลย หรือแสดงจางๆ (ในที่นี้เลือกแสดงจางๆ ให้รู้ว่ามี Slot)
+                                                        if (!imgName) return null;
+
+                                                        return (
+                                                            <div key={num} className="w-20 h-20 border border-gray-200 rounded-lg bg-white flex-shrink-0 overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+                                                                <Image
+                                                                    src={getFullImgUrl('material/drawing', imgName)}
+                                                                    className="w-full h-full object-contain p-1"
+                                                                    preview={{ mask: <EyeOutlined /> }}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {/* Empty Placeholder for Drawing if none exists */}
+                                                    {![1, 2, 3, 4, 5, 6].some(n => lastScanned?.[`asset_dmg_00${n}`]) && (
+                                                        <div className="w-full text-center py-4 bg-gray-50 rounded border border-dashed border-gray-300 text-gray-700 text-xs">
+                                                            ไม่พบข้อมูล Drawing
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Col>
+
+                                    {/* 3. สเปค (Dimension Grid) */}
+                                    <Col xs={24} md={8}>
+                                        <div className="bg-white rounded-xl border border-gray-200 h-full shadow-sm overflow-hidden flex flex-col">
+                                            {/* Header */}
+                                            <div className="bg-slate-50 px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                                                <ApartmentOutlined className="text-blue-500" />
+                                                <span className="font-semibold text-gray-700 text-sm">ข้อมูลจำเพาะ (Spec)</span>
+                                            </div>
+
+                                            <div className="p-4 flex flex-col gap-4 h-full justify-center">
+
+                                                {/* Group 1: Dimensions (กว้าง x ยาว x สูง) */}
+                                                <div>
+                                                    <Text type="secondary" className="text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
+                                                        ขนาด (Dimensions)
+                                                    </Text>
+                                                    <div className="grid grid-cols-3 gap-2">
+                                                        {/* Width */}
+                                                        <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
+                                                            <ColumnWidthOutlined className="text-blue-400 text-xs mb-1" />
+                                                            <span className="text-[14px] text-gray-700">กว้าง</span>
+                                                            <div className="font-bold text-gray-700">
+                                                                {lastScanned.asset_width || '-'} <span className="text-[14px] font-normal text-gray-700">{lastScanned.asset_width_unit}</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Length */}
+                                                        <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
+                                                            <ExpandAltOutlined className="text-blue-400 text-xs mb-1" />
+                                                            <span className="text-[14px] text-gray-700">ยาว</span>
+                                                            <div className="font-bold text-gray-700">
+                                                                {lastScanned.asset_length || '-'} <span className="text-[14px] font-normal text-gray-700">{lastScanned.asset_length_unit}</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* Height */}
+                                                        <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
+                                                            <VerticalAlignTopOutlined className="text-blue-400 text-xs mb-1" />
+                                                            <span className="text-[14px] text-gray-700">สูง</span>
+                                                            <div className="font-bold text-gray-700">
+                                                                {lastScanned.asset_height || '-'} <span className="text-[14px] font-normal text-gray-700">{lastScanned.asset_height_unit}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Divider */}
+                                                <div className="h-px bg-gray-100 w-full"></div>
+
+                                                {/* Group 2: Properties (น้ำหนัก & ความจุ) */}
+                                                <div>
+                                                    <Text type="secondary" className="text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
+                                                        คุณสมบัติ (Properties)
+                                                    </Text>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        {/* Weight */}
+                                                        <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
+                                                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500">
+                                                                <GoldOutlined />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[14px] text-gray-700">น้ำหนัก</span>
+                                                                <span className="font-bold text-gray-700 text-base leading-none">
+                                                                    {lastScanned.asset_weight || '-'} <span className="text-xs font-normal text-gray-700">{lastScanned.asset_weight_unit}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Capacity */}
+                                                        <div className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
+                                                            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-500">
+                                                                <DatabaseOutlined />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[14px] text-gray-700">ความจุ</span>
+                                                                <span className="font-bold text-gray-700 text-base leading-none">
+                                                                    {lastScanned.asset_capacity || '-'} <span className="text-xs font-normal text-gray-700">{lastScanned.asset_capacity_unit}</span>
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </Col>
+                                </Row>
+                            </div>
+                        </div>
+                    )}
                 </Card>
 
                 <Row gutter={16} className="flex-1">
@@ -833,7 +1029,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                 </Form.Item>
 
                                 <Row gutter={8} style={{ marginTop: 16 }}>
-                                    {showSaveCancel && (
+                                    {/* ซ่อนปุ่มบันทึกข้อมูลถ้าจ่ายออกแล้ว */}
+                                    {showSaveCancel && !isFinalized && (
                                         <Col span={12}>
                                             <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large">
                                                 บันทึกข้อมูล
@@ -841,8 +1038,8 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* ✅ ซ่อนปุ่ม "ยกเลิกใบเบิก" ถ้าสถานะเป็น 114 */}
-                                    {showCancelButton && bookingStatus !== '114' && (
+                                    {/* ซ่อนปุ่มยกเลิกใบเบิกถ้าจ่ายออกแล้ว */}
+                                    {showCancelButton && !isFinalized && bookingStatus !== '114' && (
                                         <Col span={showSaveCancel ? 12 : 24}>
                                             <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
                                                 ยกเลิกใบเบิก
@@ -884,16 +1081,18 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                             {/* ส่วนหัวตาราง */}
                             <div className="flex justify-between items-center mb-2">
                                 <Title level={5} style={{ margin: 0 }}>รายการในตะกร้า ({scannedList.length})</Title>
-                                <Button
-                                    danger
-                                    icon={<ReloadOutlined />}
-                                    onClick={handleReturnToStock}
-                                    disabled={selectedIds.length === 0 || bookingStatus === '112'}
-                                >
-                                    ยกเลิกจ่ายออก ({selectedIds.length})
-                                </Button>
+                                {/* ล็อคปุ่มยกเลิกจ่ายออกถ้าเป็น 115 หรือ 112 */}
+                                {!isFinalized && (
+                                    <Button
+                                        danger
+                                        icon={<ReloadOutlined />}
+                                        onClick={handleReturnToStock}
+                                        disabled={selectedIds.length === 0}
+                                    >
+                                        ยกเลิกจ่ายออก ({selectedIds.length})
+                                    </Button>
+                                )}
                             </div>
-
                             <div className="flex-1 overflow-auto flex flex-col">
                                 {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
                                 {bookingStatus === '114' && !hasScannedItems ? (
@@ -983,14 +1182,24 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         dataSource={groupedData}
                                         expandable={{
                                             expandedRowRender,
-                                            expandIcon: customExpandIcon
+                                            expandIcon: customExpandIcon,
+                                            // ✅ ปรับแก้ข้อ 2: ควบคุมการ Expand ด้วย State
+                                            expandedRowKeys: expandedKeys,
+                                            onExpand: (expanded, record) => {
+                                                // อนุญาตให้ User หุบเข้า-กางออกเองได้ด้วย
+                                                if (expanded) {
+                                                    setExpandedKeys(prev => [...prev, record.key]);
+                                                } else {
+                                                    setExpandedKeys(prev => prev.filter(k => k !== record.key));
+                                                }
+                                            }
                                         }}
                                         rowKey="key"
                                         loading={loading}
                                         pagination={false}
                                         bordered
                                         size="middle"
-                                        scroll={{ y: 400 }}
+                                        scroll={{ y: 600 }}
                                     />
                                 )}
                             </div>

@@ -131,40 +131,29 @@ function SystemOut() {
             width: 140,
             cellClass: "flex items-center justify-center py-1",
             cellRenderer: (params) => {
-                // แสดงปุ่มเฉพาะเมื่อสถานะเป็น '112'
+                // 1. กรณีสถานะ '112' แสดงปุ่มกด (Logic เดิม)
                 if (String(params.data.is_status) === '112') {
                     return (
-                        <div onClick={(e) => e.stopPropagation()}> {/* ✅ ครอบ div กันเหนียวอีกชั้น */}
+                        <div onClick={(e) => e.stopPropagation()}>
                             <Popconfirm
                                 title="ยืนยันการจ่ายออก"
                                 description="คุณต้องการยืนยันรายการนี้เป็น 'จ่ายออกสำเร็จ' ใช่หรือไม่?"
-
-                                // 🟢 สลับ Logic: เอาฟังก์ชันยืนยันมาใส่ใน onCancel (ปุ่มซ้าย)
                                 onCancel={(e) => {
-                                    e?.stopPropagation(); // กัน Trigger Row Click
+                                    e?.stopPropagation();
                                     handleConfirmOutput(params.data.draft_id);
                                 }}
-                                onConfirm={(e) => e?.stopPropagation()} // ปุ่มขวา (ยกเลิก) ไม่ทำอะไรแค่ปิด popup
-
-                                // 🟢 สลับ Text และ Style:
-                                cancelText="ยืนยัน" // ปุ่มซ้าย ให้ชื่อว่า "ยืนยัน"
-                                cancelButtonProps={{
-                                    type: 'primary',
-                                    className: "bg-teal-600 hover:bg-teal-500" // ใส่สีเขียวให้ปุ่มซ้าย
-                                }}
-
-                                okText="ยกเลิก" // ปุ่มขวา ให้ชื่อว่า "ยกเลิก"
-                                okButtonProps={{
-                                    type: 'default',
-                                    danger: true // (Optional) ใส่สีแดงหรือเทาให้ปุ่มยกเลิก
-                                }}
+                                onConfirm={(e) => e?.stopPropagation()}
+                                cancelText="ยืนยัน"
+                                cancelButtonProps={{ type: 'primary', className: "bg-teal-600 hover:bg-teal-500" }}
+                                okText="ยกเลิก"
+                                okButtonProps={{ type: 'default', danger: true }}
                             >
                                 <Button
                                     type="primary"
                                     size="small"
                                     icon={<CheckCircleOutlined />}
                                     className="bg-teal-600 hover:bg-teal-500"
-                                    onClick={(e) => e.stopPropagation()} // กัน Trigger Row Click ที่ตัวปุ่ม
+                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     ยืนยันจ่ายออก
                                 </Button>
@@ -172,17 +161,29 @@ function SystemOut() {
                         </div>
                     );
                 }
+
+                // ✅ แก้ไขจุดที่ 1: ถ้าสถานะเป็น "จ่ายออกเรียบร้อย" ให้แสดงไอคอนสีเขียว
+                if (params.data.is_status_name === 'จ่ายออกเรียบร้อย') {
+                    return (
+                        <CheckCircleOutlined className="text-green-700 text-xl" />
+                    );
+                }
+
                 return null;
             }
         },
         {
-            headerName: 'สถานะ', field: 'is_status_name', width: 150, cellClass: "text-center",
+            headerName: 'สถานะ',
+            field: 'is_status_name',
+            width: 150,
+            // เอา text-center ที่ parent ออก เพื่อให้จัดการ layout ใน div ลูกได้เอง
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: p => {
-                // ✅ ใช้สีและชื่อจาก DB
+                // ✅ แก้ไขจุดที่ 2: ปรับให้เต็มความกว้าง (w-full)
                 return (
-                    <span className={`px-2 py-1 rounded text-xs border ${p.data.is_status_color || 'bg-gray-100'}`}>
+                    <div className={`w-full text-center py-1 rounded text-xs border ${p.data.is_status_color || 'bg-gray-100'}`}>
                         {p.value || '-'}
-                    </span>
+                    </div>
                 );
             }
         },
@@ -202,9 +203,9 @@ function SystemOut() {
             headerName: 'จำนวน',
             field: 'attendees',
             width: 100,
-            cellClass: "flex items-center justify-center py-1",
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => (
-                <Tag color="blue" className="text-sm px-2">
+                <Tag color="blue" className="w-full text-center text-sm m-0">
                     {params.value || 0}
                 </Tag>
             )

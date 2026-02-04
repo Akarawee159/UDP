@@ -2,57 +2,52 @@ version: '3.8'
 
 services:
   # ------------------------------------
-  # Frontend: React (Vite)
+  # Frontend: React (Development Mode)
   # ------------------------------------
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile.dev
-    container_name: udp-client  # ชื่อสำหรับอ้างอิงใน Nginx Proxy
+      dockerfile: Dockerfile.dev  # ✅ ใช้ไฟล์ Dev (Vite)
+    container_name: udp-client-dev
     restart: always
     ports:
-      - "3091:3091"
+      - "3091:3091"               # ✅ Port ตรงกับ Vite config
     volumes:
-      # 1. Sync Source Code: แก้ไฟล์ที่ Host -> Container เปลี่ยนทันที
+      # 1. Sync Source Code: เพื่อให้แก้โค้ดแล้วหน้าเว็บเปลี่ยนทันที
       - ./client:/app
-      # 2. Prevent Overwrite: กันไม่ให้ node_modules ของ Host ทับ Container
+      # 2. Prevent Overwrite: ป้องกัน node_modules หาย
       - /app/node_modules
     environment:
-      - CHOKIDAR_USEPOLLING=true # ช่วยเรื่อง Hot Reload บน Docker
-      - TZ=Asia/Bangkok          # ตั้งเวลาเป็นประเทศไทย
+      - CHOKIDAR_USEPOLLING=true  # จำเป็นสำหรับ Hot Reload ใน Docker
+      - TZ=Asia/Bangkok
     networks:
       - shared-network
 
   # ------------------------------------
-  # Backend: Node.js Express
+  # Backend: Node.js (Development Mode)
   # ------------------------------------
   server:
     build:
       context: ./server
       dockerfile: Dockerfile.dev
-    container_name: udp-server  # ชื่อสำหรับอ้างอิงใน Nginx Proxy
+    container_name: udp-server-dev
     restart: always
     ports:
       - "3092:3092"
     environment:
       - PORT=3092
-      - TZ=Asia/Bangkok          # ตั้งเวลาเป็นประเทศไทย
-      # การเชื่อมต่อ Database ใน Shared Network
+      - NODE_ENV=development
+      - TZ=Asia/Bangkok
       - DB_HOST=db-mysql
       - DB_PORT=3306
     env_file:
-      - ./server/.env            # โหลดค่า Config อื่นๆ
+      - ./server/.env
     volumes:
-      # 1. Sync Source Code
       - ./server:/app
-      # 2. Prevent Overwrite
       - /app/node_modules
     networks:
       - shared-network
 
-# ------------------------------------
-# Network Configuration
-# ------------------------------------
 networks:
   shared-network:
-    external: true  # ใช้ Network ที่สร้างไว้แล้ว (ร่วมกับ Nginx/MySQL ตัวแม่)
+    external: true

@@ -388,32 +388,38 @@ function AssetDetail() {
             }
         },
         {
-            // --- เพิ่ม sortable และ filter ---
+            // --- แก้ไขจุดที่ 1: สถานะใช้งาน ---
             headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.asset_status_name,
+            // เพิ่ม cellClass เพื่อจัด layout ให้มี padding รอบๆ
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.asset_status_name || params.value;
                 const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    // เพิ่ม w-full เพื่อให้แถบสีขยายเต็มความกว้าง
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );
             }
         },
         {
-            // --- เพิ่ม sortable และ filter ---
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 150,
+            // --- แก้ไขจุดที่ 2: สถานะทรัพย์สิน ---
+            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.is_status_name,
+            // เพิ่ม cellClass เพื่อจัด layout ให้มี padding รอบๆ
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    // เพิ่ม w-full เพื่อให้แถบสีขยายเต็มความกว้าง
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );

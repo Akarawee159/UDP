@@ -392,36 +392,48 @@ async function getAllBookings() {
   const sql = `
     SELECT 
         b.*, 
-        -- ✅ แก้ไข Logic การนับจำนวน (attendees)
+        -- ✅ จุดที่แก้ไข: Logic การนับจำนวน (attendees)
         (
           CASE 
-            -- กรณี Status 112 (Finalized/History) 
-            -- ให้นับจาก Detail โดยเอาเฉพาะรายการที่ "สถานะล่าสุด" ยังเป็น 101 อยู่
-            WHEN b.is_status = '112' THEN 
+            -- 1. สถานะ 115 (ยืนยันจ่ายออกสำเร็จ) -> นับจาก Detail (Snapshot) เหมือนเดิม
+            WHEN b.is_status = '115' THEN 
               (
                 SELECT COUNT(*)
                 FROM tb_asset_lists_detail d1
                 WHERE d1.refID = b.refID 
-                AND d1.asset_status = '101' -- ต้องเป็นสถานะจ่ายออก
-                AND d1.scan_at = (         -- และต้องเป็นรายการล่าสุด (เวลาล่าสุด) ของสินค้านั้น
+                AND d1.is_status IN ('101', '115') 
+                AND d1.asset_status = '101'
+                AND d1.scan_at = (         
                     SELECT MAX(d2.scan_at)
                     FROM tb_asset_lists_detail d2
                     WHERE d2.refID = d1.refID
                     AND d2.asset_code = d1.asset_code
                 )
               )
-            -- กรณีอื่นๆ (Draft/กำลังแก้ไข) ให้นับจากตาราง Master ปัจจุบัน
+            
+            -- 2. ✅ สถานะ 112 (รอตรวจสอบ/จ่ายออก) -> ปรับให้นับจาก Master (tb_asset_lists)
+            -- ตามเงื่อนไข: refID ตรงกัน และ is_status เป็น 101 หรือ 112
+            WHEN b.is_status = '112' THEN 
+              (
+                SELECT COUNT(*) 
+                FROM tb_asset_lists a 
+                WHERE a.refID = b.refID 
+                AND a.is_status IN ('101', '112')
+              )
+
+            -- 3. กรณีอื่นๆ (Draft 110 / Edit 114) -> นับจาก Master โดยใช้ draft_id
             ELSE 
               (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '101')
           END
         ) as attendees,
+        
         s.G_NAME as is_status_name, 
         s.G_DESCRIPT as is_status_color,
         CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as created_by_name
     FROM booking_asset_lists b
     LEFT JOIN tb_erp_status s ON b.is_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON b.created_by = e.employee_id
-    WHERE b.is_status NOT IN ('113','30','31','32','33','34','40','41','42','43','44') 
+    WHERE b.is_status NOT IN ('113') 
     ORDER BY b.created_at DESC
   `;
   const [rows] = await db.query(sql);
@@ -502,7 +514,6 @@ async function cancelBooking(draft_id, user_id) {
 }
 
 async function getAssetsDetailByRefID(refID) {
-  // แก้ไข SQL: เลือกเฉพาะ Asset ที่สถานะ 'ล่าสุด' (ตามเวลา scan_at) เป็น 101 เท่านั้น
   const sql = `
     SELECT 
       d.*,
@@ -511,7 +522,7 @@ async function getAssetsDetailByRefID(refID) {
       CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
     FROM tb_asset_lists_detail d
     
-    -- [Logic ใหม่] Join กับ Subquery เพื่อหาเวลาล่าสุด (MAX scan_at) ของแต่ละ asset_code ใน refID นี้
+    -- Subquery เพื่อหาข้อมูลล่าสุด (MAX scan_at) ของสินค้านั้นๆ ใน RefID นี้
     INNER JOIN (
         SELECT asset_code, MAX(scan_at) as max_scan_at
         FROM tb_asset_lists_detail
@@ -522,15 +533,17 @@ async function getAssetsDetailByRefID(refID) {
     LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON d.scan_by = e.employee_id
     
-    -- [Filter] เลือกเฉพาะ refID นี้ และ สถานะล่าสุดต้องเป็น 101 (จ่ายออก) เท่านั้น
-    -- ถ้าล่าสุดเป็น 100 (คืนของ) หรืออื่นๆ จะไม่ถูกดึงมาแสดง
     WHERE d.refID = ? 
+      -- ✅ แก้ไขเงื่อนไขตรงนี้: ดึงทั้งสถานะสแกน (101) และ สถานะยืนยันจ่ายออก (115)
+      AND d.is_status IN ('101', '115') 
+      
+      -- และต้องเป็นรายการที่ Asset Status เป็น 101 (ยังถือว่าเป็นของที่จ่ายออก ไม่ใช่ของที่ถูกคืน)
       AND d.asset_status = '101'
       
     ORDER BY d.asset_code ASC
   `;
 
-  // ส่ง refID เข้าไป 2 ครั้ง (สำหรับ Subquery และ Main Query)
+  // ส่ง refID 2 ครั้ง (ครั้งแรกให้ Subquery, ครั้งสองให้ Main Query)
   const [rows] = await db.query(sql, [refID, refID]);
   return rows;
 }
@@ -545,26 +558,87 @@ async function getAssetsByMasterRefID(refID) {
     FROM tb_asset_lists a
     LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON a.scan_by = e.employee_id
-    WHERE a.refID = ? AND a.asset_status = '101'
+    WHERE a.refID = ? 
+      -- ✅ แก้ไขเงื่อนไข: ดึงรายการที่ is_status เป็น 101 หรือ 112 จากตาราง Master
+      AND a.is_status IN ('101', '112') 
     ORDER BY a.updated_at DESC
   `;
   const [rows] = await db.query(sql, [refID]);
   return rows;
 }
 
+// src/modules/Smartpackage/systemOut/systemOutModel.js
+
 async function confirmOutput(draft_id, user_id) {
   const now = getThaiNow();
 
-  // อัปเดตเฉพาะรายการที่เป็น 112 เท่านั้น เพื่อความปลอดภัย
-  const sql = `
+  // 1. ตรวจสอบว่ามีเอกสารสถานะ 112 อยู่จริงหรือไม่ (เพื่อความปลอดภัย)
+  const [bookingRes] = await db.query(
+    `SELECT draft_id FROM booking_asset_lists WHERE draft_id = ? AND is_status = '112'`,
+    [draft_id]
+  );
+
+  if (bookingRes.length === 0) {
+    throw new Error("ไม่พบรายการใบเบิก หรือสถานะไม่ใช่ 'รอตรวจสอบ' (112)");
+  }
+
+  // 2. อัปเดต Header (Booking) เป็นสถานะ 115
+  await db.query(`
         UPDATE booking_asset_lists
         SET is_status = '115',
             updated_by = ?,
             updated_at = ?
-        WHERE draft_id = ? AND is_status = '112'
+        WHERE draft_id = ?
+    `, [user_id, now, draft_id]);
+
+  // 3. อัปเดต Master (Asset Lists) เป็นสถานะ 115
+  // ใช้ draft_id เพราะ assets เหล่านั้นยังผูกอยู่กับ draft_id นี้
+  await db.query(`
+        UPDATE tb_asset_lists
+        SET is_status = '115',
+            updated_by = ?,
+            updated_at = ?
+        WHERE draft_id = ?
+    `, [user_id, now, draft_id]);
+
+  // 4. บันทึกประวัติลง Detail (Snapshot)
+  const sqlInsertDetail = `
+        INSERT INTO tb_asset_lists_detail (
+            draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+            doc_no, asset_lot, asset_holder, asset_location,
+            asset_width, asset_width_unit, asset_length, asset_length_unit,
+            asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+            asset_weight, asset_weight_unit, asset_img,
+            asset_dmg_001, asset_dmg_002, asset_dmg_003,
+            asset_dmg_004, asset_dmg_005, asset_dmg_006,
+            asset_remark, asset_usedfor, asset_brand, asset_feature,
+            asset_supplier_name, label_register, partCode, print_status,
+            asset_status, asset_action, is_status,
+            create_date, created_by, created_at,
+            updated_by, updated_at, scan_by, scan_at,
+            asset_origin, asset_destination
+        )
+        SELECT
+            t.draft_id, t.refID, t.asset_code, t.asset_detail, t.asset_type, t.asset_date,
+            t.doc_no, t.asset_lot, t.asset_holder, t.asset_location,
+            t.asset_width, t.asset_width_unit, t.asset_length, t.asset_length_unit,
+            t.asset_height, t.asset_height_unit, t.asset_capacity, t.asset_capacity_unit,
+            t.asset_weight, t.asset_weight_unit, t.asset_img,
+            t.asset_dmg_001, t.asset_dmg_002, t.asset_dmg_003,
+            t.asset_dmg_004, t.asset_dmg_005, t.asset_dmg_006,
+            t.asset_remark, t.asset_usedfor, t.asset_brand, t.asset_feature,
+            t.asset_supplier_name, t.label_register, t.partCode, t.print_status,
+            t.asset_status, 'ยืนยันจ่ายออก', '115', -- Hardcode Action & Status
+            t.create_date, t.created_by, t.created_at,
+            ?, ?, t.scan_by, t.scan_at, -- updated_by, updated_at from params
+            b.origin, b.destination
+        FROM tb_asset_lists t
+        LEFT JOIN booking_asset_lists b ON t.draft_id = b.draft_id
+        WHERE t.draft_id = ?
     `;
 
-  await db.query(sql, [user_id, now, draft_id]);
+  await db.query(sqlInsertDetail, [user_id, now, draft_id]);
+
   return true;
 }
 

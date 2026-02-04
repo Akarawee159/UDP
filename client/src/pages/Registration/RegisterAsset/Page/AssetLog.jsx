@@ -70,6 +70,7 @@ function AssetLog() {
         { headerName: '#', valueGetter: "node.rowIndex + 1", width: 80, cellClass: "text-center" },
         {
             headerName: 'Action', field: 'asset_action', width: 100, pinned: 'left',
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const action = params.value || '';
                 let color = 'default';
@@ -79,7 +80,7 @@ function AssetLog() {
                 else if (action === 'พิมพ์') { color = 'blue'; text = 'พิมพ์'; }
                 else if (action === 'ยกเลิก') { color = 'red'; text = 'ยกเลิก'; }
 
-                return <Tag color={color}>{text}</Tag>;
+                return <Tag color={color} className="w-full text-center m-0">{text}</Tag>;
             }
         },
         {
@@ -87,11 +88,12 @@ function AssetLog() {
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.is_status_name,
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );
@@ -105,7 +107,6 @@ function AssetLog() {
             )
         },
         {
-            // === Logic 1: วันที่พิมพ์สติ๊กเกอร์ ===
             headerName: 'วันที่พิมพ์สติ๊กเกอร์',
             width: 200,
             sort: 'desc',
@@ -133,7 +134,6 @@ function AssetLog() {
             }
         },
         {
-            // === Logic 2: ผู้พิมพ์สติ๊กเกอร์ ===
             headerName: 'ผู้พิมพ์สติ๊กเกอร์',
             width: 200,
             cellRenderer: (params) => {
@@ -164,11 +164,12 @@ function AssetLog() {
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.asset_status_name,
+            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.asset_status_name || params.value;
                 const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );

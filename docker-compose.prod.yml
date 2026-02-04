@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # ------------------------------------
+  # Frontend: React (Production Mode via Nginx)
+  # ------------------------------------
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile      # ✅ ใช้ไฟล์ Production (Build -> Nginx)
+    container_name: udp-client
+    restart: always
+    ports:
+      - "3091:80"                 # ✅ Map Port 3091 เข้าหา Nginx Port 80
+    # ❌ ลบ Volumes ทิ้ง: เพราะเราใช้ไฟล์ที่ Build เสร็จแล้ว (Static) ไม่มีการแก้โค้ดสดๆ
+    environment:
+      - TZ=Asia/Bangkok
+    networks:
+      - shared-network
+
+  # ------------------------------------
+  # Backend: Node.js (Production Mode)
+  # ------------------------------------
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev  # (ถ้ามี Dockerfile แยกสำหรับ Prod ให้เปลี่ยนตรงนี้)
+    container_name: udp-server
+    restart: always
+    ports:
+      - "3092:3092"
+    environment:
+      - PORT=3092
+      - NODE_ENV=production       # ✅ บอก App ว่าเป็น Production
+      - TZ=Asia/Bangkok
+      - DB_HOST=db-mysql
+      - DB_PORT=3306
+    env_file:
+      - ./server/.env
+    # ❌ ลบ Volumes ทิ้ง: เพื่อความปลอดภัยและความเสถียรของ Code บน Server
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    external: true

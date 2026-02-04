@@ -175,15 +175,16 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      if (status === '112') {
-        // 112 = จ่ายออกแล้ว (History) -> ดึงจาก Detail
+      // ✅ แยกเงื่อนไข 115 (จ่ายออกสำเร็จ) -> ดึงจาก Detail
+      if (status === '115') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
-      } else if (status === '114') {
-        // 114 = ปลดล็อคแก้ไข (Live Editing) -> ดึงจาก Master ด้วย RefID
-        // ตามโจทย์: "ดึงข้อมูลที่ tb_asset_lists.refID = booking_asset_lists.refID"
+      }
+      // ✅ เงื่อนไข 112 (รอตรวจสอบ) หรือ 114 (แก้ไข) -> ดึงจาก Master
+      else if (status === '112' || status === '114') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
-      } else {
-        // 110, 111 = Draft -> ดึงจาก Master ด้วย DraftID
+      }
+      // Draft -> ดึงจาก Master โดยใช้ draft_id
+      else {
         assets = await model.getAssetsByDraft(draft_id);
       }
     }
