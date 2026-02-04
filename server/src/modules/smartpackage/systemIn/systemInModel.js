@@ -1,4 +1,4 @@
-// src/modules/Smartpackage/systemOut/systemOutModel.js
+// src/modules/Smartpackage/systemIn/systemInModel.js
 'use strict';
 
 const db = require('../../../config/database');
@@ -16,7 +16,7 @@ async function createBooking(data) {
   const sql = `
     INSERT INTO booking_asset_lists 
     (draft_id, create_date, create_time, is_status, created_by, created_at, objective, booking_type)
-    VALUES (?, ?, ?, '110', ?, ?, ?, ?)
+    VALUES (?, ?, ?, '130', ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE updated_at = ?
   `;
   const dateOnly = dayjs(now).format('YYYY-MM-DD');
@@ -30,12 +30,12 @@ async function createBooking(data) {
   return { draft_id };
 }
 
-// RF 
+// RC 
 async function generateRefID(draft_id, user_id) {
   const dateStr = dayjs().format('DDMMYY'); // วันที่ปัจจุบัน DDMMYY
-  const prefix = `RF${dateStr}`; // Prefix ที่ต้องการค้นหา เช่น RF040226
+  const prefix = `RC${dateStr}`; // Prefix ที่ต้องการค้นหา เช่น RF040226
 
-  // ค้นหา RefID ล่าสุดของวันนี้ ที่ขึ้นต้นด้วย RF เท่านั้น (เพื่อไม่ให้นับรวมเอกสารประเภทอื่น)
+  // ค้นหา RefID ล่าสุดของวันนี้ ที่ขึ้นต้นด้วย RC เท่านั้น (เพื่อไม่ให้นับรวมเอกสารประเภทอื่น)
   // ใช้ LIKE 'RF040226%' และเรียงลำดับจากมากไปน้อยเพื่อเอาตัวล่าสุด
   const sqlGetLast = `
       SELECT refID 
@@ -83,7 +83,7 @@ async function updateBookingHeader(draft_id, body, user_id) {
         SET booking_remark = ?,
             origin = ?,
             destination = ?,
-            is_status = '111', 
+            is_status = '131', 
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
@@ -126,19 +126,19 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
   const previousStatus = booking.is_status;
   const { refID, origin, destination } = booking;
 
-  // 2. Update Header Status to 112 (Finalized)
+  // 2. Update Header Status to 132 (Finalized)
   await db.query(`
         UPDATE booking_asset_lists
-        SET is_status = '112',
+        SET is_status = '132',
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
     `, [user_id, now, draft_id]);
 
   // 3. Logic Branching (Logic เดิมทั้งหมด ไม่มีการเปลี่ยนแปลง แต่ข้อมูล origin/destination ถูกต้องแล้ว)
-  if (previousStatus === '114') {
+  if (previousStatus === '134') {
     // -------------------------------------------------
-    // Logic for Status 114 (Re-Finalize / Merge)
+    // Logic for Status 134 (Re-Finalize / Merge)
     // -------------------------------------------------
 
     // Get current items in the cart (tb_asset_lists)
@@ -187,7 +187,7 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
 
   } else {
     // -------------------------------------------------
-    // Logic for Status 111 (First Time Finalize) -> Bulk Insert
+    // Logic for Status 131 (First Time Finalize) -> Bulk Insert
     // -------------------------------------------------
     const sqlInsertDetail = `
         INSERT INTO tb_asset_lists_detail (
@@ -263,10 +263,10 @@ async function insertSingleDetail(t, origin, destination) {
 
 async function unlockBooking(draft_id, user_id) {
   const now = getThaiNow();
-  // Change logic: Update to status '114' instead of '111'
+  // Change logic: Update to status '134' instead of '131'
   await db.query(`
         UPDATE booking_asset_lists
-        SET is_status = '114',
+        SET is_status = '134',
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
@@ -290,11 +290,11 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
 
   if (!item) return { success: false, code: 'NOT_FOUND', message: 'ไม่พบทรัพย์สินนี้' };
 
-  if (item.asset_status == 101) {
+  if (item.asset_status == 102) {
     if (item.refID === refID) {
-      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ถูกจ่ายออกไปแล้วในใบเบิกนี้`, data: item };
+      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ถูกรับเข้าของดีไปแล้วในใบเบิกนี้`, data: item };
     } else {
-      return { success: false, code: 'INVALID_STATUS', message: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกจ่ายออกไปแล้ว`, data: item };
+      return { success: false, code: 'INVALID_STATUS', message: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกรับเข้าของดีไปแล้ว`, data: item };
     }
   }
 
@@ -304,8 +304,8 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
 
   await db.query(`
         UPDATE tb_asset_lists 
-        SET asset_status = 101,
-            is_status = '112',
+        SET asset_status = 102,
+            is_status = '132',
             draft_id = ?, 
             refID = ?,
             scan_by = ?, 
@@ -332,7 +332,7 @@ async function returnSingleAsset(assetCode) {
   const item = rows[0];
   if (!item) return null;
 
-  const isBooking26 = item.booking_status === '114';
+  const isBooking26 = item.booking_status === '134';
 
   // 2. Prepare Updates
   if (isBooking26) {
@@ -424,13 +424,13 @@ async function getAllBookings(searchDate) {
         b.*, 
         (
           CASE 
-            WHEN b.is_status = '115' THEN 
+            WHEN b.is_status = '135' THEN 
               (
                 SELECT COUNT(*)
                 FROM tb_asset_lists_detail d1
                 WHERE d1.refID = b.refID 
-                AND d1.is_status IN ('101', '115') 
-                AND d1.asset_status = '101'
+                AND d1.is_status IN ('102', '135') 
+                AND d1.asset_status = '102'
                 AND d1.scan_at = (         
                     SELECT MAX(d2.scan_at)
                     FROM tb_asset_lists_detail d2
@@ -438,15 +438,15 @@ async function getAllBookings(searchDate) {
                     AND d2.asset_code = d1.asset_code
                 )
               )
-            WHEN b.is_status = '112' THEN 
+            WHEN b.is_status = '132' THEN 
               (
                 SELECT COUNT(*) 
                 FROM tb_asset_lists a 
                 WHERE a.refID = b.refID 
-                AND a.is_status IN ('101', '112')
+                AND a.is_status IN ('102', '132')
               )
             ELSE 
-              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '101')
+              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '102')
           END
         ) as attendees,
         
@@ -456,9 +456,9 @@ async function getAllBookings(searchDate) {
     FROM booking_asset_lists b
     LEFT JOIN tb_erp_status s ON b.is_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON b.created_by = e.employee_id
-    WHERE b.is_status NOT IN ('113') 
-      AND b.booking_type = 'RF'
-      AND b.create_date = ? 
+    WHERE b.is_status NOT IN ('133') 
+      AND b.booking_type = 'RC'
+      AND b.create_date = ?
     ORDER BY b.created_at DESC
   `;
 
@@ -485,8 +485,8 @@ async function returnToStock(ids) {
     `;
   const [items] = await db.query(sqlFetch, [ids]);
 
-  const items26 = items.filter(i => i.booking_status === '114');
-  const itemsNormal = items.filter(i => i.booking_status !== '114');
+  const items26 = items.filter(i => i.booking_status === '134');
+  const itemsNormal = items.filter(i => i.booking_status !== '134');
 
   // 2. Handle Normal Return
   if (itemsNormal.length > 0) {
@@ -498,7 +498,7 @@ async function returnToStock(ids) {
       `, [now, normalIds]);
   }
 
-  // 3. Handle Status 114 Return (Update & Insert Detail)
+  // 3. Handle Status 134 Return (Update & Insert Detail)
   if (items26.length > 0) {
     const ids26 = items26.map(i => i.asset_code);
 
@@ -534,7 +534,7 @@ async function returnToStock(ids) {
 
 async function cancelBooking(draft_id, user_id) {
   const now = getThaiNow();
-  const sql = `UPDATE booking_asset_lists SET is_status = '113', updated_by = ?, updated_at = ? WHERE draft_id = ?`;
+  const sql = `UPDATE booking_asset_lists SET is_status = '133', updated_by = ?, updated_at = ? WHERE draft_id = ?`;
   await db.query(sql, [user_id, now, draft_id]);
   return true;
 }
@@ -547,16 +547,24 @@ async function getAssetsDetailByRefID(refID) {
       s.G_DESCRIPT as status_class,
       CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
     FROM tb_asset_lists_detail d
+    
+    -- Subquery เพื่อหาข้อมูลล่าสุด (MAX scan_at) ของสินค้านั้นๆ ใน RefID นี้
+    INNER JOIN (
+        SELECT asset_code, MAX(scan_at) as max_scan_at
+        FROM tb_asset_lists_detail
+        WHERE refID = ? 
+        GROUP BY asset_code
+    ) latest ON d.asset_code = latest.asset_code AND d.scan_at = latest.max_scan_at
 
     LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON d.scan_by = e.employee_id
     
     WHERE d.refID = ? 
-      -- ดึงทั้งสถานะสแกน (101) และ สถานะยืนยันจ่ายออก (115)
-      AND d.is_status IN ('101', '115') 
+      -- ✅ แก้ไขเงื่อนไขตรงนี้: ดึงทั้งสถานะสแกน (102) และ สถานะยืนยันรับเข้าของดี (135)
+      AND d.is_status IN ('102', '135') 
       
-      -- และต้องเป็นรายการที่ Asset Status เป็น 101 (ยังถือว่าเป็นของที่จ่ายออก ไม่ใช่ของที่ถูกคืน)
-      AND d.asset_status = '101'
+      -- และต้องเป็นรายการที่ Asset Status เป็น 102 (ยังถือว่าเป็นของที่รับเข้าของดี ไม่ใช่ของที่ถูกคืน)
+      AND d.asset_status = '102'
       
     ORDER BY d.asset_code ASC
   `;
@@ -577,8 +585,8 @@ async function getAssetsByMasterRefID(refID) {
     LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
     LEFT JOIN employees e ON a.scan_by = e.employee_id
     WHERE a.refID = ? 
-      -- ✅ แก้ไขเงื่อนไข: ดึงรายการที่ is_status เป็น 101 หรือ 112 จากตาราง Master
-      AND a.is_status IN ('101', '112') 
+      -- ✅ แก้ไขเงื่อนไข: ดึงรายการที่ is_status เป็น 102 หรือ 132 จากตาราง Master
+      AND a.is_status IN ('102', '132') 
     ORDER BY a.updated_at DESC
   `;
   const [rows] = await db.query(sql, [refID]);
@@ -590,30 +598,30 @@ async function getAssetsByMasterRefID(refID) {
 async function confirmOutput(draft_id, user_id) {
   const now = getThaiNow();
 
-  // 1. ตรวจสอบว่ามีเอกสารสถานะ 112 อยู่จริงหรือไม่ (เพื่อความปลอดภัย)
+  // 1. ตรวจสอบว่ามีเอกสารสถานะ 132 อยู่จริงหรือไม่ (เพื่อความปลอดภัย)
   const [bookingRes] = await db.query(
-    `SELECT draft_id FROM booking_asset_lists WHERE draft_id = ? AND is_status = '112'`,
+    `SELECT draft_id FROM booking_asset_lists WHERE draft_id = ? AND is_status = '132'`,
     [draft_id]
   );
 
   if (bookingRes.length === 0) {
-    throw new Error("ไม่พบรายการใบเบิก หรือสถานะไม่ใช่ 'รอตรวจสอบ' (112)");
+    throw new Error("ไม่พบรายการใบเบิก หรือสถานะไม่ใช่ 'รอตรวจสอบ' (132)");
   }
 
-  // 2. อัปเดต Header (Booking) เป็นสถานะ 115
+  // 2. อัปเดต Header (Booking) เป็นสถานะ 135
   await db.query(`
         UPDATE booking_asset_lists
-        SET is_status = '115',
+        SET is_status = '135',
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
     `, [user_id, now, draft_id]);
 
-  // 3. อัปเดต Master (Asset Lists) เป็นสถานะ 115
+  // 3. อัปเดต Master (Asset Lists) เป็นสถานะ 135
   // ใช้ draft_id เพราะ assets เหล่านั้นยังผูกอยู่กับ draft_id นี้
   await db.query(`
         UPDATE tb_asset_lists
-        SET is_status = '115',
+        SET is_status = '135',
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
@@ -646,7 +654,7 @@ async function confirmOutput(draft_id, user_id) {
             t.asset_dmg_004, t.asset_dmg_005, t.asset_dmg_006,
             t.asset_remark, t.asset_usedfor, t.asset_brand, t.asset_feature,
             t.asset_supplier_name, t.label_register, t.partCode, t.print_status,
-            t.asset_status, 'ยืนยันจ่ายออก', '115', -- Hardcode Action & Status
+            t.asset_status, 'ยืนยันรับเข้าของดี', '135', -- Hardcode Action & Status
             t.create_date, t.created_by, t.created_at,
             ?, ?, t.scan_by, t.scan_at, -- updated_by, updated_at from params
             b.origin, b.destination

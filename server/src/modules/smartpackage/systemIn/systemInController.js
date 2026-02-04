@@ -1,20 +1,20 @@
-// src/modules/Smartpackage/systemOut/systemOutController.js
+// src/modules/Smartpackage/systemIn/systemInController.js
 'use strict';
-const model = require('./systemOutModel');
+const model = require('./systemInModel');
 const dayjs = require('dayjs');
 
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการจ่ายออก' } = req.body;
+    const { draft_id, objective = 'ทำรายการรับเข้าของดี' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการจ่ายออก') {
-      booking_type = 'RF';
+    if (objective === 'ทำรายการรับเข้าของดี') {
+      booking_type = 'RC';
     }
 
     // ส่งค่าไปบันทึก
@@ -62,7 +62,7 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 111
+    // บันทึกและเปลี่ยน status -> 131
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -72,7 +72,7 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: จ่ายออก (Finalize)
+// ✅ ใหม่: รับเข้าของดี (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
@@ -194,12 +194,12 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      // ✅ แยกเงื่อนไข 115 (จ่ายออกสำเร็จ) -> ดึงจาก Detail
-      if (status === '115') {
+      // ✅ แยกเงื่อนไข 135 (รับเข้าของดีสำเร็จ) -> ดึงจาก Detail
+      if (status === '135') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
       }
-      // ✅ เงื่อนไข 112 (รอตรวจสอบ) หรือ 114 (แก้ไข) -> ดึงจาก Master
-      else if (status === '112' || status === '114') {
+      // ✅ เงื่อนไข 132 (รอตรวจสอบ) หรือ 134 (แก้ไข) -> ดึงจาก Master
+      else if (status === '132' || status === '134') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
       }
       // Draft -> ดึงจาก Master โดยใช้ draft_id
@@ -242,7 +242,7 @@ async function confirmOutput(req, res, next) {
     const io = req.app.get('io');
     if (io) io.emit('systemout:update', { action: 'output_confirmed', draft_id });
 
-    res.json({ success: true, message: 'Confirmed Output (Status 115)' });
+    res.json({ success: true, message: 'Confirmed Output (Status 135)' });
   } catch (err) { next(err); }
 }
 

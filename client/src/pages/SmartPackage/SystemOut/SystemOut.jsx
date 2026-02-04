@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Grid, Tag, Popconfirm } from 'antd';
-import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { App, Button, Input, ConfigProvider, Grid, Tag, Popconfirm, DatePicker } from 'antd';
+import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined, CalendarOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import DataTable from '../../../components/aggrid/DataTable';
 import SystemOutList from './Page/SystemOutList';
+import dayjs from 'dayjs';
+import 'dayjs/locale/th';
+import thTH from 'antd/locale/th_TH';
+dayjs.locale('th');
 
 function SystemOut() {
     const screens = Grid.useBreakpoint();
@@ -15,13 +19,18 @@ function SystemOut() {
     const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [selectedDate, setSelectedDate] = useState(dayjs());
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState(null);
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/smartpackage/systemout');
+            const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : '';
+            const res = await api.get('/smartpackage/systemout', {
+                params: { date: dateStr }
+            });
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
@@ -29,7 +38,7 @@ function SystemOut() {
         } finally {
             setLoading(false);
         }
-    }, [message]);
+    }, [message, selectedDate]);
 
     useEffect(() => {
         fetchData();
@@ -176,10 +185,9 @@ function SystemOut() {
             headerName: 'สถานะ',
             field: 'is_status_name',
             width: 150,
-            // เอา text-center ที่ parent ออก เพื่อให้จัดการ layout ใน div ลูกได้เอง
+            filter: true,
             cellClass: "flex items-center justify-center p-2",
             cellRenderer: p => {
-                // ✅ แก้ไขจุดที่ 2: ปรับให้เต็มความกว้าง (w-full)
                 return (
                     <div className={`w-full text-center py-1 rounded text-xs border ${p.data.is_status_color || 'bg-gray-100'}`}>
                         {p.value || '-'}
@@ -210,17 +218,25 @@ function SystemOut() {
                 </Tag>
             )
         },
-        { headerName: 'หมายเหตุ', field: 'booking_remark', flex: 1 },
         { headerName: 'ผู้ทำรายการ', field: 'created_by_name', width: 180 }, // ✅ Show Joined Name
         {
             headerName: 'วันที่', field: 'create_date', width: 120,
             valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString('th-TH') : '-' // ✅ Thai Date
         },
         { headerName: 'เวลา', field: 'create_time', width: 100 }, // ✅ Show Time
+        {
+            headerName: 'หมายเหตุ',
+            field: 'booking_remark',
+            flex: 1,
+            width: 180
+        },
     ], []);
 
     return (
-        <ConfigProvider theme={{ token: { colorPrimary: '#34a853', borderRadius: 8 } }}>
+        <ConfigProvider
+            locale={thTH}
+            theme={{ token: { colorPrimary: '#34a853', borderRadius: 8 } }}
+        >
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
@@ -241,6 +257,17 @@ function SystemOut() {
                         >
                             สร้างรายการจ่ายออก
                         </Button>
+                        <div className="flex items-center gap-2 px-2">
+                            <span className="text-gray-500 text-sm hidden lg:inline">วันที่:</span>
+                            <DatePicker
+                                value={selectedDate}
+                                onChange={(date) => setSelectedDate(date)}
+                                format="DD/MM/YYYY"  // แสดงผลเป็น 04/02/2026
+                                allowClear={false}
+                                className="w-40 border-gray-200 hover:border-green-500 focus:border-green-500"
+                                suffixIcon={<CalendarOutlined className="text-green-600" />}
+                            />
+                        </div>
                     </div>
                 </div>
 
