@@ -69,7 +69,7 @@ function AssetLog() {
     const columnDefs = useMemo(() => [
         { headerName: '#', valueGetter: "node.rowIndex + 1", width: 80, cellClass: "text-center" },
         {
-            headerName: 'Action', field: 'asset_action', width: 100, pinned: 'left',
+            headerName: 'Action', field: 'asset_action', width: 120, pinned: 'left',
             cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const action = params.value || '';

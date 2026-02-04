@@ -302,7 +302,7 @@ async function getHistoryByCode(assetCode) {
     LEFT JOIN employees e2 ON d.updated_by = e2.employee_id
     
     WHERE d.asset_code = ?
-    ORDER BY d.updated_at DESC, d.asset_action DESC
+     ORDER BY d.updated_at DESC, d.asset_action DESC
   `;
 
   const [rows] = await db.query(sql, [assetCode]);

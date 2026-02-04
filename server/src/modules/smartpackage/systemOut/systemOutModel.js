@@ -78,6 +78,7 @@ async function updateBookingHeader(draft_id, body, user_id) {
   const { booking_remark, origin, destination } = body;
   const now = getThaiNow();
 
+  // 1. อัปเดต Header (เหมือนเดิม)
   await db.query(`
         UPDATE booking_asset_lists
         SET booking_remark = ?,
@@ -88,6 +89,15 @@ async function updateBookingHeader(draft_id, body, user_id) {
             updated_at = ?
         WHERE draft_id = ?
     `, [booking_remark, origin, destination, user_id, now, draft_id]);
+
+  // อัปเดตรายการสินค้าในตะกร้า (tb_asset_lists) ให้เป็นสถานที่ใหม่ตาม Header
+  await db.query(`
+        UPDATE tb_asset_lists
+        SET asset_origin = ?,
+            asset_destination = ?,
+            updated_at = ?
+        WHERE draft_id = ?
+  `, [origin, destination, now, draft_id]);
 
   return { success: true };
 }
@@ -125,6 +135,13 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
 
   const previousStatus = booking.is_status;
   const { refID, origin, destination } = booking;
+
+  await db.query(`
+        UPDATE tb_asset_lists
+        SET asset_origin = ?,
+            asset_destination = ?
+        WHERE draft_id = ?
+  `, [origin, destination, draft_id]);
 
   // 2. Update Header Status to 112 (Finalized)
   await db.query(`
@@ -203,7 +220,7 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
             asset_status, asset_action, is_status,
             create_date, created_by, created_at,
             updated_by, updated_at, scan_by, scan_at,
-            asset_origin, asset_destination  
+            asset_origin, asset_destination
         )
         SELECT
             t.draft_id, t.refID, t.asset_code, t.asset_detail, t.asset_type, t.asset_date,
@@ -218,7 +235,7 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
             t.asset_status, 'เคลื่อนไหว', t.is_status, 
             t.create_date, t.created_by, t.created_at,
             t.updated_by, t.updated_at, t.scan_by, t.scan_at,
-            b.origin, b.destination
+b.origin, b.destination
         FROM tb_asset_lists t
         LEFT JOIN booking_asset_lists b ON t.draft_id = b.draft_id
         WHERE t.draft_id = ?
@@ -302,6 +319,11 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
     return { success: false, code: 'INVALID_STATUS', message: `ไม่สามารถสแกนได้ เนื่องจากสถานะไม่พร้อมใช้งาน`, data: item };
   }
 
+  // ✅ [เพิ่มใหม่] ดึงข้อมูล Origin/Destination จาก Booking Header
+  const [bookingRes] = await db.query(`SELECT origin, destination FROM booking_asset_lists WHERE draft_id = ?`, [draft_id]);
+  const { origin, destination } = bookingRes[0] || {};
+
+  // ✅ [แก้ไข] เพิ่ม asset_origin และ asset_destination ในคำสั่ง UPDATE
   await db.query(`
         UPDATE tb_asset_lists 
         SET asset_status = 101,
@@ -310,9 +332,11 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
             refID = ?,
             scan_by = ?, 
             scan_at = ?,
+            asset_origin = ?,      -- เพิ่ม field
+            asset_destination = ?, -- เพิ่ม field
             updated_at = ?
         WHERE asset_code = ?
-    `, [draft_id, refID, user_id, now, now, item.asset_code]);
+    `, [draft_id, refID, user_id, now, origin, destination, now, item.asset_code]);
 
   const [updatedRows] = await db.query(sqlGet, [item.asset_code]);
   return { success: true, code: 'SUCCESS', data: updatedRows[0] };
