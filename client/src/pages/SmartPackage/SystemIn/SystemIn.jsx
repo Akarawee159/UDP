@@ -65,8 +65,8 @@ function SystemIn() {
             }
         };
 
-        window.addEventListener('hrms:systemout-update', onUpdate);
-        return () => window.removeEventListener('hrms:systemout-update', onUpdate);
+        window.addEventListener('hrms:systemin-update', onUpdate);
+        return () => window.removeEventListener('hrms:systemin-update', onUpdate);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -196,7 +196,7 @@ function SystemIn() {
             }
         },
         {
-            headerName: 'มาจากปลายทาง',
+            headerName: 'รับเข้าจากปลายทาง',
             field: 'origin',
             width: 160,
             cellClass: "text-center text-gray-600"
@@ -235,7 +235,7 @@ function SystemIn() {
     return (
         <ConfigProvider
             locale={thTH}
-            theme={{ token: { colorPrimary: '#34a853', borderRadius: 8 } }}
+            theme={{ token: { colorPrimary: '#2b7fff', borderRadius: 8 } }}
         >
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
@@ -253,7 +253,7 @@ function SystemIn() {
                             type="primary"
                             icon={<CaretLeftOutlined />}
                             onClick={handleCreate}
-                            className="bg-green-600 hover:bg-green-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
+                            className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
                             สร้างรายการรับเข้าของดี
                         </Button>
@@ -264,8 +264,8 @@ function SystemIn() {
                                 onChange={(date) => setSelectedDate(date)}
                                 format="DD/MM/YYYY"  // แสดงผลเป็น 04/02/2026
                                 allowClear={false}
-                                className="w-40 border-gray-200 hover:border-green-500 focus:border-green-500"
-                                suffixIcon={<CalendarOutlined className="text-green-600" />}
+                                className="w-40 border-gray-200 hover:border-blue-500 focus:border-blue-500"
+                                suffixIcon={<CalendarOutlined className="text-blue-600" />}
                             />
                         </div>
                     </div>

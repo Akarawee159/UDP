@@ -65,6 +65,7 @@ export const menuItems = [
     children: [
       { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
       { id: "402", label: "สร้างข้อมูลกล่อง", path: "/material" },
+      { id: "403", label: "ข้อมูลผู้ส่ง-ผู้รับ", path: "/sender-receiver" },
     ]
   },
   {

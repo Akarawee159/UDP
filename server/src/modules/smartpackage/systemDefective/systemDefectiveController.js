@@ -1,20 +1,20 @@
-// src/modules/Smartpackage/systemIn/systemInController.js
+// src/modules/Smartpackage/systemDefective/systemDefectiveController.js
 'use strict';
-const model = require('./systemInModel');
+const model = require('./systemDefectiveModel');
 const dayjs = require('dayjs');
 
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการรับเข้าของดี' } = req.body;
+    const { draft_id, objective = 'ทำรายการรับเข้าของชำรุด' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการรับเข้าของดี') {
-      booking_type = 'RC';
+    if (objective === 'ทำรายการรับเข้าของชำรุด') {
+      booking_type = 'DF';
     }
 
     // ส่งค่าไปบันทึก
@@ -26,7 +26,7 @@ async function initBooking(req, res, next) {
     });
 
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'header_update', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, message: 'Draft initialized' });
   } catch (err) { next(err); }
@@ -50,7 +50,7 @@ async function generateBookingRef(req, res, next) {
 
     // Notify
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'ref_generated', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'ref_generated', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -62,17 +62,17 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 131
+    // บันทึกและเปลี่ยน status -> 141
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'header_update', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: รับเข้าของดี (Finalize)
+// ✅ ใหม่: รับเข้าของชำรุด (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
@@ -85,7 +85,7 @@ async function finalizeBooking(req, res, next) {
     await model.finalizeBooking(draft_id, user_id, { booking_remark, origin, destination });
 
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'finalized', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'finalized', draft_id });
 
     res.json({ success: true, message: 'Finalized' });
   } catch (err) { next(err); }
@@ -101,7 +101,7 @@ async function unlockBooking(req, res, next) {
     await model.unlockBooking(draft_id, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'unlocked', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'unlocked', draft_id });
 
     res.json({ success: true, message: 'Unlocked' });
   } catch (err) { next(err); }
@@ -124,7 +124,7 @@ async function scanAsset(req, res, next) {
     if (result.success) {
       const io = req.app.get('io');
       if (io) {
-        io.emit('systemin:update', { action: 'scan', data: result.data, draft_id });
+        io.emit('systemdefective:update', { action: 'scan', data: result.data, draft_id });
         io.emit('registerasset:upsert', result.data);
       }
       res.json({ success: true, data: result.data });
@@ -143,7 +143,7 @@ async function returnSingle(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemin:update', { action: 'return', data: updatedItem, draft_id });
+      io.emit('systemdefective:update', { action: 'return', data: updatedItem, draft_id });
       io.emit('registerasset:upsert', updatedItem);
     }
     res.json({ success: true, message: 'Returned' });
@@ -159,7 +159,7 @@ async function returnAssets(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemin:update', { action: 'return', ids, draft_id });
+      io.emit('systemdefective:update', { action: 'return', ids, draft_id });
       updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
     res.json({ success: true, message: 'Returned to stock' });
@@ -194,12 +194,12 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      // ✅ แยกเงื่อนไข 135 (รับเข้าของดีสำเร็จ) -> ดึงจาก Detail
-      if (status === '135') {
+      // ✅ แยกเงื่อนไข 145 (รับเข้าของชำรุดสำเร็จ) -> ดึงจาก Detail
+      if (status === '145') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
       }
-      // ✅ เงื่อนไข 132 (รอตรวจสอบ) หรือ 134 (แก้ไข) -> ดึงจาก Master
-      else if (status === '132' || status === '134') {
+      // ✅ เงื่อนไข 142 (รอตรวจสอบ) หรือ 144 (แก้ไข) -> ดึงจาก Master
+      else if (status === '142' || status === '144') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
       }
       // Draft -> ดึงจาก Master โดยใช้ draft_id
@@ -223,7 +223,7 @@ async function cancelBooking(req, res, next) {
 
     await model.cancelBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'cancel', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'cancel', draft_id });
 
     res.json({ success: true, message: 'Booking cancelled' });
   } catch (err) { next(err); }
@@ -240,9 +240,9 @@ async function confirmOutput(req, res, next) {
 
     // ส่ง Socket บอกให้หน้าจอร Refesh
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'output_confirmed', draft_id });
+    if (io) io.emit('systemdefective:update', { action: 'output_confirmed', draft_id });
 
-    res.json({ success: true, message: 'Confirmed Output (Status 135)' });
+    res.json({ success: true, message: 'Confirmed Output (Status 145)' });
   } catch (err) { next(err); }
 }
 

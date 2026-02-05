@@ -221,13 +221,6 @@ function RegisterAsset() {
                     cellClass: "text-center cell-blue-bold cursor-pointer"
                 },
                 {
-                    headerName: 'เตรียมเบิก', // Status 110
-                    width: 100,
-                    field: 'count_prepare',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-blue-bold cursor-pointer"
-                },
-                {
                     headerName: 'เบิกใช้', // Status 101
                     width: 100,
                     field: 'count_use',
@@ -242,7 +235,7 @@ function RegisterAsset() {
                     cellClass: "text-center cell-orange-bold cursor-pointer"
                 },
                 {
-                    headerName: 'รอซ่อม', // Status 104
+                    headerName: 'กำลังซ่อม', // Status 104
                     width: 100,
                     field: 'count_repair',
                     cellRenderer: p => valUnit(p.value),
