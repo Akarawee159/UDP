@@ -52,6 +52,9 @@ function AssetList() {
     const [lastSavedLot, setLastSavedLot] = useState(null);
     const [isPrinting, setIsPrinting] = useState(false);
 
+    const [employeeOptions, setEmployeeOptions] = useState([]);
+    const [supplierOptions, setSupplierOptions] = useState([]);
+
     // state สำหรับเก็บข้อมูล drawing ชั่วคราวเมื่อเลือก Material
     const [selectedDrawings, setSelectedDrawings] = useState({});
 
@@ -168,12 +171,41 @@ function AssetList() {
     useEffect(() => {
         const fetchOptions = async () => {
             try {
-                const res = await api.get('/masterdata/material/options');
-                const data = res.data?.data || {};
-                if (data.units) {
-                    const opts = data.units.map(u => ({ label: u.name, value: u.name }));
+                // 1. Fetch Units (Existing)
+                const resUnit = await api.get('/masterdata/material/options');
+                const dataUnit = resUnit.data?.data || {};
+                if (dataUnit.units) {
+                    const opts = dataUnit.units.map(u => ({ label: u.name, value: u.name }));
                     setUnitOptions(opts);
                 }
+
+                // 2. Fetch Employees & Suppliers (New)
+                const resOpts = await api.get('/registration/registerasset/options');
+                if (resOpts.data?.success) {
+                    const { employees, suppliers } = resOpts.data.data;
+
+                    // Map Employee Options
+                    const empOpts = employees.map(e => {
+                        const fullName = `${e.titlename_th || ''}${e.firstname_th} ${e.lastname_th}`;
+                        const displayLabel = `${e.employee_code} : ${fullName}`;
+                        return {
+                            label: displayLabel, // สิ่งที่โชว์ใน List และใช้ Search
+                            value: fullName      // สิ่งที่บันทึกลง DB (หรือจะใช้ displayLabel ก็ได้ตามต้องการ)
+                        };
+                    });
+                    setEmployeeOptions(empOpts);
+
+                    // Map Supplier Options
+                    const supOpts = suppliers.map(s => {
+                        const displayLabel = `${s.supplier_code} : ${s.supplier_name}`;
+                        return {
+                            label: displayLabel,
+                            value: s.supplier_name // หรือ displayLabel ตามต้องการ
+                        };
+                    });
+                    setSupplierOptions(supOpts);
+                }
+
             } catch (err) {
                 console.error("Error fetching options:", err);
             }
@@ -542,15 +574,30 @@ function AssetList() {
                                 </Row>
 
                                 <Form.Item label="ผู้ครอบครอง" name="asset_holder">
-                                    <Input prefix={<UserOutlined className="text-slate-400 mr-1" />} placeholder="ระบุชื่อผู้ครอบครอง" disabled={isFormLocked} />
-                                </Form.Item>
-
-                                <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="asset_location" className="mb-0">
-                                    <Input.TextArea
-                                        rows={2}
-                                        placeholder="ระบุสถานที่ติดตั้ง"
-                                        className="rounded-lg"
+                                    <Select
+                                        showSearch
+                                        placeholder="ค้นหา ชื่อ / รหัสพนักงาน"
+                                        optionFilterProp="label"
+                                        options={employeeOptions}
                                         disabled={isFormLocked}
+                                        allowClear
+                                        filterOption={(input, option) =>
+                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
+                                    />
+                                </Form.Item>
+                                <Form.Item label="ที่อยู่/ที่ติดตั้ง" name="asset_location" className="mb-0">
+                                    <Select
+                                        showSearch
+                                        placeholder="ค้นหา Supplier Code / Name"
+                                        optionFilterProp="label"
+                                        options={supplierOptions}
+                                        disabled={isFormLocked}
+                                        allowClear
+                                        className="rounded-lg"
+                                        filterOption={(input, option) =>
+                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                        }
                                     />
                                 </Form.Item>
                             </Col>

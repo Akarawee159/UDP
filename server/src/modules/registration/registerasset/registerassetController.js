@@ -244,11 +244,31 @@ async function getHistory(req, res, next) {
   }
 }
 
+async function getOptions(req, res, next) {
+  try {
+    const [employees, suppliers] = await Promise.all([
+      model.getEmployeeOptions(),
+      model.getSupplierOptions()
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        employees,
+        suppliers
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAll,
   create,
   updatePrintStatus,
   deleteByLot,
   cancelBulk,
-  getHistory
+  getHistory,
+  getOptions
 };

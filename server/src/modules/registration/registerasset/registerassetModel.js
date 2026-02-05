@@ -313,6 +313,33 @@ async function getHistoryByCode(assetCode) {
   }));
 }
 
+/** * เพิ่มฟังก์ชันดึงรายชื่อพนักงาน 
+ * Format: employee_code + titlename_th + firstname_th + lastname_th
+ */
+async function getEmployeeOptions() {
+  const sql = `
+    SELECT employee_code, titlename_th, firstname_th, lastname_th 
+    FROM employees 
+    WHERE resign_date IS NULL AND employee_id != '1'
+    ORDER BY employee_code ASC
+  `;
+  const [rows] = await db.query(sql);
+  return rows;
+}
+
+/** * เพิ่มฟังก์ชันดึงรายชื่อ Supplier
+ * Format: supplier_code + supplier_name
+ */
+async function getSupplierOptions() {
+  const sql = `
+    SELECT supplier_code, supplier_name 
+    FROM suppliers 
+    ORDER BY supplier_code ASC
+  `;
+  const [rows] = await db.query(sql);
+  return rows;
+}
+
 module.exports = {
   getAll,
   getLastLotNumber,
@@ -322,5 +349,7 @@ module.exports = {
   createBulk,
   deleteByLot,
   updateStatusCancel,
-  getHistoryByCode
+  getHistoryByCode,
+  getEmployeeOptions,
+  getSupplierOptions
 };

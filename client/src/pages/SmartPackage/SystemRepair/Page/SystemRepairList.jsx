@@ -38,7 +38,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
     const [expandedKeys, setExpandedKeys] = useState([]);
 
     // Status Logic
-    const [bookingStatus, setBookingStatus] = useState('140');
+    const [bookingStatus, setBookingStatus] = useState('150');
     const processingRef = useRef(false);
     const { canUse } = usePermission();
 
@@ -107,7 +107,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                     form.setFieldsValue({
                         draft_id: booking.draft_id,
                         refID: booking.refID,
-                        objective: 'ทำรายการรับเข้าของชำรุด',
+                        objective: 'ทำรายการเบิกขอซ่อม',
                         attendees: booking.attendees || (assets || []).length,
                         booking_remark: booking.booking_remark,
                         origin: booking.origin,
@@ -118,18 +118,18 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                 const newId = generateDraftId();
                 await api.post('/smartpackage/systemdefective/init-booking', {
                     draft_id: newId,
-                    objective: 'ทำรายการรับเข้าของชำรุด'
+                    objective: 'ทำรายการเบิกขอซ่อม'
                 });
 
                 setDraftId(newId);
                 setRefID(null);
                 setScannedList([]);
                 setLastScanned({});
-                setBookingStatus('140');
+                setBookingStatus('150');
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
-                    objective: 'ทำรายการรับเข้าของชำรุด',
+                    objective: 'ทำรายการเบิกขอซ่อม',
                     attendees: 0
                 });
             }
@@ -207,10 +207,10 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                 const newRef = res.data.data.refID;
                 setRefID(newRef);
                 form.setFieldsValue({ refID: newRef });
-                message.success('สร้างเลขที่ใบรับเข้าของชำรุดเรียบร้อย');
+                message.success('สร้างเลขที่ใบเบิกขอซ่อมเรียบร้อย');
             }
         } catch (err) {
-            message.error('สร้างเลขที่ใบรับเข้าของชำรุดไม่สำเร็จ');
+            message.error('สร้างเลขที่ใบเบิกขอซ่อมไม่สำเร็จ');
         }
     };
 
@@ -223,7 +223,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                 origin: values.origin,
                 destination: values.destination
             });
-            setBookingStatus('141');
+            setBookingStatus('151');
             message.success('บันทึกข้อมูลเรียบร้อย พร้อมสำหรับการสแกน');
         } catch (err) {
             message.error('กรุณาระบุข้อมูลให้ครบถ้วน');
@@ -236,14 +236,14 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
         try {
             values = await form.validateFields(['origin', 'destination', 'booking_remark']);
         } catch (error) {
-            message.error('กรุณาระบุสถานที่รับเข้าของชำรุดและปลายทางให้ครบถ้วน');
+            message.error('กรุณาระบุสถานที่เบิกขอซ่อมและปลายทางให้ครบถ้วน');
             return;
         }
 
         modal.confirm({
-            title: 'ยืนยันการรับเข้าของชำรุด',
+            title: 'ยืนยันการเบิกขอซ่อม',
             content: 'เมื่อยืนยันแล้วจะไม่สามารถแก้ไขหรือสแกนเพิ่มได้',
-            cancelText: 'ยืนยันรับเข้าของชำรุด',
+            cancelText: 'ยืนยันเบิกขอซ่อม',
             cancelButtonProps: { type: 'primary', className: 'bg-orange-600 hover:bg-orange-500 border-orange-600' },
             okText: 'ยกเลิก',
             okButtonProps: { type: 'default', className: 'text-gray-500 border-gray-300 hover:text-gray-700' },
@@ -259,8 +259,8 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                         booking_remark: values.booking_remark
                     });
 
-                    setBookingStatus('142');
-                    message.success('รับเข้าของชำรุดเรียบร้อย');
+                    setBookingStatus('152');
+                    message.success('เบิกขอซ่อมเรียบร้อย');
                 } catch (e) {
                     message.error('Failed: ' + (e.response?.data?.message || e.message));
                     return Promise.reject();
@@ -286,7 +286,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                     await api.post('/smartpackage/systemdefective/unlock', { draft_id: draftId });
 
                     // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
-                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 144 -> Master RefID)
+                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 154 -> Master RefID)
                     fetchData();
 
                     message.success('ปลดล็อคเรียบร้อย');
@@ -303,7 +303,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
         if (scannedList.length > 0) {
             modal.warning({
                 title: 'ไม่สามารถยกเลิกใบเบิกได้',
-                content: 'กรุณา "ยกเลิกรับเข้าของชำรุด" (คืนคลัง) รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใบเบิก',
+                content: 'กรุณา "ยกเลิกเบิกขอซ่อม" (คืนคลัง) รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใบเบิก',
                 okText: 'รับทราบ'
             });
             return;
@@ -335,30 +335,30 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                 ids: selectedIds,
                 draft_id: draftId
             });
-            message.success('ยกเลิกรับเข้าของชำรุดเรียบร้อย');
+            message.success('ยกเลิกเบิกขอซ่อมเรียบร้อย');
             setSelectedIds([]);
         } catch (err) { message.error('Error'); }
     };
 
     const handleModalClose = async () => {
-        // ✅ กรณี Status 144 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันรับเข้าของชำรุด
-        if (bookingStatus === '144') {
+        // ✅ กรณี Status 154 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันเบิกขอซ่อม
+        if (bookingStatus === '154') {
             // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน (เหมือน handleFinalize)
             let values;
             try {
                 values = await form.validateFields(['origin', 'destination', 'booking_remark']);
             } catch (error) {
-                message.error('กรุณาระบุสถานที่รับเข้าของชำรุดและปลายทางให้ครบถ้วน');
+                message.error('กรุณาระบุสถานที่เบิกขอซ่อมและปลายทางให้ครบถ้วน');
                 return;
             }
 
             // 2. แสดง Modal ยืนยัน (ใช้ Logic เดียวกับ handleFinalize)
             modal.confirm({
-                title: 'ยืนยันการรับเข้าของชำรุด',
+                title: 'ยืนยันการเบิกขอซ่อม',
                 content: 'เมื่อยืนยันแล้วจะไม่สามารถแก้ไขหรือสแกนเพิ่มได้ (ระบบจะบันทึกและปิดหน้าต่าง)',
 
                 // ⚠️ หมายเหตุ: ตาม Code ของคุณ ปุ่ม 'cancelText' คือปุ่ม Action หลัก (สีเขียว)
-                cancelText: 'ยืนยันรับเข้าของชำรุด',
+                cancelText: 'ยืนยันเบิกขอซ่อม',
                 cancelButtonProps: { type: 'primary', className: 'bg-orange-600 hover:bg-orange-500 border-orange-600' },
 
                 // ปุ่ม 'okText' คือปุ่มยกเลิก (สีเทา)
@@ -368,7 +368,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                 maskClosable: false,
                 keyboard: false,
 
-                // 🔥 Action หลัก: เมื่อกด "ยืนยันรับเข้าของชำรุด"
+                // 🔥 Action หลัก: เมื่อกด "ยืนยันเบิกขอซ่อม"
                 onCancel: async () => {
                     try {
                         // เรียก API Finalize
@@ -379,8 +379,8 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                             booking_remark: values.booking_remark
                         });
 
-                        setBookingStatus('142');
-                        message.success('รับเข้าของชำรุดเรียบร้อย');
+                        setBookingStatus('152');
+                        message.success('เบิกขอซ่อมเรียบร้อย');
 
                         // ✅ เมื่อสำเร็จ ให้สั่งปิด Modal หลัก (onCancel ของ SystemRepairList)
                         onCancel();
@@ -397,7 +397,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
             return; // หยุดการทำงาน ไม่ให้ปิด Modal หลักทันที
         }
 
-        // กรณีสถานะอื่นๆ (เช่น 142 หรือ 140) ให้ปิดหน้าต่างได้ตามปกติ
+        // กรณีสถานะอื่นๆ (เช่น 152 หรือ 150) ให้ปิดหน้าต่างได้ตามปกติ
         onCancel();
     };
 
@@ -406,24 +406,24 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
         if (processingRef.current) return;
         processingRef.current = true;
 
-        if (bookingStatus === '145') {
+        if (bookingStatus === '155') {
             modal.warning({
                 title: 'ไม่สามารถทำรายการได้',
-                content: 'ใบเบิกนี้ยืนยันการรับเข้าของชำรุดเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
+                content: 'ใบเบิกนี้ยืนยันการเบิกขอซ่อมเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
                 okText: 'รับทราบ',
                 onOk: () => processingRef.current = false
             });
             return;
         }
-        if (bookingStatus === '142') {
-            modal.warning({ title: 'แจ้งเตือน', content: 'รายการนี้ถูกรับเข้าของชำรุดแล้ว ไม่สามารถสแกนเพิ่มเติมได้', okText: 'รับทราบ', onOk: () => processingRef.current = false });
+        if (bookingStatus === '152') {
+            modal.warning({ title: 'แจ้งเตือน', content: 'รายการนี้ถูกเบิกขอซ่อมแล้ว ไม่สามารถสแกนเพิ่มเติมได้', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
         if (!refID) {
-            modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขที่ใบรับเข้าของชำรุดก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
+            modal.warning({ title: 'แจ้งเตือน', content: 'กรุณาสร้างเลขที่ใบเบิกขอซ่อมก่อนทำการสแกน', okText: 'รับทราบ', onOk: () => processingRef.current = false });
             return;
         }
-        if (bookingStatus === '140') {
+        if (bookingStatus === '150') {
             modal.warning({
                 title: 'แจ้งเตือน',
                 content: 'กรุณาระบุ รับเข้าจากปลายทาง-สถานที่รับเข้า และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
@@ -449,10 +449,10 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
 
                 if (code === 'ALREADY_SCANNED') {
                     modal.confirm({
-                        title: 'ยืนยันการยกเลิกรับเข้าของชำรุด',
+                        title: 'ยืนยันการยกเลิกเบิกขอซ่อม',
                         icon: <ExclamationCircleOutlined />,
-                        content: `ต้องการยกเลิกรับเข้าของชำรุด ${data.asset_code} ใช่หรือไม่?`,
-                        cancelText: 'ยกเลิกรับเข้าของชำรุด',
+                        content: `ต้องการยกเลิกเบิกขอซ่อม ${data.asset_code} ใช่หรือไม่?`,
+                        cancelText: 'ยกเลิกเบิกขอซ่อม',
                         cancelButtonProps: { danger: true, type: 'primary' },
                         okText: 'ปิด',
                         okButtonProps: { type: 'default' },
@@ -462,7 +462,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                     asset_code: data.asset_code,
                                     draft_id: draftId
                                 });
-                                message.success('ยกเลิกรับเข้าของชำรุดเรียบร้อย');
+                                message.success('ยกเลิกเบิกขอซ่อมเรียบร้อย');
                             } catch (e) { message.error('Failed'); }
                             processingRef.current = false;
                         },
@@ -470,10 +470,10 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                         afterClose: () => { processingRef.current = false; }
                     });
                 } else if (code === 'INVALID_STATUS') {
-                    // (Logic เดิม) สถานะ 103 แต่ผิดตะกร้า
+                    // (Logic เดิม) สถานะ 104 แต่ผิดตะกร้า
                     modal.error({
                         title: 'แจ้งเตือน',
-                        content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกรับเข้าของชำรุดไปแล้ว`,
+                        content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกเบิกขอซ่อมไปแล้ว`,
                         okText: 'รับทราบ',
                         onOk: () => { processingRef.current = false; },
                         afterClose: () => { processingRef.current = false; }
@@ -574,12 +574,12 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, draftId, refID, bookingStatus]);
 
-    const isEditingDisabled = !refID || bookingStatus === '142' || bookingStatus === '145';
+    const isEditingDisabled = !refID || bookingStatus === '152' || bookingStatus === '155';
     const hasScannedItems = scannedList.length > 0;
-    const showSaveCancel = refID && bookingStatus !== '142' && bookingStatus !== '144' && !hasScannedItems;
-    const showConfirm = (bookingStatus === '141' || bookingStatus === '144') && hasScannedItems;
-    const showCancelButton = bookingStatus !== '142' && !hasScannedItems;
-    const isFinalized = bookingStatus === '142' || bookingStatus === '145';
+    const showSaveCancel = refID && bookingStatus !== '152' && bookingStatus !== '154' && !hasScannedItems;
+    const showConfirm = (bookingStatus === '151' || bookingStatus === '154') && hasScannedItems;
+    const showCancelButton = bookingStatus !== '152' && !hasScannedItems;
+    const isFinalized = bookingStatus === '152' || bookingStatus === '155';
 
     // --- 2. Table Column Definitions ---
 
@@ -691,7 +691,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
             title: 'วันที่สแกน',
             dataIndex: 'scan_at',
             key: 'scan_at',
-            width: 140,
+            width: 139,
             render: (val) => val ? dayjs(val).format('DD/MM/YYYY') : '-'
         },
         {
@@ -718,7 +718,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                     selectedRowKeys: selectedIds,
                     onChange: (selectedKeys) => setSelectedIds(selectedKeys),
                     getCheckboxProps: (record) => ({
-                        disabled: bookingStatus === '142' || bookingStatus === '145',
+                        disabled: bookingStatus === '152' || bookingStatus === '155',
                     }),
                 }}
             />
@@ -743,7 +743,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
 
     return (
         <Modal
-            title={<Title level={4} style={{ margin: 0 }}>{targetDraftId ? 'แก้ไขรายการรับเข้าของชำรุด' : 'สร้างรายการรับเข้าของชำรุด (System Out)'}</Title>}
+            title={<Title level={4} style={{ margin: 0 }}>{targetDraftId ? 'แก้ไขรายการเบิกขอซ่อม' : 'สร้างรายการเบิกขอซ่อม (System Out)'}</Title>}
             open={open}
             onCancel={handleModalClose}
             width="95%"
@@ -989,7 +989,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
 
                 <Row gutter={16} className="flex-1">
                     <Col xs={24} md={7}>
-                        <Card title="ข้อมูลรับเข้าของชำรุด" className="h-full shadow-sm" size="small">
+                        <Card title="ข้อมูลเบิกขอซ่อม" className="h-full shadow-sm" size="small">
                             <Form layout="vertical" form={form}>
 
                                 <Form.Item label="" style={{ marginBottom: 0 }}>
@@ -1013,7 +1013,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                                 disabled={!!refID}
                                                 icon={<FileAddOutlined />}
                                             >
-                                                สร้างเลขที่ใบรับเข้าของชำรุด
+                                                สร้างเลขที่ใบเบิกขอซ่อม
                                             </Button>
                                         }
                                     />
@@ -1062,7 +1062,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                 </Form.Item>
 
                                 <Row gutter={8} style={{ marginTop: 16 }}>
-                                    {/* ซ่อนปุ่มบันทึกข้อมูลถ้ารับเข้าของชำรุดแล้ว */}
+                                    {/* ซ่อนปุ่มบันทึกข้อมูลถ้าเบิกขอซ่อมแล้ว */}
                                     {showSaveCancel && !isFinalized && (
                                         <Col span={12}>
                                             <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large">
@@ -1071,8 +1071,8 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* ซ่อนปุ่มยกเลิกใบเบิกถ้ารับเข้าของชำรุดแล้ว */}
-                                    {showCancelButton && !isFinalized && bookingStatus !== '144' && (
+                                    {/* ซ่อนปุ่มยกเลิกใบเบิกถ้าเบิกขอซ่อมแล้ว */}
+                                    {showCancelButton && !isFinalized && bookingStatus !== '154' && (
                                         <Col span={showSaveCancel ? 12 : 24}>
                                             <Button type="default" danger block icon={<CloseOutlined />} onClick={handleCancelBooking} size="large">
                                                 ยกเลิกใบเบิก
@@ -1080,8 +1080,8 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* สถานะ 144 ให้แสดงปุ่ม Confirm (Finalize) เหมือนเดิม เพื่อบันทึกการแก้ไข */}
-                                    {(showConfirm || (bookingStatus === '144' && hasScannedItems)) && (
+                                    {/* สถานะ 154 ให้แสดงปุ่ม Confirm (Finalize) เหมือนเดิม เพื่อบันทึกการแก้ไข */}
+                                    {(showConfirm || (bookingStatus === '154' && hasScannedItems)) && (
                                         <Col span={24} className="mt-2">
                                             <Button
                                                 type="primary"
@@ -1091,12 +1091,12 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                                 size="large"
                                                 className="bg-orange-600 hover:bg-orange-500"
                                             >
-                                                {bookingStatus === '144' ? 'บันทึกการแก้ไข (รับเข้าของชำรุด)' : 'รับเข้าของชำรุด (Confirm)'}
+                                                {bookingStatus === '154' ? 'บันทึกการแก้ไข (เบิกขอซ่อม)' : 'เบิกขอซ่อม (Confirm)'}
                                             </Button>
                                         </Col>
                                     )}
 
-                                    {/* {bookingStatus === '142' && canUse('system-out:unlock') && (
+                                    {/* {bookingStatus === '152' && canUse('system-out:unlock') && (
                                         <Col span={24}>
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
                                                 ปลดล็อคเพื่อแก้ไข
@@ -1114,7 +1114,7 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                             {/* ส่วนหัวตาราง */}
                             <div className="flex justify-between items-center mb-2">
                                 <Title level={5} style={{ margin: 0 }}>รายการในตะกร้า ({scannedList.length})</Title>
-                                {/* ล็อคปุ่มยกเลิกรับเข้าของชำรุดถ้าเป็น 145 หรือ 142 */}
+                                {/* ล็อคปุ่มยกเลิกเบิกขอซ่อมถ้าเป็น 155 หรือ 152 */}
                                 {!isFinalized && (
                                     <Button
                                         danger
@@ -1122,13 +1122,13 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                         onClick={handleReturnToStock}
                                         disabled={selectedIds.length === 0}
                                     >
-                                        ยกเลิกรับเข้าของชำรุด ({selectedIds.length})
+                                        ยกเลิกเบิกขอซ่อม ({selectedIds.length})
                                     </Button>
                                 )}
                             </div>
                             <div className="flex-1 overflow-auto flex flex-col">
                                 {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
-                                {bookingStatus === '144' && !hasScannedItems ? (
+                                {bookingStatus === '154' && !hasScannedItems ? (
                                     <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-8 text-center">
                                         <div className="text-orange-500 mb-4">
                                             <ExclamationCircleOutlined style={{ fontSize: 48 }} />
@@ -1142,46 +1142,46 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
                                             (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
                                         </Text>
                                         <div className="mt-4">
-                                            <Tag color="orange">Status: Unlocked (144)</Tag>
+                                            <Tag color="orange">Status: Unlocked (154)</Tag>
                                         </div>
                                         <div className="mt-6 text-xs text-gray-400">
-                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "รับเข้าของชำรุด" โดยอัตโนมัติ
+                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "เบิกขอซ่อม" โดยอัตโนมัติ
                                         </div>
                                     </div>
                                 ) : !hasScannedItems ? (
                                     <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-8">
                                         <div className="flex flex-col gap-6 w-full max-w-sm">
 
-                                            {/* เงื่อนไขที่ 1: การสร้างเลขที่ใบรับเข้าของชำรุด */}
+                                            {/* เงื่อนไขที่ 1: การสร้างเลขที่ใบเบิกขอซ่อม */}
                                             <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${refID ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100 shadow-sm'}`}>
                                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${refID ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                                     {refID ? <CheckCircleOutlined style={{ fontSize: 24 }} /> : <FileAddOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
                                                     <Text strong className={refID ? 'text-orange-700' : 'text-gray-600'}>
-                                                        {refID ? 'สร้างเลขที่ใบรับเข้าของชำรุดแล้ว' : 'กรุณาสร้างเลขที่ใบรับเข้าของชำรุด'}
+                                                        {refID ? 'สร้างเลขที่ใบเบิกขอซ่อมแล้ว' : 'กรุณาสร้างเลขที่ใบเบิกขอซ่อม'}
                                                     </Text>
                                                     <br />
-                                                    <Text type="secondary" size="small">{refID ? `เลขที่: ${refID}` : 'กดปุ่ม "สร้างเลขที่ใบรับเข้าของชำรุด" ฝั่งซ้าย'}</Text>
+                                                    <Text type="secondary" size="small">{refID ? `เลขที่: ${refID}` : 'กดปุ่ม "สร้างเลขที่ใบเบิกขอซ่อม" ฝั่งซ้าย'}</Text>
                                                 </div>
                                             </div>
 
-                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-สถานที่รับเข้า (Status 141) */}
-                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '140' ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100 shadow-sm'}`}>
-                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '140' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {bookingStatus !== '140' ? <CheckCircleOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
+                                            {/* เงื่อนไขที่ 2: การระบุต้นทาง-สถานที่รับเข้า (Status 151) */}
+                                            <div className={`flex items-center p-4 rounded-xl border-2 transition-all ${bookingStatus !== '150' ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 ${bookingStatus !== '150' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                    {bookingStatus !== '150' ? <CheckCircleOutlined style={{ fontSize: 24 }} /> : <InfoCircleOutlined style={{ fontSize: 24 }} />}
                                                 </div>
                                                 <div>
-                                                    <Text strong className={bookingStatus !== '140' ? 'text-orange-700' : 'text-gray-600'}>
-                                                        {bookingStatus !== '140' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-สถานที่รับเข้า'}
+                                                    <Text strong className={bookingStatus !== '150' ? 'text-orange-700' : 'text-gray-600'}>
+                                                        {bookingStatus !== '150' ? 'ระบุต้นทาง-ปลายทางแล้ว' : 'กรุณาระบุต้นทาง-สถานที่รับเข้า'}
                                                     </Text>
                                                     <br />
-                                                    <Text type="secondary" size="small">{bookingStatus !== '140' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
+                                                    <Text type="secondary" size="small">{bookingStatus !== '150' ? 'พร้อมสำหรับการสแกนทรัพย์สิน' : 'และกดปุ่ม "บันทึกข้อมูล"'}</Text>
                                                 </div>
                                             </div>
 
                                             {/* ข้อความแนะนำด้านล่าง */}
-                                            {bookingStatus !== '140' && refID && (
+                                            {bookingStatus !== '150' && refID && (
                                                 <div className="mt-6 bg-white border border-orange-100 shadow-sm rounded-lg p-4 flex items-center gap-4 relative overflow-hidden">
                                                     {/* Decorative Circle */}
                                                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-orange-50 rounded-full blur-xl"></div>

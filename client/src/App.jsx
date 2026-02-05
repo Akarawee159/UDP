@@ -20,6 +20,7 @@ import UserManagement from "./pages/Management/UserManagement/UserManagement";
 // ข้อมูลหลัก
 import Employees from "./pages/Masterdata/Employees/Employees";
 import Material from "./pages/Masterdata/Material/Material";
+import Suppliers from "./pages/Masterdata/Suppliers/Suppliers";
 
 // ระบบขึ้นทะเบียนทรัพย์สิน
 import RegisterAsset from "./pages/Registration/RegisterAsset/RegisterAsset";
@@ -206,6 +207,17 @@ export default function App() {
               <ProtectedRoute mainId="40" subId="402">
                 <AdminLayout>
                   <Material />
+                </AdminLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/suppliers"
+            element={
+              <ProtectedRoute mainId="40" subId="403">
+                <AdminLayout>
+                  <Suppliers />
                 </AdminLayout>
               </ProtectedRoute>
             }

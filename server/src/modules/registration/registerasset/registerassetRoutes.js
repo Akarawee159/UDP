@@ -7,6 +7,7 @@ const auth = require('../../../auth/middleware/authMiddleware');
 const controller = require('./registerassetController');
 
 router.get('/', auth, controller.getAll);
+router.get('/options', auth, controller.getOptions);
 router.get('/history/:assetCode', auth, controller.getHistory);
 router.post('/', auth, controller.create);
 router.patch('/print/:assetCode', auth, controller.updatePrintStatus);

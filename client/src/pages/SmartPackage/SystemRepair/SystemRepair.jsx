@@ -73,7 +73,7 @@ const RequisitionPane = () => {
         if (currentUser && currentUser.employee_id) {
             foundDraft = rows.find(r =>
                 String(r.created_by) === String(currentUser.employee_id) &&
-                String(r.is_status) === '140' &&
+                String(r.is_status) === '150' &&
                 (!r.refID || r.refID === '')
             );
         }
@@ -111,7 +111,7 @@ const RequisitionPane = () => {
         try {
             setLoading(true);
             await api.post('/smartpackage/systemdefective/confirm-output', { draft_id });
-            message.success('ยืนยันการรับเข้าของชำรุดสำเร็จ');
+            message.success('ยืนยันการเบิกขอซ่อมสำเร็จ');
             fetchData();
         } catch (err) {
             console.error(err);
@@ -129,12 +129,12 @@ const RequisitionPane = () => {
             width: 180,
             cellClass: "flex items-center justify-center py-1",
             cellRenderer: (params) => {
-                if (String(params.data.is_status) === '142') {
+                if (String(params.data.is_status) === '152') {
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <Popconfirm
-                                title="ยืนยันการรับเข้าของชำรุด"
-                                description="คุณต้องการยืนยันรายการนี้เป็น 'รับเข้าของชำรุดสำเร็จ' ใช่หรือไม่?"
+                                title="ยืนยันการเบิกขอซ่อม"
+                                description="คุณต้องการยืนยันรายการนี้เป็น 'เบิกขอซ่อมสำเร็จ' ใช่หรือไม่?"
                                 onCancel={(e) => {
                                     e?.stopPropagation();
                                     handleConfirmOutput(params.data.draft_id);
@@ -152,13 +152,13 @@ const RequisitionPane = () => {
                                     className="bg-teal-600 hover:bg-teal-500"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    ยืนยันรับเข้าของชำรุด
+                                    ยืนยันเบิกขอซ่อม
                                 </Button>
                             </Popconfirm>
                         </div>
                     );
                 }
-                if (params.data.is_status_name === 'รับเข้าของชำรุดเรียบร้อย') {
+                if (params.data.is_status_name === 'เบิกขอซ่อมเรียบร้อย') {
                     return <CheckCircleOutlined className="text-green-700 text-xl" />;
                 }
                 return null;
@@ -261,7 +261,6 @@ function SystemRepair() {
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
 
-    // 🔥 เพิ่ม Styles ตรงนี้เพื่อบังคับให้ Tab Pane เต็มจอ
     const tabStyles = `
         .full-height-tabs .ant-tabs-content { height: 100%; }
         .full-height-tabs .ant-tabs-tabpane { height: 100%; }
@@ -285,13 +284,12 @@ function SystemRepair() {
             locale={thTH}
             theme={{ token: { colorPrimary: '#ff6900', borderRadius: 8 } }}
         >
-            <style>{tabStyles}</style> {/* Inject CSS */}
+            <style>{tabStyles}</style>
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
                 <Tabs
                     defaultActiveKey="1"
                     items={items}
                     type="card"
-                    // 🔥 เพิ่ม className "full-height-tabs" ที่เราสร้าง CSS ไว้
                     className="flex-1 overflow-hidden full-height-tabs"
                     tabBarStyle={{ marginBottom: 16 }}
                     style={{ height: '100%' }}

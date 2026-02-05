@@ -25,6 +25,7 @@ const workhistoryRoutes = require("./src/modules/masterdata/workhistory/workhist
 const relativesRoutes = require("./src/modules/masterdata/relatives/relativesRoutes");
 const locationRoutes = require("./src/modules/masterdata/location/locationRoutes");
 const materialRoutes = require("./src/modules/masterdata/material/materialRoutes");
+const supplierRoutes = require("./src/modules/masterdata/supplier/supplierRoutes");
 
 const registerassetRoutes = require("./src/modules/registration/registerasset/registerassetRoutes");
 
@@ -103,6 +104,7 @@ app.use("/api/workhistory", auth, permit({ mainId: "40", subId: "401" }), workhi
 app.use("/api/relatives", auth, permit({ mainId: "40", subId: "401" }), relativesRoutes);
 app.use("/api/location", auth, permit({ mainId: "40", subId: "401" }), locationRoutes);
 app.use("/api/masterdata/material", auth, permit({ mainId: "40", subId: "402" }), materialRoutes);
+app.use("/api/masterdata/supplier", auth, permit({ mainId: "40", subId: "402" }), supplierRoutes);
 
 /**
  * =========================

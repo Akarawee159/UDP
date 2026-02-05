@@ -6,15 +6,15 @@ const dayjs = require('dayjs');
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการรับเข้าของชำรุด' } = req.body;
+    const { draft_id, objective = 'ทำรายการเบิกขอซ่อม' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการรับเข้าของชำรุด') {
-      booking_type = 'DF';
+    if (objective === 'ทำรายการเบิกขอซ่อม') {
+      booking_type = 'RP';
     }
 
     // ส่งค่าไปบันทึก
@@ -62,7 +62,7 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 141
+    // บันทึกและเปลี่ยน status -> 151
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -72,7 +72,7 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: รับเข้าของชำรุด (Finalize)
+// ✅ ใหม่: เบิกขอซ่อม (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
@@ -194,12 +194,12 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      // ✅ แยกเงื่อนไข 145 (รับเข้าของชำรุดสำเร็จ) -> ดึงจาก Detail
-      if (status === '145') {
+      // ✅ แยกเงื่อนไข 155 (เบิกขอซ่อมสำเร็จ) -> ดึงจาก Detail
+      if (status === '155') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
       }
-      // ✅ เงื่อนไข 142 (รอตรวจสอบ) หรือ 144 (แก้ไข) -> ดึงจาก Master
-      else if (status === '142' || status === '144') {
+      // ✅ เงื่อนไข 152 (รอตรวจสอบ) หรือ 154 (แก้ไข) -> ดึงจาก Master
+      else if (status === '152' || status === '154') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
       }
       // Draft -> ดึงจาก Master โดยใช้ draft_id
@@ -242,7 +242,7 @@ async function confirmOutput(req, res, next) {
     const io = req.app.get('io');
     if (io) io.emit('systemdefective:update', { action: 'output_confirmed', draft_id });
 
-    res.json({ success: true, message: 'Confirmed Output (Status 145)' });
+    res.json({ success: true, message: 'Confirmed Output (Status 155)' });
   } catch (err) { next(err); }
 }
 
