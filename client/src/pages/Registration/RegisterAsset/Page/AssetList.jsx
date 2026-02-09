@@ -200,7 +200,8 @@ function AssetList() {
                         const displayLabel = `${s.supplier_code} : ${s.supplier_name}`;
                         return {
                             label: displayLabel,
-                            value: s.supplier_name // หรือ displayLabel ตามต้องการ
+                            value: s.supplier_name,
+                            code: s.supplier_code
                         };
                     });
                     setSupplierOptions(supOpts);
@@ -258,8 +259,17 @@ function AssetList() {
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
+
+            // --- ส่วนที่ขาดไป ต้องเพิ่มตรงนี้ครับ ---
+            // ค้นหา object ของ supplier ที่เลือก เพื่อดึงค่า code ออกมา
+            const targetSupplier = supplierOptions.find(opt => opt.value === values.asset_location);
+            // ถ้าเจอให้ใช้ code ถ้าไม่เจอให้เป็นค่าว่าง
+            const assetOrigin = targetSupplier ? targetSupplier.code : '';
+            // ------------------------------------
+
             const payload = {
                 ...values,
+                asset_origin: assetOrigin, // ตอนนี้ตัวแปร assetOrigin ถูกประกาศแล้ว จะไม่ error ครับ
                 asset_date: values.asset_date ? dayjs(values.asset_date).format('YYYY-MM-DD') : null,
                 asset_img: displayedImage ? displayedImage.split('/').pop() : '',
                 ...selectedDrawings
@@ -271,9 +281,7 @@ function AssetList() {
                 const newRows = res.data.data;
                 const createdLot = res.data.lot;
 
-                // ✅ แก้ไข: ให้แสดงเฉพาะรายการที่สร้างล่าสุดเท่านั้น (Replace ไม่ใช่ Append)
                 setTableData(newRows);
-
                 setLastSavedLot(createdLot);
                 form.setFieldValue('asset_lot', createdLot);
                 setIsFormLocked(true);
@@ -432,7 +440,7 @@ function AssetList() {
         { headerName: 'Part Name', field: 'partName', width: 150 },
         { headerName: 'Label Code', field: 'label_register', width: 150 },
         { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
-        { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
+        { headerName: 'วันที่ขึ้นทะเบียน', field: 'create_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
         { headerName: 'ใช้สำหรับงาน', field: 'asset_usedfor', width: 150 },
         { headerName: 'ผู้จำหน่าย', field: 'asset_supplier_name', width: 150 },
@@ -786,7 +794,6 @@ function AssetList() {
             {/* --- Hidden Print Component --- */}
             <div style={{ display: 'none' }}>
                 <div ref={printRef}>
-                    {/* Loop แสดงรายการที่เลือกพิมพ์ทั้งหมด */}
                     {printList.map((item, index) => (
                         <div key={index} style={{
                             width: '5.5cm',
@@ -802,14 +809,30 @@ function AssetList() {
                             pageBreakAfter: 'always',
                             fontFamily: 'sans-serif'
                         }}>
-                            <div style={{ flex: 1, overflow: 'hidden', fontSize: '10px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '10px' }}>รหัสทรัพย์สิน : {item.asset_code}</div>
-                                <div>Lot No: {item.asset_lot}</div>
+                            <div style={{ flex: 1, overflow: 'hidden', fontSize: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {/* ปรับปรุง: ตัดบรรทัดรหัสทรัพย์สิน */}
+                                <div style={{ lineHeight: '1.2' }}>
+                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>รหัสทรัพย์สิน : </span><br />
+                                    <span style={{ fontSize: '10px' }}>{item.asset_code}</span>
+                                </div>
+
+                                <div style={{ lineHeight: '1.2' }}>
+                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>หมายเลขล็อต: </span><br />
+                                    <span style={{ fontSize: '10px' }}>{item.asset_lot}</span>
+                                </div>
+
+                                {/* ปรับปรุง: วันที่ภาษาไทย (วว ดดดด ปปปป) + พ.ศ. */}
+                                <div style={{ lineHeight: '1.2' }}>
+                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>วันที่ขึ้นทะเบียน: </span><br />
+                                    <span style={{ fontSize: '10px' }}>{item.create_date
+                                        ? dayjs(item.create_date).locale('th').add(543, 'year').format('D MMMM YYYY')
+                                        : '-'}</span>
+                                </div>
                             </div>
                             <div style={{ marginLeft: '5px' }}>
                                 <QRCodeSVG
                                     value={item.label_register}
-                                    size={80} // ปรับขนาดตามความเหมาะสมกับพื้นที่ 3.5cm
+                                    size={90}
                                     level={"M"}
                                 />
                             </div>

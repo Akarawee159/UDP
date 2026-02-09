@@ -19,7 +19,7 @@ function getBangkokNow() {
 
 const COLUMNS_LIST = `
   asset_code, asset_detail, asset_type, asset_date, doc_no, 
-  asset_lot, asset_holder, asset_location, 
+  asset_lot, asset_holder, asset_location, asset_origin,
   asset_width, asset_width_unit, 
   asset_length, asset_length_unit, 
   asset_height, asset_height_unit, 
@@ -128,7 +128,7 @@ async function createBulk(dataArray) {
   // หรือถ้าไม่มี ให้ใช้ getBangkokNow()
   const valuesForMain = dataArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
-    item.asset_lot, item.asset_holder, item.asset_location,
+    item.asset_lot, item.asset_holder, item.asset_location, item.asset_origin,
     item.asset_width, item.asset_width_unit,
     item.asset_length, item.asset_length_unit,
     item.asset_height, item.asset_height_unit,
@@ -146,7 +146,7 @@ async function createBulk(dataArray) {
   const sqlMain = `
     INSERT INTO tb_asset_lists (
       asset_code, asset_detail, asset_type, asset_date, doc_no, 
-      asset_lot, asset_holder, asset_location, 
+      asset_lot, asset_holder, asset_location, asset_origin, 
       asset_width, asset_width_unit, 
       asset_length, asset_length_unit, 
       asset_height, asset_height_unit, 
@@ -184,7 +184,7 @@ async function insertDetailLog(dataObjArray) {
   // [Timezone Fix] ใช้ getBangkokNow() เป็น default แทน new Date()
   const values = dataObjArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
-    item.asset_lot, item.asset_holder, item.asset_location,
+    item.asset_lot, item.asset_holder, item.asset_location, item.asset_origin,
     item.asset_width, item.asset_width_unit,
     item.asset_length, item.asset_length_unit,
     item.asset_height, item.asset_height_unit,

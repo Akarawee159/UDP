@@ -104,6 +104,7 @@ function RegisterAsset() {
     };
 
     // --- Logic Grouping Data by PartCode ---
+    // --- Logic Grouping Data by PartCode ---
     const groupedRows = useMemo(() => {
         const groups = {};
 
@@ -128,25 +129,20 @@ function RegisterAsset() {
             // 1. นับจำนวนรวมทั้งหมด (Inventory Total)
             groups[key].count_total += 1;
 
-            // 2. แยกสถานะตาม asset_status
+            // 2. แยกสถานะตาม asset_status เพื่อเก็บยอด (ใช้สำหรับลบออกตามสูตร)
             const status = String(row.asset_status);
 
-            // asset_status = 100 (ว่าง/ปกติ) หรือ 101 (เบิกใช้/ปกติ) -> นับเป็น "ปกติ"
-            if (status === '100' || status === '101') {
-                groups[key].count_normal++;
-            }
-
-            // แยกนับ "เบิกใช้" เฉพาะ 101 ด้วย
+            // แยกนับ "เบิกใช้" (101)
             if (status === '101') {
                 groups[key].count_use++;
             }
 
-            // แยกนับ "เบิกใช้" เฉพาะ 110 ด้วย
+            // แยกนับ "เตรียม" (110)
             if (status === '110') {
                 groups[key].count_prepare++;
             }
 
-            // สถานะอื่นๆ
+            // สถานะเสีย/ซ่อม/ซาก
             if (status === '103') {
                 groups[key].count_damaged++;
             } else if (status === '104') {
@@ -156,7 +152,16 @@ function RegisterAsset() {
             }
         });
 
-        return Object.values(groups);
+        // 3. คำนวณสูตรสรุป (Final Calculation)
+        return Object.values(groups).map(g => {
+            // สูตรที่ 1: ปกติ = ทั้งหมด - ชำรุด - ซ่อม
+            g.count_normal = g.count_total - g.count_damaged - g.count_repair;
+
+            // สูตรที่ 2: คงเหลือ = ทั้งหมด - เบิกใช้ - ชำรุด - ซ่อม
+            g.count_balance = g.count_total - g.count_use - g.count_damaged - g.count_repair;
+
+            return g;
+        });
     }, [rows]);
 
     const filteredRows = useMemo(() => {
@@ -213,15 +218,15 @@ function RegisterAsset() {
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center font-bold cursor-pointer"
                 },
+                // {
+                //     headerName: 'ของดี', // Status 100 + 101
+                //     width: 100,
+                //     field: 'count_normal',
+                //     cellRenderer: p => valUnit(p.value),
+                //     cellClass: "text-center cell-blue-bold cursor-pointer"
+                // },
                 {
-                    headerName: 'ปกติ', // Status 100 + 101
-                    width: 100,
-                    field: 'count_normal',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-blue-bold cursor-pointer"
-                },
-                {
-                    headerName: 'เบิกใช้', // Status 101
+                    headerName: 'จ่ายออก', // Status 101
                     width: 100,
                     field: 'count_use',
                     cellRenderer: p => valUnit(p.value),
@@ -242,11 +247,11 @@ function RegisterAsset() {
                     cellClass: "text-center cell-orange-bold cursor-pointer"
                 },
                 {
-                    headerName: 'เสีย', // Status 105
+                    headerName: 'คงเหลือ',
                     width: 100,
-                    field: 'count_broken',
+                    field: 'count_balance',
                     cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-red-bold cursor-pointer"
+                    cellClass: "text-center cell-blue-bold cursor-pointer"
                 },
             ]
         },

@@ -139,7 +139,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 open={open}
                 title={
                     <div className="flex items-center justify-between pr-8">
-                        <span className="text-lg font-bold text-slate-700">เลือกรายการวัสดุ</span>
+                        <span className="text-lg font-bold text-slate-700">เลือกทรัพย์สินที่ต้องการขึ้นทะเบียน</span>
                     </div>
                 }
                 onCancel={onClose}
@@ -152,7 +152,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 <div className="p-4 bg-gray-50 border-b border-gray-100">
                     <Input
                         prefix={<SearchOutlined className="text-gray-400" />}
-                        placeholder="ค้นหารหัส, ชื่อวัสดุ..."
+                        placeholder="ค้นหารหัส, ชื่อทรัพย์สิน..."
                         allowClear
                         size="large"
                         onChange={(e) => setSearchTerm(e.target.value)}
