@@ -95,8 +95,8 @@ export const menuItems = [
     icon: <FileTextOutlined />,
     type: "dropdown",
     children: [
-      { id: "701", label: "รายงานพิเศษ (Non-Move)", path: "/reports/employee-report" },
-      { id: "702", label: "รายงานตามสถานะกล่อง", path: "/reports/training-report" },
+      { id: "701", label: "รายงานพิเศษ (Non-Move)", path: "/reports/nonmove-report" },
+      { id: "702", label: "รายงานตามสถานะกล่อง", path: "/reports/boxstatus-report" },
     ]
   },
 ];

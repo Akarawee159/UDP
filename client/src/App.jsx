@@ -47,8 +47,8 @@ import SystemRepair from "./pages/SmartPackage/SystemRepair/SystemRepair";
 import SystemDefective from "./pages/SmartPackage/SystemDefective/SystemDefective";
 
 // รายงาน
-import EmployeeReport from "./pages/Reports/EmployeeReport/EmployeeReport";
-import TrainingReport from "./pages/Reports/TrainingReport/TrainingReport";
+import NonMoveReport from "./pages/Reports/NonMove/NonMove";
+import BoxStatusReport from "./pages/Reports/BoxStatus/BoxStatus";
 
 /** 404 สำหรับ route ที่ไม่มีจริง (คนพิมพ์ผิด/ไม่มีเส้นทาง) */
 function NotFoundPage() {
@@ -337,22 +337,22 @@ export default function App() {
 
           {/* รายงาน main=70 */}
           <Route
-            path="/registration/register-asset"
+            path="/reports/nonmove-report"
             element={
               <ProtectedRoute mainId="70" subId="701">
                 <AdminLayout>
-                  <EmployeeReport />
+                  <NonMoveReport />
                 </AdminLayout>
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/reports/training-report"
+            path="/reports/boxstatus-report"
             element={
               <ProtectedRoute mainId="70" subId="702">
                 <AdminLayout>
-                  <TrainingReport />
+                  <BoxStatusReport />
                 </AdminLayout>
               </ProtectedRoute>
             }

@@ -77,9 +77,9 @@ async function create(req, res, next) {
     const newId = await model.create(payload);
     const row = await model.getById(newId);
 
-    // ✅ แก้ชื่อ event เป็น company:upsert
+    // ✅ แก้ชื่อ event เป็น supplier:upsert
     const io = req.app.get('io');
-    if (io) io.emit('company:upsert', row);
+    if (io) io.emit('supplier:upsert', row);
 
     res.status(201).json({ success: true, data: row, message: 'เพิ่มข้อมูลสำเร็จ' });
   } catch (err) { next(err); }
@@ -114,7 +114,7 @@ async function update(req, res, next) {
 
     const row = await model.getById(id);
     const io = req.app.get('io');
-    if (io) io.emit('company:upsert', row);
+    if (io) io.emit('supplier:upsert', row);
 
     res.json({ success: true, data: row, message: 'อัปเดตข้อมูลสำเร็จ' });
   } catch (err) { next(err); }
@@ -138,7 +138,7 @@ async function remove(req, res, next) {
     }
 
     const io = req.app.get('io');
-    if (io) io.emit('company:delete', { id }); // ส่งกลับเป็น id
+    if (io) io.emit('supplier:delete', { id }); // ส่งกลับเป็น id
 
     res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
   } catch (err) {

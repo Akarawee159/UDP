@@ -60,6 +60,8 @@ export function connectWithStoredToken() {
             'packaging',
             'material',
             'registerasset',
+            'supplier',
+
         ];
 
         standardEntities.forEach(entity => {
@@ -80,6 +82,7 @@ export function connectWithStoredToken() {
             { s: 'systemout:update', w: 'hrms:systemout-update' },
             { s: 'systemin:update', w: 'hrms:systemin-update' },
             { s: 'systemdefective:update', w: 'hrms:systemdefective-update' },
+            { s: 'systemrepair:update', w: 'hrms:systemrepair-update' },
 
         ];
 

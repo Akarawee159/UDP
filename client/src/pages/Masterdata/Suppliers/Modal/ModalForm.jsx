@@ -148,7 +148,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 {isEditMode ? 'แก้ไขข้อมูลบริษัท' : 'เพิ่มบริษัทใหม่'}
                             </Title>
                             <Text className="text-slate-500 text-sm font-light">
-                                {isEditMode ? 'Company Information Update' : 'Create New Company Profile'}
+                                {isEditMode ? 'supplier Information Update' : 'Create New supplier Profile'}
                             </Text>
                         </div>
                     </div>
@@ -168,7 +168,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 <div className="text-center mb-8 mt-2">
                                     <div className="w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-400 mb-4 shadow-sm group hover:border-blue-300 transition-colors cursor-default">
                                         <BankOutlined style={{ fontSize: '48px' }} className="group-hover:text-blue-500 transition-colors" />
-                                        <span className="text-xs mt-3 font-medium tracking-wide uppercase text-slate-400 group-hover:text-blue-500">Company Profile</span>
+                                        <span className="text-xs mt-3 font-medium tracking-wide uppercase text-slate-400 group-hover:text-blue-500">supplier Profile</span>
                                     </div>
                                     <div className="text-slate-500 font-medium text-sm">ข้อมูลหลักองค์กร</div>
                                 </div>

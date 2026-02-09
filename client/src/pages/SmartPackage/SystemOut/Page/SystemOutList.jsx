@@ -161,22 +161,51 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             if (!open || !draftId) return;
             const { action, draft_id: incomingDraftId, data } = event.detail || {};
 
+            // ตรวจสอบว่าเป็น draft_id เดียวกันหรือไม่
             if (incomingDraftId === draftId) {
-                // ✅ รวมเคส 'unlocked' เข้าไป และสั่งอัปเดตทั้ง Status และ ScannedList
-                const refreshActions = ['header_update', 'finalized', 'unlocked', 'cancel'];
+
+                // 1. กรณีถูกยกเลิก (Cancel) -> ปิดหน้าต่างทันที
+                if (action === 'cancel') {
+                    message.warning('รายการนี้ถูกยกเลิกโดยผู้ใช้อื่น');
+                    onCancel();
+                    return;
+                }
+
+                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันจ่ายออก" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
+                if (action === 'finalized' || action === 'output_confirmed') {
+                    message.success('รายการนี้ถูกยืนยันการจ่ายออกเรียบร้อยแล้ว');
+                    onCancel(); // สั่งปิด Modal ทันที
+                    return;     // จบการทำงาน ไม่ต้องไป Refresh Data ต่อ
+                }
+
+                // 3. รายการที่ต้อง Refresh ข้อมูล (เอา 'finalized' ออก เพราะไปดักข้างบนแล้ว)
+                const refreshActions = [
+                    'header_update',
+                    'unlocked',
+                    'ref_generated'
+                ];
 
                 if (refreshActions.includes(action)) {
                     api.get(`/smartpackage/systemout/detail?draft_id=${draftId}`).then(res => {
                         const { booking, assets } = res.data;
 
-                        // 1. อัปเดตสถานะ
-                        if (booking) setBookingStatus(String(booking.is_status));
+                        if (booking) {
+                            // อัปเดต State ต่างๆ
+                            setBookingStatus(String(booking.is_status));
+                            setRefID(booking.refID); // ✅ อัปเดต RefID ใน State
 
-                        // 2. ✅ สำคัญ: อัปเดตรายการสินค้าใหม่ทันที (กรณี Unlock รายการจะกลายเป็นว่าง หรือตามที่มีใน Master)
+                            // ✅ สำคัญ: อัปเดตค่าใน Form ให้เปลี่ยนตามทันที (Origin, Destination, Remark)
+                            form.setFieldsValue({
+                                refID: booking.refID,
+                                origin: booking.origin,
+                                destination: booking.destination,
+                                booking_remark: booking.booking_remark,
+                                attendees: (assets || []).length
+                            });
+                        }
+
+                        // อัปเดตรายการสินค้าใหม่ทันที (กรณี Unlock รายการจะกลายเป็นว่าง หรือตามที่มีใน Master)
                         setScannedList(assets || []);
-
-                        // 3. ถ้าจำนวนเปลี่ยน ให้อัปเดตตัวเลขใน Form ด้วย
-                        form.setFieldValue('attendees', (assets || []).length);
                     });
                 }
 
@@ -195,7 +224,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         };
         window.addEventListener('hrms:systemout-update', handleSocketUpdate);
         return () => window.removeEventListener('hrms:systemout-update', handleSocketUpdate);
-    }, [open, draftId, message, form]);
+    }, [open, draftId, message, form, onCancel]);
 
     // --- Actions ---
 

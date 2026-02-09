@@ -196,7 +196,7 @@ function AssetLog() {
         {
             // === Logic 3: ผู้ทำรายการ (ซ่อนถ้าเป็น 120,121,122) ===
             headerName: 'ผู้ทำรายการ',
-            field: 'booking_created_by',
+            field: 'updated_by',
             width: 200,
             cellRenderer: (params) => {
                 if (isPrintOrRegister(params.data.is_status)) {

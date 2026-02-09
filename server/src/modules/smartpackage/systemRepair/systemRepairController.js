@@ -1,20 +1,20 @@
-// src/modules/Smartpackage/systemDefective/systemDefectiveController.js
+// src/modules/Smartpackage/systemRepair/systemRepairController.js
 'use strict';
-const model = require('./systemDefectiveModel');
+const model = require('./systemRepairModel');
 const dayjs = require('dayjs');
 
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการรับเข้าของชำรุด' } = req.body;
+    const { draft_id, objective = 'ทำรายการเบิกขอซ่อม' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการรับเข้าของชำรุด') {
-      booking_type = 'DF';
+    if (objective === 'ทำรายการเบิกขอซ่อม') {
+      booking_type = 'RP';
     }
 
     // ส่งค่าไปบันทึก
@@ -26,7 +26,7 @@ async function initBooking(req, res, next) {
     });
 
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'header_update', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, message: 'Draft initialized' });
   } catch (err) { next(err); }
@@ -50,7 +50,7 @@ async function generateBookingRef(req, res, next) {
 
     // Notify
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'ref_generated', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'ref_generated', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -62,11 +62,11 @@ async function confirmBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 141
+    // บันทึกและเปลี่ยน status -> 151
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'header_update', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'header_update', draft_id });
 
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
@@ -85,7 +85,7 @@ async function finalizeBooking(req, res, next) {
     await model.finalizeBooking(draft_id, user_id, { booking_remark, origin, destination });
 
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'finalized', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'finalized', draft_id });
 
     res.json({ success: true, message: 'Finalized' });
   } catch (err) { next(err); }
@@ -101,7 +101,7 @@ async function unlockBooking(req, res, next) {
     await model.unlockBooking(draft_id, user_id);
 
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'unlocked', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'unlocked', draft_id });
 
     res.json({ success: true, message: 'Unlocked' });
   } catch (err) { next(err); }
@@ -124,7 +124,7 @@ async function scanAsset(req, res, next) {
     if (result.success) {
       const io = req.app.get('io');
       if (io) {
-        io.emit('systemdefective:update', { action: 'scan', data: result.data, draft_id });
+        io.emit('systemrepair:update', { action: 'scan', data: result.data, draft_id });
         io.emit('registerasset:upsert', result.data);
       }
       res.json({ success: true, data: result.data });
@@ -143,7 +143,7 @@ async function returnSingle(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemdefective:update', { action: 'return', data: updatedItem, draft_id });
+      io.emit('systemrepair:update', { action: 'return', data: updatedItem, draft_id });
       io.emit('registerasset:upsert', updatedItem);
     }
     res.json({ success: true, message: 'Returned' });
@@ -159,7 +159,7 @@ async function returnAssets(req, res, next) {
     const io = req.app.get('io');
     if (io) {
       // ✅ ส่ง draft_id กลับไปใน socket payload
-      io.emit('systemdefective:update', { action: 'return', ids, draft_id });
+      io.emit('systemrepair:update', { action: 'return', ids, draft_id });
       updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
     res.json({ success: true, message: 'Returned to stock' });
@@ -194,12 +194,12 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      // ✅ แยกเงื่อนไข 145 (เบิกขอซ่อมสำเร็จ) -> ดึงจาก Detail
-      if (status === '145') {
+      // ✅ แยกเงื่อนไข 155 (เบิกขอซ่อมสำเร็จ) -> ดึงจาก Detail
+      if (status === '155') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
       }
-      // ✅ เงื่อนไข 142 (รอตรวจสอบ) หรือ 144 (แก้ไข) -> ดึงจาก Master
-      else if (status === '142' || status === '144') {
+      // ✅ เงื่อนไข 152 (รอตรวจสอบ) หรือ 154 (แก้ไข) -> ดึงจาก Master
+      else if (status === '152' || status === '154') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
       }
       // Draft -> ดึงจาก Master โดยใช้ draft_id
@@ -223,7 +223,7 @@ async function cancelBooking(req, res, next) {
 
     await model.cancelBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'cancel', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'cancel', draft_id });
 
     res.json({ success: true, message: 'Booking cancelled' });
   } catch (err) { next(err); }
@@ -240,9 +240,42 @@ async function confirmOutput(req, res, next) {
 
     // ส่ง Socket บอกให้หน้าจอร Refesh
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'output_confirmed', draft_id });
+    if (io) io.emit('systemrepair:update', { action: 'output_confirmed', draft_id });
 
-    res.json({ success: true, message: 'Confirmed Output (Status 145)' });
+    res.json({ success: true, message: 'Confirmed Output (Status 155)' });
+  } catch (err) { next(err); }
+}
+
+// ✅ [NEW] ดึงรายการทรัพย์สินที่กำลังซ่อม (Status 104)
+async function getRepairList(req, res, next) {
+  try {
+    const rows = await model.getAssetsOnRepair();
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+// ✅ [NEW] รับทรัพย์สินกลับเข้าคลัง
+async function receiveRepairAssets(req, res, next) {
+  try {
+    const { asset_codes } = req.body; // รับเป็น Array ของ asset_code
+    const user_id = req.user?.employee_id;
+
+    if (!asset_codes || !Array.isArray(asset_codes) || asset_codes.length === 0) {
+      throw new Error("กรุณาเลือกรายการที่ต้องการรับเข้าคลัง");
+    }
+
+    const updatedItems = await model.receiveFromRepair(asset_codes, user_id);
+
+    const io = req.app.get('io');
+    if (io) {
+      // Trigger ให้หน้า RepairRequestLog รีเฟรช
+      io.emit('systemrepair:update', { action: 'repair_received' });
+
+      // Trigger ให้หน้า Asset Register อัปเดตสถานะ
+      updatedItems.forEach(item => io.emit('registerasset:upsert', item));
+    }
+
+    res.json({ success: true, message: 'รับเข้าคลังเรียบร้อย' });
   } catch (err) { next(err); }
 }
 
@@ -260,5 +293,7 @@ module.exports = {
   cancelBooking,
   finalizeBooking,
   unlockBooking,
-  confirmOutput
+  confirmOutput,
+  getRepairList,
+  receiveRepairAssets
 };

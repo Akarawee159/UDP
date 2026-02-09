@@ -30,7 +30,7 @@ const RequisitionPane = () => {
         try {
             setLoading(true);
             const dateParam = selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : undefined;
-            const res = await api.get('/smartpackage/systemdefective', {
+            const res = await api.get('/smartpackage/systemrepair', {
                 params: { date: dateParam }
             });
             setRows(res?.data?.data || []);
@@ -61,8 +61,8 @@ const RequisitionPane = () => {
             }
         };
 
-        window.addEventListener('hrms:systemdefective-update', onUpdate);
-        return () => window.removeEventListener('hrms:systemdefective-update', onUpdate);
+        window.addEventListener('hrms:systemrepair-update', onUpdate);
+        return () => window.removeEventListener('hrms:systemrepair-update', onUpdate);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -110,7 +110,7 @@ const RequisitionPane = () => {
     const handleConfirmOutput = async (draft_id) => {
         try {
             setLoading(true);
-            await api.post('/smartpackage/systemdefective/confirm-output', { draft_id });
+            await api.post('/smartpackage/systemrepair/confirm-output', { draft_id });
             message.success('ยืนยันการเบิกขอซ่อมสำเร็จ');
             fetchData();
         } catch (err) {
@@ -158,7 +158,7 @@ const RequisitionPane = () => {
                         </div>
                     );
                 }
-                if (params.data.is_status_name === 'เบิกขอซ่อมเรียบร้อย') {
+                if (params.data.is_status_name === 'เบิกซ่อมเรียบร้อย') {
                     return <CheckCircleOutlined className="text-green-700 text-xl" />;
                 }
                 return null;

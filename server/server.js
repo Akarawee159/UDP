@@ -41,9 +41,10 @@ const zoneRoutes = require("./src/modules/settings/zone/zoneRoutes");
 const systemOutRoutes = require("./src/modules/smartpackage/systemOut/systemOutRoutes");
 const systemInRoutes = require("./src/modules/smartpackage/systemIn/systemInRoutes");
 const systemDefectiveRoutes = require("./src/modules/smartpackage/systemDefective/systemDefectiveRoutes");
+const systemRepairRoutes = require("./src/modules/smartpackage/systemRepair/systemRepairRoutes");
 
-const reportEmployeeRoutes = require("./src/modules/reports/reportEmployee/reportEmployeeRoutes");
-const reportTrainingRoutes = require("./src/modules/reports/reportTraining/reportTrainingRoutes");
+const boxstatusRoutes = require("./src/modules/reports/boxstatus/boxstatusRoutes");
+const nonmoveRoutes = require("./src/modules/reports/nonmove/nonmoveRoutes");
 const db = require("./src/config/database");
 const path = require("path");
 const app = express();
@@ -121,15 +122,15 @@ app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "
 app.use("/api/smartpackage/systemout", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
 app.use("/api/smartpackage/systemin", auth, permit({ mainId: "60", subId: "601" }), systemInRoutes);
 app.use("/api/smartpackage/systemdefective", auth, permit({ mainId: "60", subId: "601" }), systemDefectiveRoutes);
-
+app.use("/api/smartpackage/systemrepair", auth, permit({ mainId: "60", subId: "601" }), systemRepairRoutes);
 
 /**
  * =========================
  * Reports (main=70)
  * =========================
  */
-app.use("/api/report/employee", auth, permit({ mainId: "70", subId: "701" }), reportEmployeeRoutes);
-app.use("/api/report/training", auth, permit({ mainId: "70", subId: "702" }), reportTrainingRoutes);
+app.use("/api/report/boxstatus", auth, permit({ mainId: "70", subId: "701" }), boxstatusRoutes);
+app.use("/api/report/nonmove", auth, permit({ mainId: "70", subId: "702" }), nonmoveRoutes);
 
 /* --------------------- Static File Serving ------------------- */
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));

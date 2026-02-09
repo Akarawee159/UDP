@@ -70,12 +70,12 @@ function Suppliers() {
             setRows((prev) => prev.filter((r) => r.id !== id));
         };
 
-        s.on('company:upsert', onUpsert);
-        s.on('company:delete', onDelete);
+        s.on('supplier:upsert', onUpsert);
+        s.on('supplier:delete', onDelete);
 
         return () => {
-            s.off('company:upsert', onUpsert);
-            s.off('company:delete', onDelete);
+            s.off('supplier:upsert', onUpsert);
+            s.off('supplier:delete', onDelete);
         };
     }, []);
 

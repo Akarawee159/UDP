@@ -84,7 +84,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                     <div className="text-xs text-gray-400 mb-1">ชื่อบริษัท</div>
                     <div className="font-bold text-gray-800 text-base leading-tight">{record.supplier_name || '-'}</div>
                     <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <GlobalOutlined className="text-[10px]" /> {record.company_name_en || '-'}
+                      <GlobalOutlined className="text-[10px]" /> {record.supplier_name || '-'}
                     </div>
                   </div>
                 </div>
