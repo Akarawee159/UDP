@@ -39,7 +39,7 @@ services:
       - DB_HOST=db-mysql          # อ้างอิงชื่อ Container DB ใน Stack หลัก
       - DB_PORT=3306
       - DB_USER=root
-      - DB_PASS=${DB_ROOT_PASSWORD} # รับค่า Password จาก Env
+      - DB_PASS=${DB_PASSWORD} # รับค่า Password จาก Env
       - DB_NAME=${DB_NAME}        # ชื่อ Database ที่จะใช้
     # ❌ ลบ env_file ทิ้งแล้ว ใช้ environment ด้านบนแทน
     networks:
