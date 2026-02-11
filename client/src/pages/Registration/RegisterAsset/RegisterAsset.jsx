@@ -284,7 +284,7 @@ function RegisterAsset() {
                             onClick={handleCreate}
                             className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
-                            ขึ้นทะเบียนทรัพย์สิน
+                            ขึ้นทะเบียนทรัพย์สิน สินะ
                         </Button>
                     </div>
                 </div>
