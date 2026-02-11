@@ -2,17 +2,19 @@ version: '3.8'
 
 services:
   # ------------------------------------
-  # Frontend: React (Production Mode via Nginx)
+  # Frontend: React (Production Mode)
   # ------------------------------------
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile      # ✅ ใช้ไฟล์ Production (Build -> Nginx)
+      dockerfile: Dockerfile
+      # 👇 สำคัญ: React ต้องการค่านี้ตอน Build Image เพื่อให้รู้ว่า Backend อยู่ไหน
+      args:
+        - VITE_API_PATH=${VITE_API_PATH} 
     container_name: udp-client
     restart: always
     ports:
-      - "3091:80"                 # ✅ Map Port 3091 เข้าหา Nginx Port 80
-    # ❌ ลบ Volumes ทิ้ง: เพราะเราใช้ไฟล์ที่ Build เสร็จแล้ว (Static) ไม่มีการแก้โค้ดสดๆ
+      - "3091:80"  # ✅ เปิดไว้เพื่อเข้าผ่าน IP:3091 หรือให้ Nginx หลัก Proxy เข้ามา
     environment:
       - TZ=Asia/Bangkok
     networks:
@@ -24,20 +26,22 @@ services:
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile.dev  # (ถ้ามี Dockerfile แยกสำหรับ Prod ให้เปลี่ยนตรงนี้)
+      dockerfile: Dockerfile      # ✅ แนะนำให้ใช้ไฟล์สำหรับ Prod (ที่ใช้ node server.js)
     container_name: udp-server
     restart: always
     ports:
       - "3092:3092"
     environment:
       - PORT=3092
-      - NODE_ENV=production       # ✅ บอก App ว่าเป็น Production
+      - NODE_ENV=production
       - TZ=Asia/Bangkok
-      - DB_HOST=db-mysql
+      # 👇 Database Config (รับค่าจาก Portainer)
+      - DB_HOST=db-mysql          # อ้างอิงชื่อ Container DB ใน Stack หลัก
       - DB_PORT=3306
-    env_file:
-      - ./server/.env
-    # ❌ ลบ Volumes ทิ้ง: เพื่อความปลอดภัยและความเสถียรของ Code บน Server
+      - DB_USER=root
+      - DB_PASS=${DB_ROOT_PASSWORD} # รับค่า Password จาก Env
+      - DB_NAME=${DB_NAME}        # ชื่อ Database ที่จะใช้
+    # ❌ ลบ env_file ทิ้งแล้ว ใช้ environment ด้านบนแทน
     networks:
       - shared-network
 
