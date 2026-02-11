@@ -26,6 +26,8 @@ async function findRequestByKeyword(keyword) {
 
 // ✅ ปรับปรุง: ตรวจสอบสถานะก่อน ถ้ามีคำขออยู่แล้ว (4,5,6) ให้คืนค่าเลย ไม่ต้อง update ทับ
 async function requestResetPassword(employee_code, username) {
+  const now = new Date();
+
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -55,8 +57,8 @@ async function requestResetPassword(employee_code, username) {
     }
 
     // 2. ถ้าเป็นสถานะปกติ (ไม่ใช่ 4,5,6) ให้อัปเดตเป็น 4 (ส่งคำขอใหม่)
-    const updateSql = `UPDATE employees SET is_status = '4', updated_at = NOW() WHERE employee_code = ?`;
-    await connection.query(updateSql, [employee_code]);
+    const updateSql = `UPDATE employees SET is_status = '4', updated_at = ? WHERE employee_code = ?`;
+    await connection.query(updateSql, [now, employee_code]);
 
     await connection.commit();
     return { success: true, employee_code, status: '4', existing: false };
@@ -89,11 +91,13 @@ async function getPendingRequests() {
 
 // ✅ 2. อัปเดตสถานะ (ปรับปรุงให้คืนค่า result ของ MySQL)
 async function updateStatus(employee_code, status) {
-  const sql = `UPDATE employees SET is_status = ?, updated_at = NOW() WHERE employee_code = ?`;
-  
+  const now = new Date();
+
+  const sql = `UPDATE employees SET is_status = ?, updated_at = ? WHERE employee_code = ?`;
+
   // เปลี่ยนจากการรับ [rows] เป็น [result] เพื่อเอา header ของ response
-  const [result] = await db.query(sql, [status, employee_code]);
-  
+  const [result] = await db.query(sql, [status, now, employee_code]);
+
   // คืนค่า result ทั้งก้อน (ซึ่งจะมี affectedRows อยู่ข้างใน)
   return result;
 }

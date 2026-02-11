@@ -46,6 +46,9 @@ async function getNextGIdForEmployee(employee_id) {
 }
 
 async function insert(employee_id, payload = {}) {
+  // ✅ 1. สร้างตัวแปร now
+  const now = new Date();
+
   const columns = await getColumns();
   if (!columns.has('employee_id') || !columns.has('employee_code')) {
     const e = new Error('employees_relatives missing employee_id/employee_code');
@@ -63,24 +66,23 @@ async function insert(employee_id, payload = {}) {
   push('employee_id', employee_id);
   push('employee_code', base.employee_code);
 
-  // ถ้ามี g_id จาก Controller ก็ใช้เลย
   if (payload.g_id != null && columns.has('g_id')) push('g_id', payload.g_id);
 
-  // ข้อมูลเนื้อหา
-  ['g_full_name','g_relation','g_address','g_phone','is_status'].forEach(k => {
+  ['g_full_name', 'g_relation', 'g_address', 'g_phone', 'is_status'].forEach(k => {
     if (columns.has(k) && payload[k] !== undefined) push(k, payload[k]);
   });
 
-  // audit
-  if (columns.has('created_at')) fields.push('`created_at` = NOW()');
+  // ✅ 2. เปลี่ยนจุดนี้: ใช้ push แทนการเขียน SQL สด
+  if (columns.has('created_at')) push('created_at', now);
   if (columns.has('created_by')) push('created_by', payload.created_by ?? null);
 
   const sql = `
     INSERT INTO employees_relatives
-    SET ${fields.map(f => f.includes('NOW()') ? f : `${f} = ?`).join(', ')}
+    SET ${fields.map(f => `${f} = ?`).join(', ')} 
   `;
+
+
   const [rs] = await db.query(sql, params);
-  // หมายเหตุ: ตารางนี้ไม่มี auto-id; คืน g_id กลับไปใช้แทน
   return payload.g_id || rs.insertId || null;
 }
 
@@ -105,19 +107,22 @@ async function getOne(employee_id, g_id) {
 }
 
 async function updateOne(employee_id, g_id, payload = {}) {
+  // ✅ 1. สร้างตัวแปร now
+  const now = new Date();
+
   const columns = await getColumns();
   const sets = [];
   const params = [];
 
   function setKV(f, v) { sets.push('`' + f + '` = ?'); params.push(v === '' ? null : v); }
 
-  // อัปเดตเฉพาะ field ข้อมูลหลัก
-  ['g_full_name','g_relation','g_address','g_phone','is_status'].forEach(k => {
+  ['g_full_name', 'g_relation', 'g_address', 'g_phone', 'is_status'].forEach(k => {
     if (columns.has(k) && payload[k] !== undefined) setKV(k, payload[k]);
   });
 
   if (columns.has('updated_by')) setKV('updated_by', payload.updated_by ?? null);
-  if (columns.has('updated_at')) sets.push('`updated_at` = NOW()');
+
+  if (columns.has('updated_at')) setKV('updated_at', now);
 
   if (!sets.length) return 0;
 
@@ -132,13 +137,21 @@ async function updateOne(employee_id, g_id, payload = {}) {
 }
 
 async function softDelete(employee_id, g_id, payload = {}) {
+  // ✅ 1. สร้างตัวแปร now
+  const now = new Date();
+
   const columns = await getColumns();
   const sets = [];
   const params = [];
 
   if (columns.has('is_status')) sets.push("`is_status` = '99'");
   if (columns.has('deleted_by')) { sets.push('`deleted_by` = ?'); params.push(payload.deleted_by ?? null); }
-  if (columns.has('deleted_at')) sets.push('`deleted_at` = NOW()');
+
+  // ✅ 2. เปลี่ยนจุดนี้: ใส่ ? และ push now ลง params
+  if (columns.has('deleted_at')) {
+    sets.push('`deleted_at` = ?');
+    params.push(now);
+  }
 
   const sql = `
     UPDATE employees_relatives

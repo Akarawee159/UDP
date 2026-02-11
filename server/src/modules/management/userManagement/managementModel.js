@@ -182,15 +182,36 @@ async function updateUsername(employee_id, username) {
   return { affectedRows: result.affectedRows };
 }
 
-/** เคลียร์บัญชีผู้ใช้: username/password/permission_role = NULL */
-async function clearUserAccount(employee_id) {
-  // ป้องกันลบแอดมินตัวหลัก (เช่น id=1) — ปรับตามนโยบายคุณได้
+/** เคลียร์บัญชีผู้ใช้ หรือ Soft Delete สำหรับ Affiliate */
+async function clearUserAccount(employee_id, deleted_by) {
+  const now = new Date();
+  // ป้องกันลบแอดมินตัวหลัก
   if (String(employee_id) === '1') {
     const err = new Error('ไม่อนุญาตให้ลบบัญชีผู้ดูแลระบบ');
     err.status = 403;
     throw err;
   }
 
+  // ✅ เพิ่มเงื่อนไข: ถ้าเป็นผู้ใช้งานบริษัทในเครือ (รหัสขึ้นต้นด้วย OTHER)
+  if (String(employee_id).startsWith('OTHER')) {
+    const sql = `
+      UPDATE employees
+      SET is_status = 99,
+          deleted_at = ?,
+          deleted_by = ?,
+          username = NULL,
+          password = NULL,
+          permission_role = NULL,
+          password_changed_at = NULL,
+          password_expires_at = NULL
+      WHERE employee_id = ?
+      LIMIT 1
+    `;
+    const [result] = await db.query(sql, [now, deleted_by, employee_id]);
+    return { affectedRows: result.affectedRows };
+  }
+
+  // กรณีพนักงานปกติ (Clear Account) -> Logic เดิม
   const [result] = await db.query(
     `UPDATE employees
        SET username = NULL,
@@ -261,18 +282,19 @@ async function updateSignatureImage(employee_id, filename) {
 
 /** ✅ อัปเดตรหัส + วันหมดอายุ + เวลาเปลี่ยน + ล้าง must_change_password */
 async function updatePasswordWithExpiry(employee_id, password_hash, expiryDays) {
+  const now = new Date();
   const days = Number(expiryDays);
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
   const [result] = await db.query(
     `UPDATE employees
        SET password = ?,
-           password_changed_at = NOW(),
+           password_changed_at = ?,
            password_expires_at = ?,
            password_expiry_days = ?,
            must_change_password = 0
      WHERE employee_id = ?
      LIMIT 1`,
-    [password_hash, expiresAt, days, employee_id]
+    [password_hash, now, expiresAt, days, employee_id]
   );
   return { affectedRows: result.affectedRows };
 }
@@ -289,6 +311,107 @@ async function acknowledgeResetStatus(employee_id) {
   `;
   const [result] = await db.query(sql, [employee_id]);
   return { affectedRows: result.affectedRows };
+}
+
+/** ===== (เพิ่มใหม่) สร้าง ID สำหรับ Affiliate: OTHERddmmyy + ลำดับ(3) ===== */
+function _prefixToday() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth() + 1);
+  const yy = String(d.getFullYear()).slice(-2);
+  return `OTHER${dd}${mm}${yy}`;
+}
+
+async function generateAffiliateId() {
+  const prefix = _prefixToday();
+  const sql = `
+    SELECT COALESCE(MAX(CAST(SUBSTRING(employee_id, LENGTH(?) + 1, 3) AS UNSIGNED)), 0) AS lastSeq
+    FROM employees
+    WHERE employee_id LIKE CONCAT(?, '%')
+      AND employee_id REGEXP CONCAT('^', ?, '[0-9]{3}$')
+  `;
+  const [rows] = await db.query(sql, [prefix, prefix, prefix]);
+  const last = Number(rows[0]?.lastSeq || 0);
+  const next = last + 1;
+  const seq = String(next).padStart(3, '0').slice(-3);
+  return `${prefix}${seq}`;
+}
+
+/** (เพิ่มใหม่) สร้างผู้ใช้งาน Affiliate (Insert ข้อมูลพนักงานใหม่ + User) */
+async function createAffiliateUser(payload) {
+  const now = new Date();
+  const {
+    employee_id, employee_code,
+    titlename_th, firstname_th, lastname_th,
+    username, password, permission_role,
+    password_expiry_days,
+    created_by // ✅ 1. รับค่า created_by
+  } = payload;
+
+  // คำนวณวันหมดอายุรหัสผ่าน
+  const days = Number(password_expiry_days || 90);
+  const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  // ✅ 2. เพิ่ม created_by ลงใน SQL
+  const sql = `
+    INSERT INTO employees (
+      employee_id, employee_code,
+      titlename_th, firstname_th, lastname_th,
+      username, password, permission_role,
+      is_status, company, branch,
+      password_changed_at, password_expires_at, password_expiry_days, must_change_password,
+      created_by, created_at
+    ) VALUES (
+      ?, ?,
+      ?, ?, ?,
+      ?, ?, ?,
+      1, 'Affiliate', 'สำนักงานใหญ่',
+      ?, ?, ?, 0,
+      ?, ?
+    )
+  `;
+
+  // ✅ 3. เพิ่ม created_by ลงใน Array ของ Parameters (ลำดับต้องตรงกับ ? ใน SQL)
+  const [result] = await db.query(sql, [
+    employee_id, employee_code,
+    titlename_th, firstname_th, lastname_th,
+    username, password, permission_role,
+    now, expiresAt, days,
+    created_by, now
+  ]);
+
+  return { affectedRows: result.affectedRows };
+}
+
+/** ดึงรายการคำนำหน้าชื่อ (ไทย) */
+async function getTitlenames() {
+  const sql = `
+    SELECT G_NAME AS name_th 
+    FROM tb_titlename 
+    ORDER BY G_ID ASC
+  `;
+  const [rows] = await db.query(sql);
+  return rows;
+}
+
+/** (เพิ่มใหม่) สร้าง Employee Code สำหรับ Affiliate: 99 + ลำดับ(6) */
+async function generateAffiliateCode() {
+  // หาเลขลำดับสูงสุด ของรหัสที่ขึ้นต้นด้วย 99 และมีความยาว 8 ตัว (99 + 6 หลัก)
+  const sql = `
+    SELECT MAX(CAST(SUBSTRING(employee_code, 3) AS UNSIGNED)) as lastSeq
+    FROM employees
+    WHERE employee_code LIKE '99%' 
+      AND LENGTH(employee_code) = 8
+      AND employee_code REGEXP '^[0-9]+$'
+  `;
+  const [rows] = await db.query(sql);
+  const last = Number(rows[0]?.lastSeq || 0);
+  const next = last + 1;
+
+  // สร้างเลข 6 หลัก (เช่น 1 -> 000001)
+  const seq = String(next).padStart(6, '0');
+  return `99${seq}`;
 }
 
 module.exports = {
@@ -309,4 +432,8 @@ module.exports = {
   updateSignatureImage,
   updatePasswordWithExpiry,
   acknowledgeResetStatus,
+  generateAffiliateId,
+  createAffiliateUser,
+  getTitlenames,
+  generateAffiliateCode,
 };

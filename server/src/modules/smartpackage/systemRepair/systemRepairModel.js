@@ -660,11 +660,44 @@ async function getAssetsOnRepair() {
 }
 
 // ✅ [NEW] อัปเดตสถานะรับเข้าคลัง (104 -> 100, is_status -> 105)
-async function receiveFromRepair(assetCodes, user_id) {
+async function receiveFromRepair(assetCodes, user_id, extraData = {}) {
   const now = getThaiNow();
+  const { repair_parts, repair_detail } = extraData;
 
-  // 1. Update Status
-  // asset_status = 100 (พร้อมใช้งาน/ปกติ), is_status = 105 (รับคืนจากการซ่อม)
+  // 1. ดึงข้อมูลเดิมก่อน (เพื่อเอา refID/DocNo มาบันทึกประวัติ)
+  // เพราะถ้า Update เป็น NULL ไปก่อน เราจะไม่รู้ว่ามาจากเอกสารไหน
+  const sqlFetchBefore = `
+      SELECT asset_code, refID 
+      FROM tb_asset_lists 
+      WHERE asset_code IN (?) AND asset_status = 104
+  `;
+  const [itemsToProcess] = await db.query(sqlFetchBefore, [assetCodes]);
+
+  // 2. บันทึกลงตาราง tb_asset_repair (Insert ทีละรายการ)
+  if (itemsToProcess.length > 0) {
+    // แปลง array parts เป็น JSON String
+    const partsJson = repair_parts ? JSON.stringify(repair_parts) : null;
+    const detailText = repair_detail || null;
+
+    for (const item of itemsToProcess) {
+      const sqlInsertRepair = `
+        INSERT INTO tb_asset_repair 
+        (asset_code, asset_docno, asset_repair, asset_detail, created_by, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      // item.refID คือ เลขที่เอกสารที่ใช้อ้างอิงตอนส่งซ่อม
+      await db.query(sqlInsertRepair, [
+        item.asset_code,
+        item.refID,      // asset_docno
+        partsJson,       // asset_repair (JSON)
+        detailText,      // asset_detail (Textarea)
+        user_id,
+        now
+      ]);
+    }
+  }
+
+  // 3. Update Status (104 -> 100) คืนค่าปกติ
   const sqlUpdate = `
         UPDATE tb_asset_lists
         SET asset_status = 100,
@@ -681,9 +714,8 @@ async function receiveFromRepair(assetCodes, user_id) {
     `;
   await db.query(sqlUpdate, [user_id, now, assetCodes]);
 
-  // 2. Insert Log (Detail) เพื่อเก็บประวัติ
-  // ดึงข้อมูลล่าสุดหลังอัปเดตเพื่อมา insert ลง log
-  const sqlFetch = `
+  // 4. Insert Log (tb_asset_lists_detail)
+  const sqlFetchUpdated = `
         SELECT a.*, 
                s.G_NAME as asset_status_name, 
                s.G_DESCRIPT as asset_status_color
@@ -691,12 +723,17 @@ async function receiveFromRepair(assetCodes, user_id) {
         LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
         WHERE a.asset_code IN (?)
     `;
-  const [updatedRows] = await db.query(sqlFetch, [assetCodes]);
+  const [updatedRows] = await db.query(sqlFetchUpdated, [assetCodes]);
 
   for (const item of updatedRows) {
-    // ใช้ฟังก์ชัน insertSingleDetail ที่มีอยู่แล้วเพื่อเก็บ log
-    // ปรับค่า is_status ใน log ให้ชัดเจนว่าเป็น 'รับเข้าจากการซ่อม'
-    const logItem = { ...item, is_status: '105', asset_action: 'รับเข้าคลัง (ซ่อมเสร็จ)' };
+    const logItem = {
+      ...item,
+      is_status: '105',
+      asset_action: 'รับเข้าคลัง (ซ่อมเสร็จ)'
+      // หมายเหตุ: ใน Log รายละเอียดสินทรัพย์ (tb_asset_lists_detail) 
+      // อาจจะไม่ต้องเก็บ parts/detail ถ้าตารางนั้นไม่มี field รองรับ
+      // แต่ข้อมูลจะถูกเก็บถาวรใน tb_asset_repair แล้ว
+    };
     await insertSingleDetail(logItem);
   }
 

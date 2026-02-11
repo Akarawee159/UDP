@@ -50,12 +50,12 @@ async function getAll() {
     FROM employees
     WHERE COALESCE(is_status, 1) <> 99
       AND employee_id != 1
+      AND employee_id NOT LIKE 'OTHER%'
     ORDER BY CAST(employee_code AS UNSIGNED) ASC;
   `;
   const [rows] = await db.query(sql);
   return rows;
 }
-
 /** รหัสพนักงานล่าสุดจาก employee_code */
 async function getLastEmployeeCode() {
   const sql = `
@@ -127,10 +127,10 @@ async function getOptions() {
   ] = await Promise.all([
     safeQuery(`SELECT G_NAME AS name_th, G_NAME_EN AS name_en FROM tb_titlename ORDER BY G_ID`, [], 'tb_titlename'),
     safeQuery(`SELECT company_code, company_name_th FROM tb_company ORDER BY company_name_th`, [], 'tb_company'),
-    safeQuery(`SELECT G_CODE AS branch_code, G_NAME AS branch, company_code FROM tb_branch ORDER BY G_CODE`, [], 'tb_branch'),
-    safeQuery(`SELECT G_CODE AS dep_code, G_NAME AS department, branch_code FROM tb_department WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_department'),
+    safeQuery(`SELECT G_CODE AS branch_code, G_NAME AS branch FROM tb_branch ORDER BY G_CODE`, [], 'tb_branch'),
+    safeQuery(`SELECT G_CODE AS dep_code, G_NAME AS department FROM tb_department WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_department'),
     safeQuery(`SELECT G_NAME AS worksites FROM tb_worksites ORDER BY G_CODE`, [], 'tb_worksites'),
-    safeQuery(`SELECT G_NAME AS position, department_code FROM tb_position WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_position'),
+    safeQuery(`SELECT G_NAME AS position FROM tb_position WHERE G_NAME IS NOT NULL AND TRIM(G_NAME) <> '' ORDER BY G_CODE`, [], 'tb_position'),
     safeQuery(`SELECT G_NAME AS employee_type FROM tb_employee_type ORDER BY G_CODE`, [], 'tb_employee_type'),
     safeQuery(`SELECT G_NAME AS working_status FROM tb_working_status ORDER BY G_CODE`, [], 'tb_working_status'),
     safeQuery(`SELECT G_NAME AS resign_reason FROM tb_resign_reason ORDER BY G_CODE`, [], 'tb_resign_reason'),
@@ -211,7 +211,7 @@ const EMP_BASE_FIELDS = [
 
 const EMP_PROFILE_FIELDS = [
   'employee_id', 'employee_code',
-  'foreign_workers', 'jobapp_number', 'job_date', 'salary',
+  'foreign_workers', 'over_age', 'jobapp_number', 'job_date', 'salary',
   'id_card', 'iris_id', 'foreign_id', 'passport_id', 'issued_district', 'issued_province', 'idcard_sdate', 'idcard_edate',
   'reg_addr_no', 'village_name', 'village_no', 'alley', 'junction', 'road',
   'subdistrict', 'district', 'province', 'postcode', 'phone_number',
@@ -239,7 +239,7 @@ const EMP_PROFILE_FIELDS = [
 ];
 
 const EMP_BOOLEAN_FIELDS = new Set([
-  'disabled_person', 'foreign_workers', 'sso_registered', 'sso_card_lost', 'sso_card_expired',
+  'disabled_person', 'foreign_workers', 'over_age', 'sso_registered', 'sso_card_lost', 'sso_card_expired',
   'has_car_license', 'has_motorcycle_license', 'formerly_employed', 'has_guarantor', 'can_type',
 ]);
 
@@ -280,44 +280,42 @@ const EMP_LOG_FIELDS = [
 ];
 
 // ✅ ฟังก์ชัน insert log โดยรับ payload ที่มีเฉพาะฟิลด์ที่เปลี่ยน
-// ✅ ฟังก์ชัน insert log ที่ปรับปรุง logic ตามโจทย์
+// ✅ แก้ไขฟังก์ชัน insertEmployeeLog
 async function insertEmployeeLog(logPayload) {
+  // 1. ประกาศตัวแปร now
+  const now = new Date();
+
   const columns = await getEmployeeLogColumns();
   const fields = EMP_LOG_FIELDS.filter(f => columns.has(f));
 
-  // ต้องมี employee_id
   if (!logPayload.employee_id) {
     throw new Error('employees_log insert require employee_id');
   }
 
-  // 🔹 ตรวจสอบว่าเป็นโหมด Create หรือ Update
-  // ถ้ามี updated_by ส่งมา ถือว่าเป็น Update
   const isUpdate = !!logPayload.updated_by;
-  // ถ้ามี created_by แต่ไม่มี updated_by ถือว่าเป็น Create
   const isCreate = !!logPayload.created_by && !isUpdate;
 
-  // สร้าง SQL Values
-  // - ถ้า Create: created_at = NOW(), updated_at = NULL (?)
-  // - ถ้า Update: updated_at = NOW()
-  const valuesSql = fields.map(f => {
-    if (f === 'created_at' && isCreate) return 'NOW()';
-    if (f === 'updated_at' && isUpdate) return 'NOW()';
-    return '?';
-  }).join(', ');
+  // 2. แก้ SQL Values: ใช้ '?' ทุกกรณี (ไม่ต้องเช็ค NOW() ตรงนี้แล้ว)
+  const valuesSql = fields.map(() => '?').join(', ');
 
   const sql = `
     INSERT INTO employees_log (${fields.map(f => `\`${f}\``).join(', ')})
     VALUES (${valuesSql})
   `;
 
-  // เตรียม Params (ตัด field ที่ใช้ NOW() ออกไป)
+  // 3. เตรียม Params: ใส่ now ลงไปแทน
   const params = [];
   fields.forEach(f => {
-    if (f === 'created_at' && isCreate) return; // ใช้ NOW() ใน SQL แล้ว
-    if (f === 'updated_at' && isUpdate) return; // ใช้ NOW() ใน SQL แล้ว
+    if (f === 'created_at' && isCreate) {
+      params.push(now); // ✅ ส่งค่า now
+      return;
+    }
+    if (f === 'updated_at' && isUpdate) {
+      params.push(now); // ✅ ส่งค่า now
+      return;
+    }
 
     const v = logPayload[f];
-    // แปลง undefined/ค่าว่าง ให้เป็น NULL (ยกเว้น 0 หรือ false)
     if (v === undefined || v === '') {
       params.push(null);
     } else {
@@ -358,27 +356,32 @@ async function updateEmployeeImage(employee_id, imgPath) {
 
 // เพิ่มข้อมูลพื้นฐานลงตาราง employees
 async function createBase(payload) {
+  // 1. ประกาศตัวแปร now
+  const now = new Date();
+
   const columns = await getEmployeeColumns();
   const fields = EMP_BASE_FIELDS.filter(f => columns.has(f));
 
-  // สร้าง Placeholders: เฉพาะ created_at ที่ใช้ NOW() ส่วน updated_at ใช้ ? ปกติ (ซึ่งค่าจะเป็น NULL)
-  const placeholders = fields.map(f => (f === 'created_at' ? 'NOW()' : '?')).join(', ');
+  // 2. แก้ Placeholders: เป็น ? ทั้งหมด
+  const placeholders = fields.map(() => '?').join(', ');
 
   const sql = `
     INSERT INTO employees (${fields.map(f => `\`${f}\``).join(', ')})
     VALUES (${placeholders})
   `;
 
-  const params = fields
-    .filter(f => f !== 'created_at') // ตัด created_at ออกเพราะใช้ NOW()
-    .map((f) => {
-      // 🔹 บังคับให้ updated_at และ updated_by เป็น NULL ตอนสร้าง
-      if (f === 'updated_at' || f === 'updated_by') return null;
+  // 3. แก้ Params: ไม่ต้อง filter created_at ออกแล้ว แต่ให้ check เพื่อ return now
+  const params = fields.map((f) => {
+    // กรณี created_at ให้ใช้ค่า now
+    if (f === 'created_at') return now;
 
-      const v = payload[f];
-      if (EMP_BOOLEAN_FIELDS.has(f)) return (v === true || v === 1 || v === '1') ? 1 : 0;
-      return (v === '' || v === undefined) ? null : v;
-    });
+    // กรณี updated_at/by ให้เป็น NULL ตอนสร้าง
+    if (f === 'updated_at' || f === 'updated_by') return null;
+
+    const v = payload[f];
+    if (EMP_BOOLEAN_FIELDS.has(f)) return (v === true || v === 1 || v === '1') ? 1 : 0;
+    return (v === '' || v === undefined) ? null : v;
+  });
 
   await db.query(sql, params);
   return { ...payload };
@@ -391,15 +394,22 @@ async function createProfile(payload) {
   if (!fields.includes('employee_id') || !fields.includes('employee_code')) {
     throw Object.assign(new Error('employees_profile missing employee_id/employee_code'), { status: 500 });
   }
+
   const sql = `
     INSERT INTO employees_profile (${fields.map(f => `\`${f}\``).join(', ')})
     VALUES (${fields.map(() => '?').join(', ')})
   `;
+
   const params = fields.map((f) => {
     const v = payload[f];
-    if (EMP_BOOLEAN_FIELDS.has(f)) return (v === true || v === 1 || v === '1') ? 1 : 0;
+    // Logic การแปลงค่า Boolean: เช็คให้ครอบคลุมทั้ง boolean, number, string
+    if (EMP_BOOLEAN_FIELDS.has(f)) {
+      const isTrue = v === true || v === 1 || String(v) === '1' || String(v).toLowerCase() === 'true';
+      return isTrue ? 1 : 0;
+    }
     return (v === '' || v === undefined) ? null : v;
   });
+
   await db.query(sql, params);
   return { ...payload };
 }
@@ -478,6 +488,9 @@ async function getBaseById(employee_id) {
 
 // อัปเดตฟิลด์ในตาราง employees
 async function updateBase(conn, employee_id, payload) {
+  // 1. ประกาศตัวแปร now
+  const now = new Date();
+
   const columns = await getEmployeeColumns();
   const allow = new Set(EMP_BASE_FIELDS.filter(f => f !== 'employee_id' && f !== 'employee_code'));
   const updatable = [...allow].filter(f => columns.has(f));
@@ -486,7 +499,7 @@ async function updateBase(conn, employee_id, payload) {
   const params = [];
 
   updatable.forEach(f => {
-    if (f === 'updated_at') return;
+    if (f === 'updated_at') return; // ข้ามไปก่อน เดี๋ยวจัดการข้างล่าง
     if (payload[f] === undefined) return;
     sets.push(`\`${f}\` = ?`);
     const v = EMP_BOOLEAN_FIELDS.has(f)
@@ -495,8 +508,10 @@ async function updateBase(conn, employee_id, payload) {
     params.push(v);
   });
 
+  // 2. แก้ตรงนี้: ใช้ ? และ push params
   if (columns.has('updated_at')) {
-    sets.push('`updated_at` = NOW()');
+    sets.push('`updated_at` = ?'); // เปลี่ยน NOW() เป็น ?
+    params.push(now);              // ใส่ค่า now ลงไปใน params
   }
 
   if (!sets.length) return;
@@ -514,12 +529,19 @@ async function updateProfile(conn, employee_id, payload) {
   const fields = [...allow].filter(f => columns.has(f) && payload[f] !== undefined);
 
   if (!fields.length) return;
+
   const sets = fields.map(f => `\`${f}\` = ?`).join(', ');
-  const params = fields.map(f => (
-    EMP_BOOLEAN_FIELDS.has(f)
-      ? ((payload[f] === true || payload[f] === 1 || payload[f] === '1') ? 1 : 0)
-      : (payload[f] === '' ? null : payload[f])
-  ));
+
+  const params = fields.map(f => {
+    const v = payload[f];
+    // แก้ไข Logic การแปลงค่า Boolean
+    if (EMP_BOOLEAN_FIELDS.has(f)) {
+      const isTrue = v === true || v === 1 || String(v) === '1' || String(v).toLowerCase() === 'true';
+      return isTrue ? 1 : 0;
+    }
+    return (v === '' || v === undefined) ? null : v;
+  });
+
   await conn.query(`UPDATE employees_profile SET ${sets} WHERE employee_id = ? LIMIT 1`, [...params, employee_id]);
 }
 
@@ -584,15 +606,21 @@ async function getDocCode(codeKey) {
 
 // Soft delete
 async function softDelete(employee_id, deletedBy) {
+  // 1. ประกาศตัวแปร now
+  const now = new Date();
+
+  // 2. แก้ SQL: deleted_at = ?
   const sql = `
     UPDATE employees
     SET is_status = 99,
-        deleted_at = NOW(),
+        deleted_at = ?, 
         deleted_by = ?
     WHERE employee_id = ?
     LIMIT 1
   `;
-  const [rs] = await db.query(sql, [deletedBy, employee_id]);
+
+  // 3. ส่ง now เข้าไปใน params (ลำดับต้องตรงกับ ? ใน SQL)
+  const [rs] = await db.query(sql, [now, deletedBy, employee_id]);
   return rs.affectedRows > 0;
 }
 

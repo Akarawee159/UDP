@@ -257,25 +257,23 @@ async function getRepairList(req, res, next) {
 // ✅ [NEW] รับทรัพย์สินกลับเข้าคลัง
 async function receiveRepairAssets(req, res, next) {
   try {
-    const { asset_codes } = req.body; // รับเป็น Array ของ asset_code
+    const { asset_codes, repair_parts, repair_detail } = req.body; // รับค่าเพิ่ม
     const user_id = req.user?.employee_id;
 
     if (!asset_codes || !Array.isArray(asset_codes) || asset_codes.length === 0) {
       throw new Error("กรุณาเลือกรายการที่ต้องการรับเข้าคลัง");
     }
 
-    const updatedItems = await model.receiveFromRepair(asset_codes, user_id);
+    // ส่งข้อมูล repair_parts, repair_detail ไปที่ Model
+    const updatedItems = await model.receiveFromRepair(asset_codes, user_id, { repair_parts, repair_detail });
 
     const io = req.app.get('io');
     if (io) {
-      // Trigger ให้หน้า RepairRequestLog รีเฟรช
       io.emit('systemrepair:update', { action: 'repair_received' });
-
-      // Trigger ให้หน้า Asset Register อัปเดตสถานะ
       updatedItems.forEach(item => io.emit('registerasset:upsert', item));
     }
 
-    res.json({ success: true, message: 'รับเข้าคลังเรียบร้อย' });
+    res.json({ success: true, message: 'รับเข้าคลังและบันทึกประวัติการซ่อมเรียบร้อย' });
   } catch (err) { next(err); }
 }
 

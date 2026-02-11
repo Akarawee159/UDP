@@ -1,20 +1,35 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Input, App, Grid, Button, ConfigProvider } from 'antd';
+import { Input, App, Grid, Button, ConfigProvider, Modal, Form, Checkbox, Divider } from 'antd';
 import { SearchOutlined, ClockCircleOutlined, UserOutlined, CalendarOutlined, ToolOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import api from "../../../../api";
 import DataTable from '../../../../components/aggrid/DataTable';
 import { getSocket } from '../../../../socketClient';
 
+// ตัวเลือกชิ้นส่วน (สามารถแยกไปไฟล์ config ได้)
+const REPAIR_PARTS_OPTIONS = [
+    'ชิ้นส่วนที่ 1',
+    'ชิ้นส่วนที่ 2',
+    'ชิ้นส่วนที่ 3',
+    'ชิ้นส่วนที่ 4',
+    'ชิ้นส่วนที่ 5',
+    'ชิ้นส่วนที่ 6',
+];
+
 function RepairRequestLog() {
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
-    const { message, modal } = App.useApp();
+    const { message } = App.useApp(); // เอา modal ออกจากตรงนี้ เพราะเราจะใช้ <Modal> component แทน
 
     const [loading, setLoading] = useState(false);
     const [rowData, setRowData] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
+
+    // State สำหรับ Modal รับเข้า
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [confirmLoading, setConfirmLoading] = useState(false);
+    const [form] = Form.useForm();
 
     // 1. ดึงข้อมูลจาก API (tb_asset_lists where asset_status = 104)
     const fetchData = useCallback(async () => {
@@ -51,34 +66,50 @@ function RepairRequestLog() {
         return () => window.removeEventListener('hrms:systemrepair-update', onUpdate);
     }, [fetchData]);
 
-    // 3. ฟังก์ชันรับเข้าคลัง (Update 100, 105)
-    const handleReceiveToStock = () => {
+    const handleReceiveToStockClick = () => {
         if (selectedRows.length === 0) {
             message.warning("กรุณาเลือกรายการที่ต้องการรับเข้าคลัง");
             return;
         }
+        setIsModalOpen(true); // เปิด Modal
+    };
 
-        modal.confirm({
-            title: 'ยืนยันการรับเข้าคลัง',
-            content: `คุณต้องการรับทรัพย์สินจำนวน ${selectedRows.length} รายการ กลับเข้าคลัง (สถานะปกติ) ใช่หรือไม่?`,
-            okText: 'ยืนยัน',
-            cancelText: 'ยกเลิก',
-            okButtonProps: { className: 'bg-green-600 hover:!bg-green-500' }, // บังคับสีปุ่ม OK ใน Modal
-            onOk: async () => {
-                try {
-                    setLoading(true);
-                    const asset_codes = selectedRows.map(r => r.asset_code);
-                    await api.post('/smartpackage/systemrepair/receive-repair', { asset_codes });
-                    message.success("รับเข้าคลังเรียบร้อย");
-                    setSelectedRows([]); // Clear selection
-                    fetchData();
-                } catch (err) {
-                    message.error(err.response?.data?.message || "เกิดข้อผิดพลาด");
-                } finally {
-                    setLoading(false);
-                }
-            }
-        });
+    const handleModalOk = async () => {
+        try {
+            // Validate Form
+            const values = await form.validateFields();
+
+            setConfirmLoading(true);
+            const asset_codes = selectedRows.map(r => r.asset_code);
+
+            // ส่งข้อมูลไป API (รวม Parts และ Remark)
+            await api.post('/smartpackage/systemrepair/receive-repair', {
+                asset_codes,
+                repair_parts: values.repair_parts, // Array ของชิ้นส่วน
+                repair_detail: values.repair_detail // ข้อความ textarea
+            });
+
+            message.success("รับเข้าคลังและบันทึกข้อมูลการซ่อมเรียบร้อย");
+
+            // Reset และปิด Modal
+            setIsModalOpen(false);
+            form.resetFields();
+            setSelectedRows([]);
+            fetchData();
+
+        } catch (err) {
+            // กรณี Validate ไม่ผ่าน หรือ API Error
+            if (err.errorFields) return; // Validate Failed
+            console.error(err);
+            message.error(err.response?.data?.message || "เกิดข้อผิดพลาดในการบันทึก");
+        } finally {
+            setConfirmLoading(false);
+        }
+    };
+
+    const handleModalCancel = () => {
+        setIsModalOpen(false);
+        form.resetFields();
     };
 
     const onSelectionChanged = useCallback((event) => {
@@ -170,6 +201,7 @@ function RepairRequestLog() {
         <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200">
             {/* Search Bar Section */}
             <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none p-2">
+                {/* ... Input Search เหมือนเดิม ... */}
                 <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100 flex-1 md:flex-none">
                     <Input
                         prefix={<SearchOutlined className="text-gray-400" />}
@@ -181,16 +213,14 @@ function RepairRequestLog() {
                     />
                     <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
 
-                    {/* 4. แก้ปัญหาปุ่มสีเขียว (ใช้ !bg-green-600 เพื่อ Override Theme Global) */}
                     <ConfigProvider theme={{ token: { colorPrimary: '#16a34a' } }}>
                         <Button
                             type="primary"
                             icon={<ToolOutlined />}
                             disabled={selectedRows.length === 0}
-                            onClick={handleReceiveToStock}
+                            onClick={handleReceiveToStockClick} // เปลี่ยน function ตรงนี้
                             className="bg-green-600 hover:!bg-green-500 border-none h-9 rounded-lg px-4 font-medium shadow-md transition-all"
                         >
-                            {/* แสดงจำนวนรายการที่เลือก */}
                             ซ่อมแล้ว ({selectedRows.length})
                         </Button>
                     </ConfigProvider>
@@ -209,6 +239,52 @@ function RepairRequestLog() {
                     suppressRowClickSelection={true}
                 />
             </div>
+
+            {/* ================= MODAL FORM ================= */}
+            <Modal
+                title={
+                    <div className="flex items-center gap-2 text-green-700">
+                        <ToolOutlined />
+                        <span>บันทึกผลการซ่อมและรับเข้าคลัง</span>
+                    </div>
+                }
+                open={isModalOpen}
+                onOk={handleModalOk}
+                onCancel={handleModalCancel}
+                okText="ยืนยันรับเข้า"
+                cancelText="ยกเลิก"
+                confirmLoading={confirmLoading}
+                okButtonProps={{ className: 'bg-green-600 hover:!bg-green-500' }}
+            >
+                <div className="mb-4 text-gray-500 text-sm">
+                    กำลังทำรายการรับเข้าจำนวน: <span className="font-bold text-black">{selectedRows.length}</span> รายการ
+                </div>
+
+                <Form form={form} layout="vertical">
+                    <Form.Item
+                        name="repair_parts"
+                        label="รายการชิ้นส่วนที่ซ่อม/เปลี่ยน (เลือกได้หลายรายการ)"
+                    >
+                        <Checkbox.Group className="flex flex-col gap-2">
+                            {REPAIR_PARTS_OPTIONS.map(opt => (
+                                <Checkbox key={opt} value={opt}>{opt}</Checkbox>
+                            ))}
+                        </Checkbox.Group>
+                    </Form.Item>
+
+                    <Divider className="my-2" />
+
+                    <Form.Item
+                        name="repair_detail"
+                        label="รายละเอียดเพิ่มเติม / หมายเหตุ"
+                    >
+                        <Input.TextArea
+                            rows={3}
+                            placeholder="ระบุรายละเอียดการซ่อม หรือหมายเหตุ..."
+                        />
+                    </Form.Item>
+                </Form>
+            </Modal>
         </div>
     );
 }

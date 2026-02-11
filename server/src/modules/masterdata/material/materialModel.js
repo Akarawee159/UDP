@@ -3,6 +3,11 @@
 
 const db = require('../../../config/database');
 
+// ✅ Helper: สร้างเวลาปัจจุบันเป็น Timezone ไทย (UTC+7)
+const getThaiNow = () => {
+  return dayjs().format('YYYY-MM-DD HH:mm:ss');
+};
+
 /** ดึงรายการทั้งหมด */
 async function getAll() {
   // ใช้ LEFT JOIN กับ tb_erp_status
@@ -73,13 +78,13 @@ async function checkCodeDuplicate(material_code, excludeId = null) {
 }
 
 async function create(data) {
+  const now = getThaiNow();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
     const [lastRows] = await conn.query('SELECT material_id FROM materials ORDER BY material_id DESC LIMIT 1 FOR UPDATE');
     const nextId = lastRows.length ? Number(lastRows[0].material_id) + 1 : 1;
 
-    // เพิ่ม fields drawing_001 - 006
     const sql = `
       INSERT INTO materials (
         material_id, material_code, material_name, material_source, material_usedfor, material_type,
@@ -91,12 +96,10 @@ async function create(data) {
         material_width, material_width_unit, material_length, material_length_unit,
         material_height, material_height_unit, material_capacity, material_capacity_unit,
         material_weight, material_weight_unit,
-        -- Drawings
         drawing_001, drawing_002, drawing_003, drawing_004, drawing_005, drawing_006
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(),
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?, ?, ?, ?) -- เพิ่ม placeholder อีก 6 ตัว
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await conn.query(sql, [
@@ -105,7 +108,7 @@ async function create(data) {
       data.material_detail, data.material_feature, data.material_image, data.currency,
       data.quantity_mainunit, data.mainunit_name, data.quantity_subunit, data.subunit_name,
       data.minimum_order, data.minstock, data.maxstock, data.is_status,
-      data.created_by,
+      data.created_by, now,
       data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
       data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
       data.material_weight, data.material_weight_unit,
@@ -125,6 +128,8 @@ async function create(data) {
 }
 
 async function update(material_id, data) {
+  const now = getThaiNow(); // เรียกใช้เวลาไทย
+
   const sql = `
     UPDATE materials
     SET 
@@ -133,11 +138,10 @@ async function update(material_id, data) {
       material_detail = ?, material_feature = ?, material_image = ?, currency = ?,
       quantity_mainunit = ?, mainunit_name = ?, quantity_subunit = ?, subunit_name = ?,
       minimum_order = ?, minstock = ?, maxstock = ?, is_status = ?,
-      updated_by = ?, updated_at = NOW(),
+      updated_by = ?, updated_at = ?,
       material_width = ?, material_width_unit = ?, material_length = ?, material_length_unit = ?,
       material_height = ?, material_height_unit = ?, material_capacity = ?, material_capacity_unit = ?,
       material_weight = ?, material_weight_unit = ?,
-      -- Drawings
       drawing_001 = ?, drawing_002 = ?, drawing_003 = ?, 
       drawing_004 = ?, drawing_005 = ?, drawing_006 = ?
     WHERE material_id = ?
@@ -149,11 +153,10 @@ async function update(material_id, data) {
     data.material_detail, data.material_feature, data.material_image, data.currency,
     data.quantity_mainunit, data.mainunit_name, data.quantity_subunit, data.subunit_name,
     data.minimum_order, data.minstock, data.maxstock, data.is_status,
-    data.updated_by,
+    data.updated_by, now,
     data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
     data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
     data.material_weight, data.material_weight_unit,
-    // Drawing Values
     data.drawing_001 || '', data.drawing_002 || '', data.drawing_003 || '',
     data.drawing_004 || '', data.drawing_005 || '', data.drawing_006 || '',
     material_id
