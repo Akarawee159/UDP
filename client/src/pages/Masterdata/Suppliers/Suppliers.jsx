@@ -54,20 +54,26 @@ function Suppliers() {
         const s = getSocket();
         if (!s) return;
 
-        const onUpsert = (row) => {
+        const onUpsert = (payload) => {
+            // Payload อาจจะมี oldCode มาด้วยถ้ามีการเปลี่ยน Code
+            const { oldCode, ...row } = payload;
+
             setRows((prev) => {
-                const idx = prev.findIndex((r) => r.id === row.id);
+                // ถ้ามี oldCode ให้หาจาก oldCode ก่อน
+                const searchKey = oldCode || row.supplier_code;
+                const idx = prev.findIndex((r) => r.supplier_code === searchKey);
+
                 if (idx === -1) {
-                    return [...prev, row].sort((a, b) => a.id - b.id);
+                    return [...prev, row].sort((a, b) => a.supplier_code.localeCompare(b.supplier_code));
                 }
                 const next = prev.slice();
-                next[idx] = row;
+                next[idx] = row; // แทนที่ด้วยข้อมูลใหม่ (ซึ่ง code อาจเปลี่ยนไปแล้ว)
                 return next;
             });
         };
 
-        const onDelete = ({ id }) => {
-            setRows((prev) => prev.filter((r) => r.id !== id));
+        const onDelete = ({ supplier_code }) => {
+            setRows((prev) => prev.filter((r) => r.supplier_code !== supplier_code));
         };
 
         s.on('supplier:upsert', onUpsert);
@@ -122,11 +128,19 @@ function Suppliers() {
             headerComponentParams: { align: 'center' }
         },
         {
-            headerName: 'รหัสบริษัท',
+            headerName: 'รหัสย่อ',
             field: 'supplier_code',
-            width: 120,
+            width: 140,
             filter: true,
             cellClass: "cursor-pointer text-blue-600 font-semibold",
+            headerComponentParams: { align: 'center' }
+        },
+        {
+            headerName: 'รหัสลูกค้า', // เพิ่ม Column นี้
+            field: 'supplier_code2',
+            width: 140,
+            filter: true,
+            cellClass: "cursor-pointer text-purple-600 font-medium",
             headerComponentParams: { align: 'center' }
         },
         {

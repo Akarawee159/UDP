@@ -14,14 +14,13 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
 
   const handleOk = async () => {
-    if (!record?.id) return;
+    if (!record?.supplier_code) return;
     try {
       setLoading(true);
-      // ✅ API Endpoint สำหรับ Company
-      await api.delete(`/masterdata/supplier/${record.id}`);
+      // ส่ง code ไปลบ
+      await api.delete(`/masterdata/supplier/${encodeURIComponent(record.supplier_code)}`);
       message.success('ลบข้อมูลสำเร็จ');
-      onSuccess?.(record?.id);
-      // onClose?.(); // ให้ Parent จัดการปิดเอง
+      onSuccess?.(record.supplier_code);
     } catch (err) {
       const apiMsg = err?.response?.data?.message || 'ลบไม่สำเร็จ';
       message.error(apiMsg);

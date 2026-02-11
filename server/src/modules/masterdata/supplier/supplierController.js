@@ -1,12 +1,11 @@
 'use strict';
 
-// ✅ แก้ path model ให้ถูกต้อง
 const model = require('./supplierModel');
 
-/** helper: trim และ validate payload */
 function parsePayload(body) {
   return {
     supplier_code: String(body.supplier_code || '').trim(),
+    supplier_code2: String(body.supplier_code2 || '').trim(), // เพิ่มรหัสภายใน
     supplier_type: String(body.supplier_type || '').trim(),
     branch_name: String(body.branch_name || '').trim(),
     supplier_name: String(body.supplier_name || '').trim(),
@@ -19,18 +18,6 @@ function parsePayload(body) {
   };
 }
 
-function ensureRequired(payload) {
-  const missing = [];
-  if (!payload.supplier_code) missing.push('รหัสบริษัท');
-  if (!payload.supplier_name) missing.push('ชื่อบริษัท (ไทย)');
-
-  if (missing.length) {
-    const err = new Error(`กรอกข้อมูลไม่ครบ: ${missing.join(', ')}`);
-    err.status = 400;
-    throw err;
-  }
-}
-
 async function getAll(_req, res, next) {
   try {
     const rows = await model.getAll();
@@ -38,10 +25,10 @@ async function getAll(_req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function getById(req, res, next) {
+async function getByCode(req, res, next) {
   try {
-    const id = Number(req.params.G_ID); // รับเป็น param ชื่อเดิมแต่ cast เป็น id
-    const row = await model.getById(id);
+    const code = req.params.code; // ไม่ต้อง Number() แล้ว เพราะเป็น String
+    const row = await model.getByCode(code);
     if (!row) {
       const err = new Error('ไม่พบข้อมูล');
       err.status = 404;
@@ -51,13 +38,16 @@ async function getById(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function checkCode(req, res, next) {
+// API สำหรับ Check Real-time
+async function checkDuplicate(req, res, next) {
   try {
-    const code = String(req.query.code || '').trim();
-    const excludeId = req.query.excludeId || null;
-    if (!code) return res.json({ exists: false });
+    const field = req.query.field || 'supplier_code'; // รับ field ที่จะเช็ค
+    const value = String(req.query.value || '').trim();
+    const excludeCode = req.query.excludeCode || null;
 
-    const exists = await model.checkCodeDuplicate(code, excludeId);
+    if (!value) return res.json({ exists: false });
+
+    const exists = await model.checkDuplicate(field, value, excludeCode);
     res.json({ exists: exists });
   } catch (err) { next(err); }
 }
@@ -65,30 +55,34 @@ async function checkCode(req, res, next) {
 async function create(req, res, next) {
   try {
     const payload = parsePayload(req.body);
-    ensureRequired(payload);
+    if (!payload.supplier_code) throw new Error('กรุณาระบุรหัสผู้ขาย (ภายนอก)');
+    if (!payload.supplier_name) throw new Error('กรุณาระบุชื่อบริษัท');
 
-    const dup = await model.checkCodeDuplicate(payload.supplier_code, null);
-    if (dup) {
-      const err = new Error('รหัสบริษัท (Company Code) ซ้ำในระบบ');
-      err.status = 409;
-      throw err;
+    // เช็คซ้ำทั้ง 2 รหัส
+    if (await model.checkDuplicate('supplier_code', payload.supplier_code)) {
+      throw new Error(`รหัสภายนอก ${payload.supplier_code} มีอยู่แล้ว`);
+    }
+    if (payload.supplier_code2 && await model.checkDuplicate('supplier_code2', payload.supplier_code2)) {
+      throw new Error(`รหัสภายใน ${payload.supplier_code2} มีอยู่แล้ว`);
     }
 
-    const newId = await model.create(payload);
-    const row = await model.getById(newId);
+    const newCode = await model.create(payload);
+    const row = await model.getByCode(newCode);
 
-    // ✅ แก้ชื่อ event เป็น supplier:upsert
     const io = req.app.get('io');
     if (io) io.emit('supplier:upsert', row);
 
     res.status(201).json({ success: true, data: row, message: 'เพิ่มข้อมูลสำเร็จ' });
-  } catch (err) { next(err); }
+  } catch (err) {
+    err.status = 409;
+    next(err);
+  }
 }
 
 async function update(req, res, next) {
   try {
-    const id = Number(req.params.G_ID);
-    const exist = await model.getById(id);
+    const oldCode = req.params.code; // Code เดิมจาก URL
+    const exist = await model.getByCode(oldCode);
     if (!exist) {
       const err = new Error('ไม่พบข้อมูล');
       err.status = 404;
@@ -96,25 +90,23 @@ async function update(req, res, next) {
     }
 
     const payload = parsePayload(req.body);
-    ensureRequired(payload);
 
-    const dup = await model.checkCodeDuplicate(payload.supplier_code, id);
-    if (dup) {
-      const err = new Error('รหัสบริษัทซ้ำในระบบ');
-      err.status = 409;
-      throw err;
+    // เช็คซ้ำ (exclude ตัวเองด้วย oldCode)
+    if (await model.checkDuplicate('supplier_code', payload.supplier_code, oldCode)) {
+      throw new Error(`รหัสภายนอก ${payload.supplier_code} ซ้ำกับข้อมูลอื่น`);
+    }
+    if (payload.supplier_code2 && await model.checkDuplicate('supplier_code2', payload.supplier_code2, oldCode)) {
+      throw new Error(`รหัสภายใน ${payload.supplier_code2} ซ้ำกับข้อมูลอื่น`);
     }
 
-    const ok = await model.update(id, payload);
-    if (!ok) {
-      const err = new Error('อัปเดตไม่สำเร็จ');
-      err.status = 500;
-      throw err;
-    }
+    const ok = await model.update(oldCode, payload);
+    if (!ok) throw new Error('อัปเดตไม่สำเร็จ');
 
-    const row = await model.getById(id);
+    // ดึงข้อมูลใหม่ด้วย Code ใหม่ (เผื่อมีการเปลี่ยน Code)
+    const row = await model.getByCode(payload.supplier_code);
+
     const io = req.app.get('io');
-    if (io) io.emit('supplier:upsert', row);
+    if (io) io.emit('supplier:upsert', { ...row, oldCode: oldCode }); // ส่ง oldCode กลับไปบอก Frontend ให้ลบตัวเก่าถ้า Code เปลี่ยน
 
     res.json({ success: true, data: row, message: 'อัปเดตข้อมูลสำเร็จ' });
   } catch (err) { next(err); }
@@ -122,23 +114,16 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
-    const id = Number(req.params.G_ID);
-    const exist = await model.getById(id);
-    if (!exist) {
-      const err = new Error('ไม่พบข้อมูล');
+    const code = req.params.code;
+    const ok = await model.remove(code);
+    if (!ok) {
+      const err = new Error('ลบไม่สำเร็จ หรือไม่พบข้อมูล');
       err.status = 404;
       throw err;
     }
 
-    const ok = await model.remove(id);
-    if (!ok) {
-      const err = new Error('ลบไม่สำเร็จ');
-      err.status = 500;
-      throw err;
-    }
-
     const io = req.app.get('io');
-    if (io) io.emit('supplier:delete', { id }); // ส่งกลับเป็น id
+    if (io) io.emit('supplier:delete', { supplier_code: code });
 
     res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
   } catch (err) {
@@ -152,8 +137,8 @@ async function remove(req, res, next) {
 
 module.exports = {
   getAll,
-  getById,
-  checkCode,
+  getByCode,
+  checkDuplicate,
   create,
   update,
   remove,

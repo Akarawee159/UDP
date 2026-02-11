@@ -3,8 +3,8 @@ import { Modal, Form, Input, App, Button, ConfigProvider, Spin, Row, Col, Typogr
 import {
     IdcardOutlined, TagOutlined, EditOutlined, SaveOutlined,
     DeleteOutlined, PlusCircleOutlined, BankOutlined,
-    GlobalOutlined, EnvironmentOutlined, PhoneOutlined,
-    SafetyCertificateOutlined, BranchesOutlined, InfoCircleOutlined
+    InfoCircleOutlined, PhoneOutlined, SafetyCertificateOutlined,
+    BranchesOutlined, EnvironmentOutlined, BarcodeOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 
@@ -14,25 +14,30 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
     const [form] = Form.useForm();
 
-    // ตรวจสอบโหมด: ถ้ามี record ส่งมา = Edit Mode
-    const isEditMode = !!record?.id;
+    // ใช้ supplier_code เป็นตัวเช็คว่าเป็น Edit Mode
+    const isEditMode = !!record?.supplier_code;
 
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
-    const [checkingCode, setCheckingCode] = useState(false);
+
+    // State สำหรับสถานะการตรวจสอบซ้ำ
+    const [checkingCode1, setCheckingCode1] = useState(false);
+    const [checkingCode2, setCheckingCode2] = useState(false);
+
+    // เก็บค่าเดิมไว้เปรียบเทียบตอนแก้ไข
     const [originalCode, setOriginalCode] = useState(null);
 
     const timerRef = useRef(null);
 
-    // 1. ฟังก์ชันดึงข้อมูลล่าสุด (เฉพาะ Edit Mode)
-    const fetchDetail = useCallback(async (id) => {
+    // ฟังก์ชันดึงรายละเอียด (กรณี Edit)
+    const fetchDetail = useCallback(async (code) => {
         try {
             setFetching(true);
-            const res = await api.get(`/masterdata/supplier/${id}`);
+            const res = await api.get(`/masterdata/supplier/${encodeURIComponent(code)}`);
             const data = res?.data?.data;
             if (data) {
                 form.setFieldsValue(data);
-                setOriginalCode(data.supplier_code || null);
+                setOriginalCode(data.supplier_code); // จำ code หลักเดิมไว้
             }
         } catch (err) {
             console.error(err);
@@ -49,34 +54,46 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             setOriginalCode(null);
 
             if (isEditMode) {
+                // Set ค่าเบื้องต้นจาก record ก่อน fetch
                 form.setFieldsValue(record);
-                setOriginalCode(record.supplier_code || null);
-                fetchDetail(record.id);
+                setOriginalCode(record.supplier_code);
+                fetchDetail(record.supplier_code);
             }
         }
     }, [open, isEditMode, record, form, fetchDetail]);
 
-    // Validation
-    const validateCode = (_rule, value) => new Promise((resolve, reject) => {
+    // --- Dynamic Validator Check ---
+    const checkDuplicateApi = async (field, value) => {
+        let url = `/masterdata/supplier/check-duplicate?field=${field}&value=${encodeURIComponent(value)}`;
+        // ถ้าแก้ไข ให้ส่ง excludeCode ไปด้วย (ส่งค่า PK เดิม)
+        if (isEditMode && originalCode) {
+            url += `&excludeCode=${encodeURIComponent(originalCode)}`;
+        }
+        const res = await api.get(url);
+        return res?.data?.exists;
+    };
+
+    const validateField = (fieldName, setChecking) => (_rule, value) => new Promise((resolve, reject) => {
         clearTimeout(timerRef.current);
-        const code = (value || '').trim();
-        if (!code || (isEditMode && code === originalCode)) {
-            setCheckingCode(false);
+        const inputVal = (value || '').trim();
+
+        // ถ้าไม่มีค่า หรือ (ในโหมดแก้ไข และค่าเท่ากับค่าใน record เดิม) ไม่ต้องเช็ค
+        if (!inputVal || (isEditMode && record && inputVal === record[fieldName])) {
+            setChecking(false);
             return resolve();
         }
 
-        setCheckingCode(true);
+        setChecking(true);
+        // Debounce 600ms
         timerRef.current = setTimeout(async () => {
             try {
-                let url = `/masterdata/supplier/check-code?code=${encodeURIComponent(code)}`;
-                if (isEditMode) url += `&excludeId=${record.id}`;
-                const res = await api.get(url);
-                setCheckingCode(false);
-                if (res?.data?.exists) reject('รหัสนี้มีแล้วในระบบ');
+                const isDup = await checkDuplicateApi(fieldName, inputVal);
+                setChecking(false);
+                if (isDup) reject('รหัสนี้มีในระบบแล้ว');
                 else resolve();
             } catch (err) {
-                setCheckingCode(false);
-                resolve(); // ถ้าเช็คไม่ได้ ให้ผ่านไปก่อน
+                setChecking(false);
+                resolve(); // ถ้า error ให้ผ่านไปก่อน
             }
         }, 600);
     });
@@ -90,7 +107,8 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             let resData;
 
             if (isEditMode) {
-                const res = await api.put(`/masterdata/supplier/${record.id}`, payload);
+                // ส่ง PUT ไปที่ originalCode (เพราะ user อาจแก้ supplier_code ใหม่)
+                const res = await api.put(`/masterdata/supplier/${encodeURIComponent(originalCode)}`, payload);
                 message.success('อัปเดตข้อมูลสำเร็จ');
                 resData = res?.data?.data;
             } else {
@@ -100,7 +118,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             }
 
             form.resetFields();
-            onSuccess?.(resData || null);
+            onSuccess?.(resData);
             onClose?.();
         } catch (err) {
             if (err?.errorFields) return;
@@ -110,25 +128,17 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         }
     };
 
-    const handleCancel = () => {
-        form.resetFields();
-        onClose?.();
-    };
-
     return (
         <ConfigProvider
             theme={{
                 token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: "'Prompt', 'Inter', sans-serif" },
-                components: {
-                    Input: { controlHeight: 42 }, // ปรับความสูง Input ให้ดู Modern
-                    Button: { controlHeight: 40 }
-                }
+                components: { Input: { controlHeight: 42 }, Button: { controlHeight: 40 } }
             }}
         >
             <Modal
                 open={open}
                 title={null}
-                onCancel={handleCancel}
+                onCancel={onClose}
                 footer={null}
                 width={1000}
                 closable={false}
@@ -137,7 +147,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 centered
                 styles={{ content: { padding: 0, borderRadius: '20px', overflow: 'hidden' } }}
             >
-                {/* --- Header --- */}
+                {/* Header */}
                 <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -148,175 +158,157 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 {isEditMode ? 'แก้ไขข้อมูลบริษัท' : 'เพิ่มบริษัทใหม่'}
                             </Title>
                             <Text className="text-slate-500 text-sm font-light">
-                                {isEditMode ? 'supplier Information Update' : 'Create New supplier Profile'}
+                                Supplier Management
                             </Text>
                         </div>
                     </div>
-                    <Button type="text" onClick={handleCancel} className="text-slate-400 hover:text-slate-600 rounded-full w-10 h-10 flex items-center justify-center hover:bg-slate-100">
+                    <Button type="text" onClick={onClose} className="text-slate-400 hover:text-slate-600 rounded-full w-10 h-10 flex items-center justify-center hover:bg-slate-100">
                         <span className="text-2xl font-light">&times;</span>
                     </Button>
                 </div>
 
-                <Spin spinning={fetching} tip="กำลังโหลดข้อมูล...">
+                <Spin spinning={fetching} tip="กำลังโหลด...">
                     <Form form={form} layout="vertical" autoComplete="off">
-
-                        {/* --- Main Content Split Layout --- */}
                         <div className="flex flex-col md:flex-row h-auto md:h-[550px]">
 
-                            {/* LEFT SIDE: Identity & Basic Info */}
+                            {/* LEFT SIDE: Codes & Basic Info */}
                             <div className="w-full md:w-[340px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0">
                                 <div className="text-center mb-8 mt-2">
                                     <div className="w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-400 mb-4 shadow-sm group hover:border-blue-300 transition-colors cursor-default">
                                         <BankOutlined style={{ fontSize: '48px' }} className="group-hover:text-blue-500 transition-colors" />
-                                        <span className="text-xs mt-3 font-medium tracking-wide uppercase text-slate-400 group-hover:text-blue-500">supplier Profile</span>
                                     </div>
                                     <div className="text-slate-500 font-medium text-sm">ข้อมูลหลักองค์กร</div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                                        {/* รหัสย่อ */}
                                         <Form.Item
-                                            label={<span className="text-slate-600 font-medium">รหัสบริษัท <span className="text-red-500">*</span></span>}
+                                            label={<span className="text-slate-600 font-medium">รหัสย่อ <span className="text-red-500">*</span></span>}
                                             name="supplier_code"
-                                            rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]}
+                                            rules={[
+                                                { required: true, message: 'ระบุรหัส' },
+                                                { validator: validateField('supplier_code', setCheckingCode1) }
+                                            ]}
                                             hasFeedback
-                                            validateStatus={checkingCode ? 'validating' : undefined}
+                                            validateStatus={checkingCode1 ? 'validating' : undefined}
                                             className="mb-4"
                                         >
-                                            <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="Ex. COMP-001" className="font-mono bg-slate-50" maxLength={20} />
+                                            <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="Ex. SUP-EXT-001" className="font-mono bg-slate-50" />
                                         </Form.Item>
 
+                                        {/* รหัสลูกค้าภายใน (เพิ่มใหม่) */}
                                         <Form.Item
-                                            label={<span className="text-slate-600 font-medium">ชื่อบริษัท<span className="text-red-500">*</span></span>}
-                                            name="supplier_name"
-                                            rules={[{ required: true, message: 'ระบุชื่อบริษัท' }]}
+                                            label={<span className="text-slate-600 font-medium">รหัสลูกค้า</span>}
+                                            name="supplier_code2"
+                                            rules={[
+                                                { validator: validateField('supplier_code2', setCheckingCode2) }
+                                            ]}
+                                            hasFeedback
+                                            validateStatus={checkingCode2 ? 'validating' : undefined}
                                             className="mb-4"
                                         >
-                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ชื่อภาษาไทย" />
+                                            <Input prefix={<BarcodeOutlined className="text-slate-400" />} placeholder="Ex. INT-001" className="font-mono bg-slate-50" />
                                         </Form.Item>
 
                                     </div>
                                 </div>
                             </div>
 
-                            {/* RIGHT SIDE: Details & Address */}
+                            {/* RIGHT SIDE: Details */}
                             <div className="flex-1 p-8 overflow-y-auto custom-scrollbar bg-white">
-
-                                {/* Section 1: Business Details */}
                                 <div className="mb-8">
                                     <div className="flex items-center gap-3 mb-5">
                                         <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><SafetyCertificateOutlined /></div>
                                         <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-widest">Business Info</h3>
                                         <div className="flex-1 h-px bg-slate-100 ml-2"></div>
                                     </div>
-
+                                    {/* ... Fields อื่นๆ เหมือนเดิม ... */}
                                     <Row gutter={16}>
+                                        <Col span={24}>
+                                            <Form.Item
+                                                label={<span className="text-slate-600 font-medium">ชื่อบริษัท<span className="text-red-500">*</span></span>}
+                                                name="supplier_name"
+                                                rules={[{ required: true, message: 'ระบุชื่อบริษัท' }]}
+                                                className="mb-0"
+                                            >
+                                                <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ระบุชื่อบริษัท" />
+                                            </Form.Item>
+                                        </Col>
                                         <Col span={12}>
                                             <Form.Item label="ประเภทธุรกิจ" name="supplier_type">
-                                                <Input prefix={<InfoCircleOutlined className="text-slate-400" />} placeholder="เช่น ผลิตชิ้นส่วนยานยนต์" />
+                                                <Input prefix={<InfoCircleOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="เลขผู้เสียภาษี (Tax ID)" name="tax_id">
-                                                <Input prefix={<IdcardOutlined className="text-slate-400" />} placeholder="13 หลัก" className="font-mono" />
+                                                <Input prefix={<IdcardOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="ชื่อสาขา (ถ้ามี)" name="branch_name">
-                                                <Input prefix={<BranchesOutlined className="text-slate-400" />} placeholder="เช่น สำนักงานใหญ่" />
+                                                <Input prefix={<BranchesOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="เบอร์โทรบริษัท" name="contact_phone">
-                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} placeholder="02-xxx-xxxx" />
+                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="เบอร์โทรศัพท์" name="supplier_phone">
-                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} placeholder="02-xxx-xxxx" />
+                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="ชื่อผู้ติดต่อ" name="contact_name">
-                                                <Input prefix={<BranchesOutlined className="text-slate-400" />} placeholder="เช่น สำนักงานใหญ่" />
+                                                <Input prefix={<BranchesOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                     </Row>
                                 </div>
 
-                                {/* Section 2: Location */}
                                 <div>
                                     <div className="flex items-center gap-3 mb-5">
                                         <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><EnvironmentOutlined /></div>
                                         <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-widest">Address & Location</h3>
                                         <div className="flex-1 h-px bg-slate-100 ml-2"></div>
                                     </div>
-
                                     <Row gutter={16}>
                                         <Col span={24}>
                                             <Form.Item label="ที่อยู่" name="supplier_address">
-                                                <Input.TextArea
-                                                    rows={3}
-                                                    placeholder="เลขที่, หมู่, ถนน, แขวง/ตำบล, เขต/อำเภอ, จังหวัด, รหัสไปรษณีย์"
-                                                    className="rounded-xl"
-                                                />
+                                                <Input.TextArea rows={3} className="rounded-xl" />
                                             </Form.Item>
                                         </Col>
                                         <Col span={24}>
                                             <Form.Item label="หมายเหตุ" name="remark">
-                                                <Input.TextArea
-                                                    rows={3}
-                                                    placeholder="หมายเหตุ"
-                                                    className="rounded-xl"
-                                                />
+                                                <Input.TextArea rows={3} className="rounded-xl" />
                                             </Form.Item>
                                         </Col>
                                     </Row>
                                 </div>
-
                             </div>
                         </div>
                     </Form>
                 </Spin>
 
-                {/* --- Footer --- */}
                 <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center z-50 rounded-b-2xl">
                     <div>
                         {isEditMode && (
-                            <Button
-                                danger
-                                type="text"
-                                onClick={onDelete}
-                                disabled={loading || fetching}
-                                icon={<DeleteOutlined />}
-                                className="hover:bg-red-50 text-red-500 font-medium"
-                            >
+                            <Button danger type="text" onClick={onDelete} disabled={loading || fetching} icon={<DeleteOutlined />}>
                                 ลบข้อมูลบริษัท
                             </Button>
                         )}
                     </div>
                     <div className="flex gap-3">
-                        <Button
-                            type="primary"
-                            loading={loading}
-                            onClick={handleOk}
-                            icon={<SaveOutlined />}
-                            className="px-6 rounded-lg shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-500 font-medium"
-                        >
+                        <Button type="primary" loading={loading} onClick={handleOk} icon={<SaveOutlined />} className="px-6 bg-blue-600 hover:bg-blue-500">
                             {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}
                         </Button>
-                        <Button
-                            onClick={handleCancel}
-                            disabled={loading}
-                            className="px-6 rounded-lg border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300"
-                        >
-                            ยกเลิก
-                        </Button>
+                        <Button onClick={onClose} disabled={loading}>ยกเลิก</Button>
                     </div>
                 </div>
             </Modal>
         </ConfigProvider>
     );
 }
-
 export default ModalForm;

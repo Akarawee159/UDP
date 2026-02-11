@@ -6,36 +6,46 @@ const db = require('../../../config/database');
 async function getAll() {
   const sql = `
     SELECT 
-      id, supplier_code, supplier_type, branch_name,
+      supplier_code, supplier_code2, supplier_type, branch_name,
       supplier_name, remark,
       supplier_address, contact_name, supplier_phone, contact_phone, tax_id
     FROM suppliers
-    ORDER BY id ASC
+    ORDER BY supplier_code ASC
   `;
   const [rows] = await db.query(sql);
   return rows;
 }
 
-/** ดึงข้อมูลตาม ID */
-async function getById(id) {
+/** ดึงข้อมูลตาม Code */
+async function getByCode(code) {
   const sql = `
     SELECT *
     FROM suppliers
-    WHERE id = ?
+    WHERE supplier_code = ?
     LIMIT 1
   `;
-  const [rows] = await db.query(sql, [id]);
+  const [rows] = await db.query(sql, [code]);
   return rows[0] || null;
 }
 
-/** ตรวจว่ามี supplier_code ซ้ำหรือไม่ */
-async function checkCodeDuplicate(supplier_code, excludeId = null) {
-  let sql = `SELECT id FROM suppliers WHERE supplier_code = ?`;
-  const params = [supplier_code];
-  if (excludeId != null) {
-    sql += ` AND id <> ?`;
-    params.push(excludeId);
+/** * ตรวจสอบค่าซ้ำ (ใช้ได้ทั้ง supplier_code และ supplier_code2)
+ * @param {string} field - ชื่อ column ที่ต้องการเช็ค ('supplier_code' หรือ 'supplier_code2')
+ * @param {string} value - ค่าที่ต้องการเช็ค
+ * @param {string} excludeCode - รหัสเดิม (กรณีแก้ไข) เพื่อไม่ให้เช็คเจอตัวเอง
+ */
+async function checkDuplicate(field, value, excludeCode = null) {
+  // ป้องกัน SQL Injection โดยการ allow เฉพาะชื่อ field ที่กำหนด
+  const allowedFields = ['supplier_code', 'supplier_code2'];
+  if (!allowedFields.includes(field)) throw new Error('Invalid field check');
+
+  let sql = `SELECT supplier_code FROM suppliers WHERE ${field} = ?`;
+  const params = [value];
+
+  if (excludeCode) {
+    sql += ` AND supplier_code <> ?`;
+    params.push(excludeCode);
   }
+
   const [rows] = await db.query(sql, params);
   return rows.length > 0;
 }
@@ -48,17 +58,17 @@ async function create(data) {
 
     const sql = `
       INSERT INTO suppliers 
-      (supplier_code, supplier_type, branch_name, supplier_name, remark, supplier_address, contact_name, supplier_phone, contact_phone, tax_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (supplier_code, supplier_code2, supplier_type, branch_name, supplier_name, remark, supplier_address, contact_name, supplier_phone, contact_phone, tax_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await conn.query(sql, [
-      data.supplier_code, data.supplier_type, data.branch_name,
+    await conn.query(sql, [
+      data.supplier_code, data.supplier_code2, data.supplier_type, data.branch_name,
       data.supplier_name, data.remark,
       data.supplier_address, data.contact_name, data.supplier_phone, data.contact_phone, data.tax_id
     ]);
 
     await conn.commit();
-    return result.insertId;
+    return data.supplier_code; // คืนค่าเป็น code แทน id
   } catch (err) {
     await conn.rollback();
     throw err;
@@ -67,40 +77,25 @@ async function create(data) {
   }
 }
 
-/** แก้ไขข้อมูล และอัปเดต tb_branch ด้วย (Cascading Update) */
-async function update(id, data) {
+/** แก้ไขข้อมูล (ระวัง: ถ้าเปลี่ยน supplier_code ที่เป็น PK ต้องจัดการให้ดี) */
+async function update(oldCode, data) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
-    // 1. ดึง code เดิมเพื่อดูว่ามีการเปลี่ยนหรือไม่
-    const [oldRows] = await conn.query('SELECT supplier_code FROM suppliers WHERE id = ?', [id]);
-    const oldCode = oldRows[0]?.supplier_code;
-
-    // 2. อัปเดต suppliers
-    const sqlCompany = `
+    const sql = `
       UPDATE suppliers
-      SET supplier_code=?, supplier_type=?, branch_name=?, 
+      SET supplier_code=?, supplier_code2=?, supplier_type=?, branch_name=?, 
           supplier_name=?, remark=?, 
           supplier_address=?, contact_name=?, supplier_phone=?, contact_phone=?, tax_id=?
-      WHERE id = ?
+      WHERE supplier_code = ?
     `;
-    const [result] = await conn.query(sqlCompany, [
-      data.supplier_code, data.supplier_type, data.branch_name,
+    const [result] = await conn.query(sql, [
+      data.supplier_code, data.supplier_code2, data.supplier_type, data.branch_name,
       data.supplier_name, data.remark,
       data.supplier_address, data.contact_name, data.supplier_phone, data.contact_phone, data.tax_id,
-      id
+      oldCode // ใช้ oldCode ใน Where Clause
     ]);
-
-    // 3. Cascading Update ไปยัง tb_branch ถ้า code เปลี่ยน
-    if (oldCode && oldCode !== data.supplier_code) {
-      const sqlBranch = `
-        UPDATE tb_branch
-        SET supplier_code = ?
-        WHERE supplier_code = ?
-      `;
-      await conn.query(sqlBranch, [data.supplier_code, oldCode]);
-    }
 
     await conn.commit();
     return result.affectedRows > 0;
@@ -114,16 +109,16 @@ async function update(id, data) {
 }
 
 /** ลบข้อมูล */
-async function remove(id) {
-  const sql = `DELETE FROM suppliers WHERE id = ?`;
-  const [result] = await db.query(sql, [id]);
+async function remove(code) {
+  const sql = `DELETE FROM suppliers WHERE supplier_code = ?`;
+  const [result] = await db.query(sql, [code]);
   return result.affectedRows > 0;
 }
 
 module.exports = {
   getAll,
-  getById,
-  checkCodeDuplicate,
+  getByCode,
+  checkDuplicate,
   create,
   update,
   remove,
