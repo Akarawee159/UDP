@@ -41,7 +41,8 @@ services:
       - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD} # รับค่า Password จาก Env
       - DB_NAME=${DB_NAME}        # ชื่อ Database ที่จะใช้
-    # ❌ ลบ env_file ทิ้งแล้ว ใช้ environment ด้านบนแทน
+      - JWT_SECRET=${JWT_SECRET}
+      - REFRESH_SECRET=${REFRESH_SECRET}
     networks:
       - shared-network
 
