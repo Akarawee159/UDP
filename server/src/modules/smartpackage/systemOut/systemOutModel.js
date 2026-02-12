@@ -635,9 +635,10 @@ async function confirmOutput(draft_id, user_id) {
         UPDATE tb_asset_lists
         SET is_status = '115',
             updated_by = ?,
-            updated_at = ?
+            updated_at = ?,
+            last_used = ?
         WHERE draft_id = ?
-    `, [user_id, now, draft_id]);
+    `, [user_id, now, now, draft_id]);
 
   // 4. บันทึกประวัติลง Detail (Snapshot)
   const sqlInsertDetail = `

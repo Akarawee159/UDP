@@ -12,6 +12,17 @@ async function getAll(_req, res, next) {
   }
 }
 
+async function getHistory(req, res, next) {
+  try {
+    const { code } = req.params;
+    const rows = await model.getHistory(code);
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAll,
+  getHistory,
 };

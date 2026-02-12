@@ -143,8 +143,8 @@ const DataTable = ({
 
         // Pagination
         pagination={true}
-        paginationPageSize={30}
-        paginationPageSizeSelector={[30, 50, 100]}
+        paginationPageSize={50}
+        paginationPageSizeSelector={[50, 100, 200]}
         localeText={LOCALE_TEXT_TH}
 
         // Selection (แก้ Warning deprecated string)

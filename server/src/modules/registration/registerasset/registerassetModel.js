@@ -138,7 +138,7 @@ async function createBulk(dataArray) {
     item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
     item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
-    item.print_status, item.asset_status, item.is_status,
+    item.print_status, item.asset_status, item.is_status, item.last_used || getBangkokNow(),
     // created_at, created_by, created_at
     item.created_at || getBangkokNow(), item.created_by, item.created_at || getBangkokNow()
   ]);
@@ -155,7 +155,7 @@ async function createBulk(dataArray) {
       asset_img, 
       asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
       asset_remark, asset_usedfor, asset_brand, asset_feature, asset_supplier_name, label_register, partCode, 
-      print_status, asset_status, is_status, 
+      print_status, asset_status, is_status, last_used,
       create_date, created_by, created_at
     ) VALUES ?
   `;
