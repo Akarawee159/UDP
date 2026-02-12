@@ -378,8 +378,6 @@ async function returnSingleAsset(assetCode) {
               is_status = '115',
               draft_id = NULL, 
               refID = NULL, 
-              scan_by = NULL, 
-              scan_at = NULL, 
               updated_at = ?
           WHERE asset_code = ?
       `, [now, assetCode]);
@@ -418,8 +416,6 @@ async function returnSingleAsset(assetCode) {
               is_status = ?,
               draft_id = NULL, 
               refID = NULL, 
-              scan_by = NULL, 
-              scan_at = NULL, 
               updated_at = ?
           WHERE asset_code = ?
       `, [targetAssetStatus, targetIsStatus, now, assetCode]);

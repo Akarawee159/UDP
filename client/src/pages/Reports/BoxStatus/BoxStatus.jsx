@@ -1,643 +1,466 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+// เพิ่ม Input เข้าไปใน import นี้
+import { Grid, Card, Typography, Tabs, Select, Input, DatePicker, Button, Form, Row, Col, Space } from 'antd';
+import { SearchOutlined, ClearOutlined, ClockCircleOutlined, UserOutlined, CalendarOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-    ResponsiveContainer, Cell, PieChart, Pie
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+    PieChart, Pie, Cell
 } from 'recharts';
-import * as XLSX from 'xlsx';
-import {
-    FileExcelOutlined,
-    ReloadOutlined,
-    AppstoreOutlined,
-    TableOutlined,
-    PieChartOutlined,
-    BarChartOutlined,
-    FilterOutlined,
-    SearchOutlined
-} from '@ant-design/icons';
-
-import api from '../../../api';
+import dayjs from 'dayjs';
+import 'dayjs/locale/th';
+import buddhistEra from 'dayjs/plugin/buddhistEra';
 import DataTable from '../../../components/aggrid/DataTable';
+import api from '../../../api';
 
-// --- Configuration ---
-const STATUS_CONFIG = {
-    100: {
-        label: 'คงคลัง',
-        color: '#3b82f6',
-        bgColor: '#eff6ff',
-        borderColor: '#3b82f6',
-        icon: '📦'
-    },
-    101: {
-        label: 'จ่ายออกใช้งาน',
-        color: '#22c55e',
-        bgColor: '#f0fdf4',
-        borderColor: '#22c55e',
-        icon: '✅'
-    },
-    103: {
-        label: 'ของชำรุด',
-        color: '#eab308',
-        bgColor: '#fefce8',
-        borderColor: '#eab308',
-        icon: '⚠️'
-    },
-    104: {
-        label: 'เบิกซ่อม',
-        color: '#f97316',
-        bgColor: '#fff7ed',
-        borderColor: '#f97316',
-        icon: '🔧'
-    },
-    107: {
-        label: 'ของเสีย',
-        color: '#ef4444',
-        bgColor: '#fef2f2',
-        borderColor: '#ef4444',
-        icon: '❌'
-    },
-};
+// ตั้งค่า Dayjs ให้รองรับปีพุทธศักราช และภาษาไทย
+dayjs.extend(buddhistEra);
+dayjs.locale('th');
+
+const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
 
 function BoxStatus() {
-    // --- State ---
-    const [rowData, setRowData] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [selectedStatus, setSelectedStatus] = useState('ALL');
-    const [viewMode, setViewMode] = useState('cards'); // 'cards', 'table', 'chart'
-    const [searchTerm, setSearchTerm] = useState('');
-    const [gridApi, setGridApi] = useState(null);
+    const screens = Grid.useBreakpoint();
+    const isMd = !!screens.md;
+    const [form] = Form.useForm();
 
-    // --- Fetch Data ---
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await api.get('/report/boxstatus');
-            if (res.data?.success) {
-                setRowData(res.data.data || []);
+    const [loading, setLoading] = useState(false);
+    const [rawData, setRawData] = useState([]);
+    const [displayData, setDisplayData] = useState([]);
+
+    const [selectedPartCodePie, setSelectedPartCodePie] = useState('ALL');
+
+    const containerStyle = useMemo(() => ({
+        margin: isMd ? '-8px' : '0',
+        padding: isMd ? '16px' : '12px',
+        minHeight: '100vh',
+        backgroundColor: '#f0f2f5'
+    }), [isMd]);
+
+    // ---------------------------------------------------------
+    // 1. Fetch Data
+    // ---------------------------------------------------------
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const res = await api.get('/report/boxstatus');
+                if (res.data.success) {
+                    setRawData(res.data.data);
+                    setDisplayData(res.data.data);
+                }
+            } catch (error) {
+                console.error("Error fetching box status:", error);
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            console.error("Error fetching box status:", error);
-        } finally {
-            setLoading(false);
-        }
+        };
+        fetchData();
     }, []);
 
-    // --- Socket Event Listeners ---
-    useEffect(() => {
-        fetchData();
-
-        const eventsToListen = [
-            'hrms:registerasset-upsert',
-            'hrms:systemout-update',
-            'hrms:systemin-update',
-            'hrms:systemdefective-update',
-            'hrms:systemrepair-update',
-        ];
-
-        const handleRefresh = () => fetchData();
-        eventsToListen.forEach(evt => window.addEventListener(evt, handleRefresh));
-
-        return () => {
-            eventsToListen.forEach(evt => window.removeEventListener(evt, handleRefresh));
-        };
-    }, [fetchData]);
-
-    // --- Statistics Calculation ---
-    const statistics = useMemo(() => {
-        const stats = {
-            total: rowData.length,
-            byStatus: {}
+    // ---------------------------------------------------------
+    // 2. Prepare Options (ดึงข้อมูลสำหรับ Dropdown)
+    // ---------------------------------------------------------
+    const options = useMemo(() => {
+        const extractUnique = (key, labelKey = null) => {
+            const map = new Map();
+            rawData.forEach(item => {
+                const value = item[key];
+                if (value) {
+                    const label = labelKey ? item[labelKey] : value;
+                    map.set(value, label);
+                }
+            });
+            return Array.from(map.entries())
+                .map(([value, label]) => ({ value, label }))
+                .sort((a, b) => a.value.localeCompare(b.value));
         };
 
-        Object.keys(STATUS_CONFIG).forEach(key => {
-            stats.byStatus[key] = rowData.filter(r => String(r.asset_status) === String(key)).length;
-        });
+        return {
+            assetCodes: extractUnique('asset_code'), // เพิ่มตัวเลือกสำหรับรหัสทรัพย์สิน
+            origins: extractUnique('asset_origin'),
+            destinations: extractUnique('asset_destination'),
+            statuses: extractUnique('asset_status', 'asset_status_name'),
+            lots: extractUnique('asset_lot'),
+            partCodes: extractUnique('partCode')
+        };
+    }, [rawData]);
 
-        return stats;
-    }, [rowData]);
+    // ---------------------------------------------------------
+    // 3. Search Logic
+    // ---------------------------------------------------------
+    const handleSearch = (values) => {
+        let filtered = [...rawData];
 
-    // --- Filtered Data ---
-    const filteredData = useMemo(() => {
-        let data = rowData;
-
-        // Filter by status
-        if (selectedStatus !== 'ALL') {
-            data = data.filter(r => String(r.asset_status) === String(selectedStatus));
+        // แก้ไข Asset Code เป็น Exact Match เพราะเลือกจาก Dropdown
+        if (values.asset_code) {
+            filtered = filtered.filter(item => item.asset_code === values.asset_code);
+        }
+        if (values.asset_origin) {
+            filtered = filtered.filter(item => item.asset_origin === values.asset_origin);
+        }
+        if (values.asset_destination) {
+            filtered = filtered.filter(item => item.asset_destination === values.asset_destination);
+        }
+        if (values.asset_status) {
+            filtered = filtered.filter(item => item.asset_status === values.asset_status);
         }
 
-        // Filter by search term
-        if (searchTerm) {
-            const search = searchTerm.toLowerCase();
-            data = data.filter(r =>
-                r.asset_code?.toLowerCase().includes(search) ||
-                r.asset_detail?.toLowerCase().includes(search) ||
-                r.asset_brand?.toLowerCase().includes(search) ||
-                r.doc_no?.toLowerCase().includes(search)
-            );
+        if (values.create_date_range && values.create_date_range.length === 2) {
+            const [start, end] = values.create_date_range;
+            filtered = filtered.filter(item => {
+                const date = dayjs(item.create_date);
+                return date.isValid() && (date.isSame(start, 'day') || date.isAfter(start, 'day')) && (date.isSame(end, 'day') || date.isBefore(end, 'day'));
+            });
         }
 
-        return data;
-    }, [rowData, selectedStatus, searchTerm]);
+        if (values.updated_at_range && values.updated_at_range.length === 2) {
+            const [start, end] = values.updated_at_range;
+            filtered = filtered.filter(item => {
+                const dateToCheck = item.updated_at || item.created_at;
+                const date = dayjs(dateToCheck);
+                return date.isValid() && (date.isSame(start, 'day') || date.isAfter(start, 'day')) && (date.isSame(end, 'day') || date.isBefore(end, 'day'));
+            });
+        }
 
-    // --- Chart Data ---
-    const chartData = useMemo(() => {
-        return Object.entries(STATUS_CONFIG).map(([code, config]) => ({
-            name: config.label,
-            count: statistics.byStatus[code] || 0,
-            color: config.color,
-            code: code,
-            percentage: statistics.total > 0
-                ? ((statistics.byStatus[code] || 0) / statistics.total * 100).toFixed(1)
-                : 0
-        }));
-    }, [statistics]);
+        if (values.doc_no) filtered = filtered.filter(item => item.doc_no?.toLowerCase().includes(values.doc_no.toLowerCase()));
+        if (values.asset_lot) filtered = filtered.filter(item => item.asset_lot === values.asset_lot);
+        if (values.partCode) filtered = filtered.filter(item => item.partCode === values.partCode);
 
-    // --- Brand Distribution ---
-    const brandData = useMemo(() => {
-        const brands = {};
-        filteredData.forEach(item => {
-            const brand = item.asset_brand || 'ไม่ระบุ';
-            brands[brand] = (brands[brand] || 0) + 1;
+        setDisplayData(filtered);
+    };
+
+    const handleReset = () => {
+        form.resetFields();
+        setDisplayData(rawData);
+    };
+
+    // ---------------------------------------------------------
+    // 4. Chart Data
+    // ---------------------------------------------------------
+    const barChartData = useMemo(() => {
+        const groups = {};
+        displayData.forEach(item => {
+            const partCode = item.partCode || 'Unknown';
+            if (!groups[partCode]) {
+                groups[partCode] = {
+                    name: `BOX NO ${partCode}`,
+                    partCode: partCode,
+                    status100: 0, status103: 0, status104: 0, total: 0
+                };
+            }
+            const status = String(item.asset_status);
+            groups[partCode].total += 1;
+            if (status === '100') groups[partCode].status100 += 1;
+            else if (status === '103') groups[partCode].status103 += 1;
+            else if (status === '104') groups[partCode].status104 += 1;
         });
-        return Object.entries(brands)
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 10);
-    }, [filteredData]);
+        return Object.values(groups);
+    }, [displayData]);
 
-    // --- Column Definitions ---
+    const { pieChartData, allStats } = useMemo(() => {
+        let filteredForPie = displayData;
+        if (selectedPartCodePie !== 'ALL') {
+            filteredForPie = displayData.filter(item => item.partCode === selectedPartCodePie);
+        }
+
+        let statsMap = {
+            '100': { id: '100', name: 'คงเหลือ', value: 0, color: '#1890ff' },
+            '101': { id: '101', name: 'จ่ายออก', value: 0, color: '#52c41a' },
+            '103': { id: '103', name: 'ชำรุด', value: 0, color: '#faad14' },
+            '104': { id: '104', name: 'เบิกซ่อม', value: 0, color: '#fa8c16' },
+            'overdue': { id: 'overdue', name: 'เลยกำหนดส่งคืน', value: 0, color: '#f5222d' },
+            'count_total': { id: 'count_total', name: 'ทั้งหมด', value: 0, color: '#000000', isTotal: true },
+        };
+
+        statsMap['count_total'].value = filteredForPie.length;
+        const today = dayjs();
+
+        filteredForPie.forEach(item => {
+            const status = String(item.asset_status);
+            const refID = item.refID || '';
+            const scanDate = item.scan_at ? dayjs(item.scan_at) : null;
+            let isOverdue = false;
+            if (refID.startsWith('RF') && scanDate && today.diff(scanDate, 'day') > 7) {
+                isOverdue = true;
+            }
+
+            if (isOverdue) statsMap['overdue'].value += 1;
+            else if (statsMap[status]) statsMap[status].value += 1;
+        });
+
+        const displayOrder = ['count_total', '101', '103', '104', 'overdue', '100'];
+        const sortedStatsArray = displayOrder.map(key => statsMap[key]).filter(item => item !== undefined);
+        const filteredChartData = Object.values(statsMap).filter(item => !item.isTotal && item.value > 0);
+
+        return { pieChartData: filteredChartData, allStats: sortedStatsArray };
+    }, [displayData, selectedPartCodePie]);
+
+    // ---------------------------------------------------------
+    // 5. Columns Definition (AG Grid)
+    // ---------------------------------------------------------
+    const formatDateThai = (date) => date ? dayjs(date).format('DD/MM/BBBB') : '-';
+
+    // Helper สำหรับแสดงค่าว่างเป็น "-"
+    const safeVal = (val) => (val === null || val === undefined || val === '') ? '-' : val;
+
     const columnDefs = useMemo(() => [
+        { headerName: '#', valueGetter: "node.rowIndex + 1", width: 60, cellClass: "text-center" },
         {
-            headerName: "รหัสทรัพย์สิน",
-            field: "asset_code",
-            filter: 'agTextColumnFilter',
-            minWidth: 150,
-            pinned: 'left'
-        },
-        {
-            headerName: "ชื่อทรัพย์สิน",
-            field: "asset_detail",
-            filter: 'agTextColumnFilter',
-            flex: 1,
-            minWidth: 200
-        },
-        {
-            headerName: "สถานะ",
-            field: "asset_status",
-            minWidth: 140,
-            filter: 'agSetColumnFilter',
+            headerName: 'เลยกำหนดส่งคืน',
+            width: 150,
+            cellClass: "flex items-center justify-center",
             cellRenderer: (params) => {
-                const status = params.value;
-                const config = STATUS_CONFIG[status];
-                if (!config) return status;
-                return (
-                    <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
-                        <span
-                            className="px-3 py-1 rounded-full text-xs font-semibold"
-                            style={{
-                                backgroundColor: config.bgColor,
-                                color: config.color,
-                                border: `1px solid ${config.borderColor}`
-                            }}
-                        >
-                            {config.label}
+                const { refID, scan_at } = params.data;
+                const today = dayjs();
+                const scanDate = scan_at ? dayjs(scan_at) : null;
+
+                // Logic: refID เริ่มต้น RF และ scan_at เกิน 7 วัน
+                if (refID && String(refID).startsWith('RF') && scanDate && today.diff(scanDate, 'day') > 7) {
+                    return (
+                        <span className="text-red-500 font-bold flex items-center gap-1">
+                            <ExclamationCircleOutlined /> เลยกำหนด
                         </span>
+                    );
+                }
+                return <span className="text-gray-400">-</span>;
+            }
+        },
+        {
+            headerName: 'สถานะใช้งาน',
+            field: 'asset_status',
+            width: 160,
+            filter: true,
+            cellClass: "flex items-center",
+            cellRenderer: (params) => {
+                const { asset_status_color, asset_status_name, asset_status } = params.data;
+                const colorClass = asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+                return (
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                        {asset_status_name || asset_status || '-'}
                     </div>
                 );
             }
         },
         {
-            headerName: "ยี่ห้อ",
-            field: "asset_brand",
-            filter: 'agTextColumnFilter',
-            width: 120
+            headerName: 'วันที่ใช้งานล่าสุด',
+            field: 'updated_at',
+            width: 160,
+            cellRenderer: (params) => {
+                const dateToShow = params.data.updated_at || params.data.created_at;
+                return (
+                    <div className="flex items-center gap-2">
+                        <ClockCircleOutlined className="text-blue-500" />
+                        {formatDateThai(dateToShow)}
+                    </div>
+                );
+            }
         },
         {
-            headerName: "ประเภท",
-            field: "asset_type",
-            filter: 'agTextColumnFilter',
-            width: 120
+            headerName: 'ผู้ดำเนินการล่าสุด',
+            field: 'updated_by_name',
+            width: 180,
+            cellRenderer: (params) => (
+                <div className="flex items-center gap-2">
+                    <UserOutlined className="text-blue-500" />
+                    {safeVal(params.value)}
+                </div>
+            )
         },
+        { headerName: 'ต้นทาง', field: 'asset_origin', width: 120, cellRenderer: p => safeVal(p.value) },
+        { headerName: 'ปลายทาง', field: 'asset_destination', width: 120, cellRenderer: p => safeVal(p.value) },
+        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 150, cellRenderer: p => safeVal(p.value) },
         {
-            headerName: "เลขที่เอกสาร",
-            field: "doc_no",
-            filter: 'agTextColumnFilter',
-            width: 150
+            headerName: 'วันที่ขึ้นทะเบียน',
+            field: 'create_date',
+            width: 160,
+            cellRenderer: (params) => (
+                <div className="flex items-center gap-2">
+                    <CalendarOutlined className="text-green-500" />
+                    {formatDateThai(params.value)}
+                </div>
+            )
         },
+        { headerName: 'ชื่อสินค้า', field: 'asset_detail', width: 200, cellRenderer: p => safeVal(p.value) },
+        { headerName: 'Part Code', field: 'partCode', width: 120, cellRenderer: p => safeVal(p.value) },
+        { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150, cellRenderer: p => safeVal(p.value) },
+        { headerName: 'Lot', field: 'asset_lot', width: 120, cellRenderer: p => safeVal(p.value) },
         {
-            headerName: "LOT",
-            field: "asset_lot",
-            width: 100
-        },
-        {
-            headerName: "ใช้งานสำหรับ",
-            field: "asset_usedfor",
-            filter: 'agTextColumnFilter',
-            width: 200
+            headerName: 'สถานะทรัพย์สิน',
+            field: 'is_status',
+            width: 160,
+            filter: true,
+            cellClass: "flex items-center",
+            cellRenderer: (params) => {
+                const { is_status_color, is_status_name, is_status } = params.data;
+                const colorClass = is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+                return (
+                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                        {is_status_name || is_status || '-'}
+                    </div>
+                );
+            }
         },
     ], []);
 
-    // --- Export Excel ---
-    const handleExportExcel = () => {
-        if (!gridApi) return;
+    // ---------------------------------------------------------
+    // Render
+    // ---------------------------------------------------------
 
-        const allColumns = gridApi.getAllDisplayedColumns();
-        const headers = allColumns.map(col => col.getColDef().headerName);
-        const fieldKeys = allColumns.map(col => col.getColDef().field);
+    const renderPieChart = () => (
+        <div style={{ display: 'flex', flexDirection: isMd ? 'row' : 'column', height: 450 }}>
+            <div style={{ width: isMd ? 250 : '100%', padding: '20px', borderRight: isMd ? '1px solid #f0f0f0' : 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Title level={5}>ข้อมูลกล่อง</Title>
+                <Select
+                    value={selectedPartCodePie}
+                    style={{ width: '100%' }}
+                    onChange={(value) => setSelectedPartCodePie(value)}
+                    options={[{ value: 'ALL', label: 'กล่องทั้งหมด' }, ...options.partCodes.map(pc => ({ value: pc.value, label: `BOX NO ${pc.value}` }))]}
+                    showSearch
+                    optionFilterProp="label"
+                />
+            </div>
+            <div style={{ flex: 1, height: '100%', minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie data={pieChartData} cx="50%" cy="50%" labelLine={true} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} outerRadius={130} dataKey="value">
+                            {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip formatter={(value, name) => [value, name]} />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+            <div style={{ width: isMd ? 250 : '100%', padding: '20px', borderLeft: isMd ? '1px solid #f0f0f0' : 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <Title level={5} style={{ marginBottom: 16 }}>ข้อมูลกล่อง ({selectedPartCodePie === 'ALL' ? 'ทั้งหมด' : selectedPartCodePie})</Title>
+                {allStats.map((item) => (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 12, opacity: (item.value === 0 && !item.isTotal) ? 0.4 : 1 }}>
+                        <div style={{ width: 12, height: 12, backgroundColor: item.color, marginRight: 10, borderRadius: '2px', border: item.isTotal ? '1px solid #000' : 'none' }} />
+                        <Text style={{ flex: 1, fontWeight: item.isTotal ? 'bold' : 'normal' }}>{item.name}</Text>
+                        <Text strong style={{ fontSize: item.isTotal ? '16px' : '14px' }}>{item.value}</Text>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 
-        const exportData = [];
-        gridApi.forEachNodeAfterFilterAndSort((node) => {
-            const row = {};
-            fieldKeys.forEach((key, index) => {
-                let val = node.data[key];
-                if (key === 'asset_status' && STATUS_CONFIG[val]) {
-                    val = STATUS_CONFIG[val].label;
-                }
-                row[headers[index]] = val;
-            });
-            exportData.push(row);
-        });
+    const renderBarChart = () => (
+        <div style={{ width: '100%', height: 450 }}>
+            <ResponsiveContainer>
+                <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="status100" name="คงเหลือ" fill="#1890ff" label={{ position: 'top' }} />
+                    <Bar dataKey="status103" name="ชำรุด" fill="#faad14" label={{ position: 'top' }} />
+                    <Bar dataKey="status104" name="เบิกซ่อม" fill="#fa8c16" label={{ position: 'top' }} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
 
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "BoxStatus_Report");
-        XLSX.writeFile(wb, `BoxStatus_${selectedStatus}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    };
-
-    // --- Custom Tooltip for Charts ---
-    const CustomTooltip = ({ active, payload }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-                    <p className="font-semibold text-gray-800">{payload[0].name}</p>
-                    <p className="text-sm text-gray-600">
-                        จำนวน: <span className="font-bold text-blue-600">{payload[0].value}</span> ชิ้น
-                    </p>
-                    {payload[0].payload.percentage && (
-                        <p className="text-xs text-gray-500">
-                            ({payload[0].payload.percentage}%)
-                        </p>
-                    )}
-                </div>
-            );
-        }
-        return null;
-    };
+    const tabItems = [
+        { key: '1', label: 'Pie Chart', children: renderPieChart() },
+        { key: '2', label: 'Bar Chart', children: renderBarChart() },
+    ];
 
     return (
-        <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
-            {/* Header */}
-            <div className="bg-white shadow-md border-b border-gray-200">
-                <div className="p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-                                <span className="text-3xl">📊</span>
-                                รายงานสถานะทรัพย์สิน
-                            </h1>
-                            <p className="text-sm text-gray-500 mt-1">
-                                ภาพรวมและรายละเอียดทรัพย์สิน ทั้งหมด {statistics.total.toLocaleString()} รายการ
-                            </p>
-                        </div>
+        <div style={containerStyle}>
+            <Title level={3} style={{ marginBottom: 20 }}>รายงานสถานะกล่อง</Title>
 
-                        <div className="flex items-center gap-3">
-                            {/* View Mode Toggle */}
-                            <div className="flex bg-gray-100 rounded-lg p-1">
-                                <button
-                                    onClick={() => setViewMode('cards')}
-                                    className={`px-4 py-2 rounded-md transition-all flex items-center gap-2 ${viewMode === 'cards'
-                                        ? 'bg-white shadow-sm text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-800'
-                                        }`}
-                                    title="มุมมองการ์ด"
-                                >
-                                    <AppstoreOutlined />
-                                    <span className="text-sm font-medium">การ์ด</span>
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('chart')}
-                                    className={`px-4 py-2 rounded-md transition-all flex items-center gap-2 ${viewMode === 'chart'
-                                        ? 'bg-white shadow-sm text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-800'
-                                        }`}
-                                    title="มุมมองกราฟ"
-                                >
-                                    <PieChartOutlined />
-                                    <span className="text-sm font-medium">กราฟ</span>
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('table')}
-                                    className={`px-4 py-2 rounded-md transition-all flex items-center gap-2 ${viewMode === 'table'
-                                        ? 'bg-white shadow-sm text-blue-600'
-                                        : 'text-gray-600 hover:text-gray-800'
-                                        }`}
-                                    title="มุมมองตาราง"
-                                >
-                                    <TableOutlined />
-                                    <span className="text-sm font-medium">ตาราง</span>
-                                </button>
-                            </div>
+            <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: 20 }}>
+                <Tabs defaultActiveKey="1" items={tabItems} type="card" size="large" />
+            </Card>
 
-                            {/* Refresh Button */}
-                            <button
-                                onClick={fetchData}
-                                disabled={loading}
-                                className="p-2.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="รีเฟรชข้อมูล"
-                            >
-                                <ReloadOutlined spin={loading} className="text-lg" />
-                            </button>
+            <Card title="เงื่อนไขการค้นหา" bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: 20 }}>
+                <Form form={form} onFinish={handleSearch} layout="vertical">
+                    <Row gutter={[16, 16]}>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="asset_code" label="รหัสทรัพย์สิน">
+                                {/* เปลี่ยนจาก Input เป็น Select เพื่อให้เลือกจากข้อมูลที่มีได้ */}
+                                <Select
+                                    placeholder="ค้นหารหัสทรัพย์สิน"
+                                    allowClear
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={options.assetCodes}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="asset_origin" label="ต้นทาง">
+                                <Select placeholder="เลือกต้นทาง" allowClear showSearch optionFilterProp="label" options={options.origins} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="asset_destination" label="ปลายทาง">
+                                <Select placeholder="เลือกปลายทาง" allowClear showSearch optionFilterProp="label" options={options.destinations} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="asset_status" label="สถานะใช้งาน">
+                                <Select placeholder="เลือกสถานะ" allowClear showSearch optionFilterProp="label" options={options.statuses} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="create_date_range" label="วันที่ขึ้นทะเบียน">
+                                {/* ปรับ Format เป็น D MMMM BBBB เพื่อให้แสดง วัน เดือนเต็ม ปี พ.ศ. */}
+                                <RangePicker
+                                    style={{ width: '100%' }}
+                                    format="D MM BBBB"
+                                    placeholder={['วันเริ่มต้น', 'วันสิ้นสุด']}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="updated_at_range" label="วันที่ใช้งานล่าสุด">
+                                <RangePicker
+                                    style={{ width: '100%' }}
+                                    format="D MM BBBB"
+                                    placeholder={['วันเริ่มต้น', 'วันสิ้นสุด']}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="doc_no" label="เลขที่เอกสาร">
+                                <Input placeholder="เลขที่เอกสาร" allowClear />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="asset_lot" label="ล๊อตสินค้า">
+                                <Select placeholder="เลือกล๊อต" allowClear showSearch optionFilterProp="label" options={options.lots} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={6}>
+                            <Form.Item name="partCode" label="Part Code">
+                                <Select placeholder="เลือก Part Code" allowClear showSearch optionFilterProp="label" options={options.partCodes} />
+                            </Form.Item>
+                        </Col>
+                        <Col xs={24} md={24} style={{ textAlign: 'right' }}>
+                            <Space>
+                                <Button icon={<ClearOutlined />} onClick={handleReset}>ล้างค่า</Button>
+                                <Button type="primary" icon={<SearchOutlined />} htmlType="submit">ค้นหา</Button>
+                            </Space>
+                        </Col>
+                    </Row>
+                </Form>
+            </Card>
 
-                            {/* Export Button */}
-                            <button
-                                onClick={handleExportExcel}
-                                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg shadow-sm transition-all hover:shadow-md font-medium"
-                            >
-                                <FileExcelOutlined />
-                                Export Excel
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Status Filter Pills */}
-                    <div className="flex flex-wrap gap-3 items-center">
-                        <button
-                            onClick={() => setSelectedStatus('ALL')}
-                            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${selectedStatus === 'ALL'
-                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-200'
-                                : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
-                                }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <span className="text-lg">🏢</span>
-                                <span>ทั้งหมด</span>
-                                <span className={`px-2 py-0.5 rounded-full text-xs ${selectedStatus === 'ALL' ? 'bg-white/20' : 'bg-blue-50 text-blue-700'
-                                    }`}>
-                                    {statistics.total}
-                                </span>
-                            </div>
-                        </button>
-
-                        {Object.entries(STATUS_CONFIG).map(([code, config]) => (
-                            <button
-                                key={code}
-                                onClick={() => setSelectedStatus(code)}
-                                className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${selectedStatus === code
-                                    ? 'shadow-lg text-white'
-                                    : 'bg-white border-2 hover:shadow-md'
-                                    }`}
-                                style={selectedStatus === code ? {
-                                    backgroundColor: config.color,
-                                    boxShadow: `0 4px 14px ${config.color}40`
-                                } : {
-                                    borderColor: config.borderColor + '30',
-                                    color: config.color
-                                }}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">{config.icon}</span>
-                                    <span>{config.label}</span>
-                                    <span
-                                        className="px-2 py-0.5 rounded-full text-xs"
-                                        style={selectedStatus === code ? {
-                                            backgroundColor: 'rgba(255,255,255,0.25)'
-                                        } : {
-                                            backgroundColor: config.bgColor,
-                                            color: config.color
-                                        }}
-                                    >
-                                        {statistics.byStatus[code] || 0}
-                                    </span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Search Bar */}
-                    <div className="mt-4">
-                        <div className="relative max-w-md">
-                            <SearchOutlined className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="ค้นหารหัส, ชื่อทรัพย์สิน, ยี่ห้อ, เลขที่เอกสาร..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-11 pr-4 py-2.5 border-2 border-gray-200 rounded-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                            />
-                            {searchTerm && (
-                                <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    ✕
-                                </button>
-                            )}
-                        </div>
-                    </div>
+            <Card
+                title="รายละเอียดข้อมูล"
+                bordered={false}
+                style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+            >
+                {/* กำหนด Height ให้ AG Grid */}
+                <div style={{ height: 600, width: '100%' }}>
+                    <DataTable
+                        rowData={displayData}
+                        columnDefs={columnDefs}
+                        loading={loading}
+                    />
                 </div>
-            </div>
-
-            {/* Content Area */}
-            <div className="flex-1 overflow-auto p-6">
-                {/* Cards View */}
-                {viewMode === 'cards' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredData.map((item, index) => {
-                            const config = STATUS_CONFIG[item.asset_status];
-                            return (
-                                <div
-                                    key={index}
-                                    className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border-2 border-gray-100 hover:border-blue-200"
-                                >
-                                    {/* Card Header */}
-                                    <div
-                                        className="p-4 border-b-4"
-                                        style={{
-                                            backgroundColor: config?.bgColor || '#f9fafb',
-                                            borderBottomColor: config?.color || '#6b7280'
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-2xl">{config?.icon || '📦'}</span>
-                                            <span
-                                                className="px-3 py-1 rounded-full text-xs font-bold"
-                                                style={{
-                                                    backgroundColor: config?.color || '#6b7280',
-                                                    color: 'white'
-                                                }}
-                                            >
-                                                {config?.label || 'ไม่ทราบ'}
-                                            </span>
-                                        </div>
-                                        <h3 className="font-bold text-gray-800 text-sm">
-                                            {item.asset_code}
-                                        </h3>
-                                    </div>
-
-                                    {/* Card Body */}
-                                    <div className="p-4 space-y-2.5">
-                                        <div>
-                                            <p className="text-xs text-gray-500 mb-1">ชื่อทรัพย์สิน</p>
-                                            <p className="text-sm font-medium text-gray-800 line-clamp-2">
-                                                {item.asset_detail || '-'}
-                                            </p>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
-                                            <div>
-                                                <p className="text-xs text-gray-500 mb-1">ยี่ห้อ</p>
-                                                <p className="text-sm font-medium text-gray-700">
-                                                    {item.asset_brand || '-'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs text-gray-500 mb-1">ประเภท</p>
-                                                <p className="text-sm font-medium text-gray-700">
-                                                    {item.asset_type || '-'}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        {item.doc_no && (
-                                            <div className="pt-2">
-                                                <p className="text-xs text-gray-500 mb-1">เลขที่เอกสาร</p>
-                                                <p className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                                                    {item.doc_no}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {item.asset_lot && (
-                                            <div>
-                                                <p className="text-xs text-gray-500 mb-1">LOT</p>
-                                                <p className="text-xs font-mono text-gray-600">
-                                                    {item.asset_lot}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {filteredData.length === 0 && (
-                            <div className="col-span-full text-center py-20">
-                                <div className="text-6xl mb-4">📭</div>
-                                <p className="text-gray-500 text-lg">ไม่พบข้อมูลทรัพย์สิน</p>
-                                <p className="text-gray-400 text-sm mt-2">ลองเปลี่ยนตัวกรองหรือคำค้นหา</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Chart View */}
-                {viewMode === 'chart' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Status Distribution - Bar Chart */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <BarChartOutlined className="text-blue-600" />
-                                สถิติตามสถานะ
-                            </h3>
-                            <ResponsiveContainer width="100%" height={350}>
-                                <BarChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                    <XAxis
-                                        dataKey="name"
-                                        tick={{ fontSize: 12 }}
-                                        angle={-15}
-                                        textAnchor="end"
-                                        height={80}
-                                    />
-                                    <YAxis tick={{ fontSize: 12 }} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={50}>
-                                        {chartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        {/* Status Distribution - Pie Chart */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <PieChartOutlined className="text-green-600" />
-                                สัดส่วนตามสถานะ
-                            </h3>
-                            <ResponsiveContainer width="100%" height={350}>
-                                <PieChart>
-                                    <Pie
-                                        data={chartData}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ name, percentage }) => `${name}: ${percentage}%`}
-                                        outerRadius={110}
-                                        fill="#8884d8"
-                                        dataKey="count"
-                                    >
-                                        {chartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip content={<CustomTooltip />} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        {/* Brand Distribution */}
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                <BarChartOutlined className="text-purple-600" />
-                                Top 10 ยี่ห้อ {selectedStatus !== 'ALL' && `(${STATUS_CONFIG[selectedStatus]?.label})`}
-                            </h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={brandData} layout="horizontal">
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                    <XAxis type="number" tick={{ fontSize: 12 }} />
-                                    <YAxis
-                                        dataKey="name"
-                                        type="category"
-                                        width={120}
-                                        tick={{ fontSize: 12 }}
-                                    />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Bar
-                                        dataKey="count"
-                                        fill="#8b5cf6"
-                                        radius={[0, 8, 8, 0]}
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                )}
-
-                {/* Table View */}
-                {viewMode === 'table' && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full flex flex-col overflow-hidden">
-                        <div className="p-4 border-b border-gray-200 bg-gray-50">
-                            <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                                <TableOutlined className="text-blue-600" />
-                                รายการทรัพย์สิน
-                                <span className="text-sm font-normal text-gray-500">
-                                    ({filteredData.length.toLocaleString()} รายการ)
-                                </span>
-                            </h3>
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                            <DataTable
-                                rowData={filteredData}
-                                columnDefs={columnDefs}
-                                loading={loading}
-                                onGridReady={(params) => setGridApi(params.api)}
-                            />
-                        </div>
-                    </div>
-                )}
-            </div>
+            </Card>
         </div>
     );
 }

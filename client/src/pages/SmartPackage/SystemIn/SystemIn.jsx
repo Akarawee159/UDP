@@ -153,7 +153,7 @@ function SystemIn() {
                                 }}
                                 onConfirm={(e) => e?.stopPropagation()}
                                 cancelText="ยืนยัน"
-                                cancelButtonProps={{ type: 'primary', className: "bg-teal-600 hover:bg-teal-500" }}
+                                cancelButtonProps={{ type: 'primary', className: "!bg-teal-600 hover:!bg-teal-500" }}
                                 okText="ยกเลิก"
                                 okButtonProps={{ type: 'default', danger: true }}
                             >
@@ -161,7 +161,7 @@ function SystemIn() {
                                     type="primary"
                                     size="small"
                                     icon={<CheckCircleOutlined />}
-                                    className="bg-teal-600 hover:bg-teal-500"
+                                    className="!bg-teal-600 hover:!bg-teal-500"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     ยืนยันรับเข้าของดี

@@ -249,12 +249,26 @@ function RepairRequestLog() {
                     </div>
                 }
                 open={isModalOpen}
-                onOk={handleModalOk}
-                onCancel={handleModalCancel}
-                okText="ยืนยันรับเข้า"
-                cancelText="ยกเลิก"
-                confirmLoading={confirmLoading}
-                okButtonProps={{ className: 'bg-green-600 hover:!bg-green-500' }}
+                onCancel={handleModalCancel} // ยังต้องมีเพื่อให้กดปุ่ม X หรือคลิกข้างนอกปิดได้
+
+                // ✅ ใช้ footer เพื่อกำหนดลำดับปุ่มเอง (เรียงจากซ้ายไปขวา)
+                footer={[
+                    <Button
+                        key="submit"
+                        type="primary"
+                        loading={confirmLoading}
+                        onClick={handleModalOk}
+                        className="bg-green-600 hover:!bg-green-500"
+                    >
+                        ยืนยันรับเข้า
+                    </Button>,
+                    <Button
+                        key="back"
+                        onClick={handleModalCancel}
+                    >
+                        ยกเลิก
+                    </Button>
+                ]}
             >
                 <div className="mb-4 text-gray-500 text-sm">
                     กำลังทำรายการรับเข้าจำนวน: <span className="font-bold text-black">{selectedRows.length}</span> รายการ

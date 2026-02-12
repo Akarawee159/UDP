@@ -354,8 +354,6 @@ async function returnSingleAsset(assetCode) {
               is_status = '115',
               draft_id = NULL, 
               refID = NULL, 
-              scan_by = NULL, 
-              scan_at = NULL, 
               updated_at = ?
           WHERE asset_code = ?
       `, [now, assetCode]);
@@ -378,8 +376,6 @@ async function returnSingleAsset(assetCode) {
               is_status = '115',
               draft_id = NULL, 
               refID = NULL, 
-              scan_by = NULL, 
-              scan_at = NULL, 
               updated_at = ?
           WHERE asset_code = ?
       `, [now, assetCode]);
@@ -661,8 +657,6 @@ async function confirmOutput(draft_id, user_id) {
             refID = NULL,
             asset_origin = NULL,
             asset_destination = NULL,
-            scan_by = NULL,
-            scan_at = NULL,
             updated_by = ?,
             updated_at = ?
         WHERE draft_id = ?
