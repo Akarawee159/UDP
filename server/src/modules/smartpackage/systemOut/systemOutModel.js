@@ -309,7 +309,7 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
 
   if (item.asset_status == 101) {
     if (item.refID === refID) {
-      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ถูกจ่ายออกไปแล้วในใบเบิกนี้`, data: item };
+      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ซ้ำ`, data: item };
     } else {
       return { success: false, code: 'INVALID_STATUS', message: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกจ่ายออกไปแล้ว`, data: item };
     }

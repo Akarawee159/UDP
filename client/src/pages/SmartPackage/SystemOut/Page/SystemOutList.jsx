@@ -476,29 +476,31 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             } else {
                 const { code, data, message: msg } = res.data;
 
-                if (code === 'ALREADY_SCANNED') {
-                    modal.confirm({
-                        title: 'ยืนยันการยกเลิกจ่ายออก',
-                        icon: <ExclamationCircleOutlined />,
-                        content: `ต้องการยกเลิกจ่ายออก ${data.asset_code} ใช่หรือไม่?`,
-                        cancelText: 'ยกเลิกจ่ายออก',
-                        cancelButtonProps: { danger: true, type: 'primary' },
-                        okText: 'ปิด',
-                        okButtonProps: { type: 'default' },
-                        onCancel: async () => {
-                            try {
-                                await api.post('/smartpackage/systemout/return-single', {
-                                    asset_code: data.asset_code,
-                                    draft_id: draftId
-                                });
-                                message.success('ยกเลิกจ่ายออกเรียบร้อย');
-                            } catch (e) { message.error('Failed'); }
-                            processingRef.current = false;
-                        },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
-                } else if (code === 'INVALID_STATUS') {
+                // if (code === 'ALREADY_SCANNED') {
+                //     modal.confirm({
+                //         title: 'ยืนยันการยกเลิกจ่ายออก',
+                //         icon: <ExclamationCircleOutlined />,
+                //         content: `ต้องการยกเลิกจ่ายออก ${data.asset_code} ใช่หรือไม่?`,
+                //         cancelText: 'ยกเลิกจ่ายออก',
+                //         cancelButtonProps: { danger: true, type: 'primary' },
+                //         okText: 'ปิด',
+                //         okButtonProps: { type: 'default' },
+                //         onCancel: async () => {
+                //             try {
+                //                 await api.post('/smartpackage/systemout/return-single', {
+                //                     asset_code: data.asset_code,
+                //                     draft_id: draftId
+                //                 });
+                //                 message.success('ยกเลิกจ่ายออกเรียบร้อย');
+                //             } catch (e) { message.error('Failed'); }
+                //             processingRef.current = false;
+                //         },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+                // } else 
+
+                if (code === 'INVALID_STATUS') {
                     modal.error({
                         title: 'แจ้งเตือน',
                         content: (
