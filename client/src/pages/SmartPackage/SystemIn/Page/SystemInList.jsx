@@ -476,90 +476,94 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             } else {
                 const { code, data, message: msg } = res.data;
 
-                if (code === 'ALREADY_SCANNED') {
-                    modal.confirm({
-                        title: 'ยืนยันการยกเลิกรับเข้าของดี',
-                        icon: <ExclamationCircleOutlined />,
-                        content: `ต้องการยกเลิกรับเข้าของดี ${data.asset_code} ใช่หรือไม่?`,
-                        cancelText: 'ยกเลิกรับเข้าของดี',
-                        cancelButtonProps: { danger: true, type: 'primary' },
-                        okText: 'ปิด',
-                        okButtonProps: { type: 'default' },
-                        onCancel: async () => {
-                            try {
-                                await api.post('/smartpackage/systemin/return-single', {
-                                    asset_code: data.asset_code,
-                                    draft_id: draftId
-                                });
-                                message.success('ยกเลิกรับเข้าของดีเรียบร้อย');
-                            } catch (e) { message.error('Failed'); }
-                            processingRef.current = false;
-                        },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
-                } else if (code === 'INVALID_STATUS') {
-                    // (Logic เดิม) สถานะ 102 แต่ผิดตะกร้า
-                    modal.error({
-                        title: 'แจ้งเตือน',
-                        content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกรับเข้าของดีไปแล้ว`,
-                        okText: 'รับทราบ',
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
+                // if (code === 'ALREADY_SCANNED') {
+                //     modal.confirm({
+                //         title: 'ยืนยันการยกเลิกรับเข้าของดี',
+                //         icon: <ExclamationCircleOutlined />,
+                //         content: `ต้องการยกเลิกรับเข้าของดี ${data.asset_code} ใช่หรือไม่?`,
+                //         cancelText: 'ยกเลิกรับเข้าของดี',
+                //         cancelButtonProps: { danger: true, type: 'primary' },
+                //         okText: 'ปิด',
+                //         okButtonProps: { type: 'default' },
+                //         onCancel: async () => {
+                //             try {
+                //                 await api.post('/smartpackage/systemin/return-single', {
+                //                     asset_code: data.asset_code,
+                //                     draft_id: draftId
+                //                 });
+                //                 message.success('ยกเลิกรับเข้าของดีเรียบร้อย');
+                //             } catch (e) { message.error('Failed'); }
+                //             processingRef.current = false;
+                //         },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+                // } else 
 
-                } else if (code === 'INVALID_STATUS_101') {
-                    // 🚩 Case ใหม่: สถานะไม่ใช่ 101
-                    modal.warning({
-                        title: 'แจ้งเตือน: สถานะไม่ถูกต้อง',
-                        content: (
-                            <div className="flex flex-col gap-2">
-                                <span className="text-gray-700">สินค้าต้องมีสถานะ <b>"จ่ายออกใช้งาน"</b> เท่านั้น</span>
-                                <div className="bg-red-50 p-2 rounded border border-red-200 mt-1">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">รหัสทรัพย์สิน:</span>
-                                        <span className="font-bold">{data.asset_code}</span>
-                                    </div>
-                                    <div className="flex justify-between mt-1">
-                                        <span className="text-gray-500">สถานะปัจจุบัน:</span>
-                                        <span className={`px-2 rounded text-xs border ${data.asset_status_color || 'bg-gray-200'}`}>
-                                            {data.asset_status_name || data.asset_status}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ),
-                        okText: 'รับทราบ',
-                        okButtonProps: { type: 'primary', danger: true },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
+                // if (code === 'INVALID_STATUS') {
+                //     // (Logic เดิม) สถานะ 102 แต่ผิดตะกร้า
+                //     modal.error({
+                //         title: 'แจ้งเตือน',
+                //         content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกรับเข้าของดีไปแล้ว`,
+                //         okText: 'รับทราบ',
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
 
-                } else if (code === 'INVALID_ORIGIN') {
-                    // 🚩 Case ใหม่: รับเข้าจากปลายทาง ไม่ตรงกับ Asset Destination
-                    modal.warning({
-                        title: 'แจ้งเตือน: ผิดเงื่อนไขการรับเข้า',
-                        content: (
-                            <div className="flex flex-col gap-2">
-                                <span className="text-gray-700">รับเข้าจากปลายทาง ไม่ตรงกับ ต้นทางของทรัพย์สิน</span>
-                                <div className="bg-orange-50 p-3 rounded border border-orange-200 mt-2 text-sm">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="text-gray-500">รับเข้าจากปลายทาง:</div>
-                                        <div className="font-bold text-red-600">{data.expected_origin || '-'}</div>
+                // } else if (code === 'INVALID_STATUS_101') {
+                //     // 🚩 Case ใหม่: สถานะไม่ใช่ 101
+                //     modal.warning({
+                //         title: 'แจ้งเตือน: สถานะไม่ถูกต้อง',
+                //         content: (
+                //             <div className="flex flex-col gap-2">
+                //                 <span className="text-gray-700">สินค้าต้องมีสถานะ <b>"จ่ายออกใช้งาน"</b> เท่านั้น</span>
+                //                 <div className="bg-red-50 p-2 rounded border border-red-200 mt-1">
+                //                     <div className="flex justify-between">
+                //                         <span className="text-gray-500">รหัสทรัพย์สิน:</span>
+                //                         <span className="font-bold">{data.asset_code}</span>
+                //                     </div>
+                //                     <div className="flex justify-between mt-1">
+                //                         <span className="text-gray-500">สถานะปัจจุบัน:</span>
+                //                         <span className={`px-2 rounded text-xs border ${data.asset_status_color || 'bg-gray-200'}`}>
+                //                             {data.asset_status_name || data.asset_status}
+                //                         </span>
+                //                     </div>
+                //                 </div>
+                //             </div>
+                //         ),
+                //         okText: 'รับทราบ',
+                //         okButtonProps: { type: 'primary', danger: true },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
 
-                                        <div className="text-gray-500">ต้นทางของทรัพย์สิน:</div>
-                                        <div className="font-bold text-blue-600">{data.actual_destination || '-'}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        ),
-                        okText: 'รับทราบ',
-                        okButtonProps: { type: 'primary', danger: true },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
+                // } else if (code === 'INVALID_ORIGIN') {
+                //     // 🚩 Case ใหม่: รับเข้าจากปลายทาง ไม่ตรงกับ Asset Destination
+                //     modal.warning({
+                //         title: 'แจ้งเตือน: ผิดเงื่อนไขการรับเข้า',
+                //         content: (
+                //             <div className="flex flex-col gap-2">
+                //                 <span className="text-gray-700">รับเข้าจากปลายทาง ไม่ตรงกับ ต้นทางของทรัพย์สิน</span>
+                //                 <div className="bg-orange-50 p-3 rounded border border-orange-200 mt-2 text-sm">
+                //                     <div className="grid grid-cols-2 gap-2">
+                //                         <div className="text-gray-500">รับเข้าจากปลายทาง:</div>
+                //                         <div className="font-bold text-red-600">{data.expected_origin || '-'}</div>
 
-                } else {
+                //                         <div className="text-gray-500">ต้นทางของทรัพย์สิน:</div>
+                //                         <div className="font-bold text-blue-600">{data.actual_destination || '-'}</div>
+                //                     </div>
+                //                 </div>
+                //             </div>
+                //         ),
+                //         okText: 'รับทราบ',
+                //         okButtonProps: { type: 'primary', danger: true },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+
+                // } else 
+
+                {
                     message.error(msg);
                     processingRef.current = false;
                 }

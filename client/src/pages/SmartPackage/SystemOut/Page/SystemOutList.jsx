@@ -500,38 +500,40 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 //     });
                 // } else 
 
-                if (code === 'INVALID_STATUS') {
-                    modal.error({
-                        title: 'แจ้งเตือน',
-                        content: (
-                            <div className="flex flex-col gap-3 mt-2">
-                                <div className="text-gray-700">
-                                    ไม่สามารถสแกนเพื่อจ่ายออกได้ เนื่องจากพบว่า
-                                    <div className="font-bold text-black text-lg mt-1">
-                                        {data.asset_code}
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded border border-gray-200">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-gray-500 text-sm">สถานะปัจจุบัน:</span>
-                                        <span className={`px-2 py-0.5 rounded text-sm border font-medium ${data.asset_status_color || 'bg-gray-200 text-gray-600 border-gray-300'}`}>
-                                            {data.asset_status_name || 'ไม่ระบุสถานะ'}
-                                        </span>
-                                    </div>
-                                    {data.refID && (
-                                        <div className="text-red-600 text-sm font-semibold">
-                                            * อยู่ในใบเบิกเลขที่: {data.refID}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ),
-                        okText: 'รับทราบ',
-                        okButtonProps: { type: 'primary' },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
-                } else {
+                // if (code === 'INVALID_STATUS') {
+                //     modal.error({
+                //         title: 'แจ้งเตือน',
+                //         content: (
+                //             <div className="flex flex-col gap-3 mt-2">
+                //                 <div className="text-gray-700">
+                //                     ไม่สามารถสแกนเพื่อจ่ายออกได้ เนื่องจากพบว่า
+                //                     <div className="font-bold text-black text-lg mt-1">
+                //                         {data.asset_code}
+                //                     </div>
+                //                 </div>
+                //                 <div className="flex flex-col gap-2 bg-gray-50 p-3 rounded border border-gray-200">
+                //                     <div className="flex items-center gap-2">
+                //                         <span className="text-gray-500 text-sm">สถานะปัจจุบัน:</span>
+                //                         <span className={`px-2 py-0.5 rounded text-sm border font-medium ${data.asset_status_color || 'bg-gray-200 text-gray-600 border-gray-300'}`}>
+                //                             {data.asset_status_name || 'ไม่ระบุสถานะ'}
+                //                         </span>
+                //                     </div>
+                //                     {data.refID && (
+                //                         <div className="text-red-600 text-sm font-semibold">
+                //                             * อยู่ในใบเบิกเลขที่: {data.refID}
+                //                         </div>
+                //                     )}
+                //                 </div>
+                //             </div>
+                //         ),
+                //         okText: 'รับทราบ',
+                //         okButtonProps: { type: 'primary' },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+                // } else 
+
+                {
                     message.error(msg);
                     processingRef.current = false;
                 }

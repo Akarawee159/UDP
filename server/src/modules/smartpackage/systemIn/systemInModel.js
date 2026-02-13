@@ -281,7 +281,7 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
   // 🔴 เช็ค: ถ้าอยู่ในตะกร้านี้แล้ว (Status 102 && refID ตรงกัน)
   if (item.asset_status == 102) {
     if (item.refID === refID) {
-      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ถูกรับเข้าของดีไปแล้วในใบเบิกนี้`, data: item };
+      return { success: false, code: 'ALREADY_SCANNED', message: `รายการนี้ซ้ำ`, data: item };
     } else {
       return { success: false, code: 'INVALID_STATUS', message: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกรับเข้าของดีไปแล้ว`, data: item };
     }

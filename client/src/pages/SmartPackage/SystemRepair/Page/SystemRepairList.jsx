@@ -428,65 +428,68 @@ function SystemRepairList({ open, onCancel, targetDraftId }) {
             } else {
                 const { code, data, message: msg } = res.data;
 
-                if (code === 'ALREADY_SCANNED') {
-                    modal.confirm({
-                        title: 'ยืนยันการยกเลิกเบิกขอซ่อม',
-                        icon: <ExclamationCircleOutlined />,
-                        content: `ต้องการยกเลิกเบิกขอซ่อม ${data.asset_code} ใช่หรือไม่?`,
-                        cancelText: 'ยกเลิกเบิกขอซ่อม',
-                        cancelButtonProps: { danger: true, type: 'primary' },
-                        okText: 'ปิด',
-                        okButtonProps: { type: 'default' },
-                        onCancel: async () => {
-                            try {
-                                await api.post('/smartpackage/systemrepair/return-single', {
-                                    asset_code: data.asset_code,
-                                    draft_id: draftId
-                                });
-                                message.success('ยกเลิกเบิกขอซ่อมเรียบร้อย');
-                            } catch (e) { message.error('Failed'); }
-                            processingRef.current = false;
-                        },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
-                } else if (code === 'INVALID_STATUS') {
-                    modal.error({
-                        title: 'แจ้งเตือน',
-                        content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกเบิกขอซ่อมไปแล้ว`,
-                        okText: 'รับทราบ',
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
-                } else if (code === 'INVALID_STATUS_103') {
-                    // [NEW] Case สำหรับเช็คสถานะ 103 และแสดงผลแบบ Dynamic
-                    modal.warning({
-                        title: 'แจ้งเตือน: สถานะไม่ถูกต้อง',
-                        content: (
-                            <div className="flex flex-col gap-2">
-                                <span className="text-gray-700">สินค้าต้องมีสถานะ <b>"รอแจ้งซ่อม (103)"</b> เท่านั้น</span>
-                                <div className="bg-red-50 p-2 rounded border border-red-200 mt-1">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">รหัสทรัพย์สิน:</span>
-                                        <span className="font-bold">{data.asset_code}</span>
-                                    </div>
-                                    <div className="flex justify-between mt-1 items-center">
-                                        <span className="text-gray-500">สถานะปัจจุบัน:</span>
-                                        {/* ใช้ dynamic color class จาก backend */}
-                                        <span className={`px-2 py-0.5 rounded text-xs border ${data.asset_status_color || 'bg-gray-200 text-gray-700 border-gray-300'}`}>
-                                            {data.asset_status_name || data.asset_status}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ),
-                        okText: 'รับทราบ',
-                        okButtonProps: { type: 'primary', danger: true },
-                        onOk: () => { processingRef.current = false; },
-                        afterClose: () => { processingRef.current = false; }
-                    });
+                // if (code === 'ALREADY_SCANNED') {
+                //     modal.confirm({
+                //         title: 'ยืนยันการยกเลิกเบิกขอซ่อม',
+                //         icon: <ExclamationCircleOutlined />,
+                //         content: `ต้องการยกเลิกเบิกขอซ่อม ${data.asset_code} ใช่หรือไม่?`,
+                //         cancelText: 'ยกเลิกเบิกขอซ่อม',
+                //         cancelButtonProps: { danger: true, type: 'primary' },
+                //         okText: 'ปิด',
+                //         okButtonProps: { type: 'default' },
+                //         onCancel: async () => {
+                //             try {
+                //                 await api.post('/smartpackage/systemrepair/return-single', {
+                //                     asset_code: data.asset_code,
+                //                     draft_id: draftId
+                //                 });
+                //                 message.success('ยกเลิกเบิกขอซ่อมเรียบร้อย');
+                //             } catch (e) { message.error('Failed'); }
+                //             processingRef.current = false;
+                //         },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+                // } else 
 
-                } else {
+                // if (code === 'INVALID_STATUS') {
+                //     modal.error({
+                //         title: 'แจ้งเตือน',
+                //         content: `ไม่สามารถสแกนได้ เนื่องจากสินค้านี้ถูกเบิกขอซ่อมไปแล้ว`,
+                //         okText: 'รับทราบ',
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+                // } else if (code === 'INVALID_STATUS_103') {
+                //     // [NEW] Case สำหรับเช็คสถานะ 103 และแสดงผลแบบ Dynamic
+                //     modal.warning({
+                //         title: 'แจ้งเตือน: สถานะไม่ถูกต้อง',
+                //         content: (
+                //             <div className="flex flex-col gap-2">
+                //                 <span className="text-gray-700">สินค้าต้องมีสถานะ <b>"รอแจ้งซ่อม (103)"</b> เท่านั้น</span>
+                //                 <div className="bg-red-50 p-2 rounded border border-red-200 mt-1">
+                //                     <div className="flex justify-between">
+                //                         <span className="text-gray-500">รหัสทรัพย์สิน:</span>
+                //                         <span className="font-bold">{data.asset_code}</span>
+                //                     </div>
+                //                     <div className="flex justify-between mt-1 items-center">
+                //                         <span className="text-gray-500">สถานะปัจจุบัน:</span>
+                //                         {/* ใช้ dynamic color class จาก backend */}
+                //                         <span className={`px-2 py-0.5 rounded text-xs border ${data.asset_status_color || 'bg-gray-200 text-gray-700 border-gray-300'}`}>
+                //                             {data.asset_status_name || data.asset_status}
+                //                         </span>
+                //                     </div>
+                //                 </div>
+                //             </div>
+                //         ),
+                //         okText: 'รับทราบ',
+                //         okButtonProps: { type: 'primary', danger: true },
+                //         onOk: () => { processingRef.current = false; },
+                //         afterClose: () => { processingRef.current = false; }
+                //     });
+
+                // } else 
+                {
                     message.error(msg);
                     processingRef.current = false;
                 }
