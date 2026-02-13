@@ -196,7 +196,7 @@ function SystemIn() {
             }
         },
         {
-            headerName: 'รับเข้าจากปลายทาง',
+            headerName: 'รับเข้าจากปลายทาง (จากใบเบิก)',
             field: 'origin',
             width: 160,
             cellClass: "text-center text-gray-600"
