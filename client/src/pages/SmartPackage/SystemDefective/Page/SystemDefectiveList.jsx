@@ -1129,13 +1129,13 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* {bookingStatus === '142' && canUse('system-out:unlock') && (
+                                    {bookingStatus === '142' && canUse('system-out:unlock') && (
                                         <Col span={24}>
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-amber-500 text-amber-500 hover:text-amber-600 hover:border-amber-600">
                                                 ปลดล็อคเพื่อแก้ไข
                                             </Button>
                                         </Col>
-                                    )} */}
+                                    )}
                                 </Row>
                             </Form>
                         </Card>

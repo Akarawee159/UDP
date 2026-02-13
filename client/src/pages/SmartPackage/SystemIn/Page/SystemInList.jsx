@@ -1061,7 +1061,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                 </Form.Item>
                                 <Divider />
                                 {/* รับเข้าจากปลายทาง */}
-                                <Form.Item label="รับเข้าจากปลายทาง" name="origin" rules={[{ required: true }]}>
+                                <Form.Item label="รับเข้าจากปลายทาง (ใบเบิก)" name="origin" rules={[{ required: true }]}>
                                     <Select
                                         showSearch // เปิดให้พิมพ์ค้นหาได้
                                         optionFilterProp="label" // ให้ค้นหาจาก label (เราจะรวม code + name ไว้ในนี้)
@@ -1129,13 +1129,13 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         </Col>
                                     )}
 
-                                    {/* {bookingStatus === '132' && canUse('system-out:unlock') && (
+                                    {bookingStatus === '132' && canUse('system-out:unlock') && (
                                         <Col span={24}>
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:text-orange-600 hover:border-orange-600">
                                                 ปลดล็อคเพื่อแก้ไข
                                             </Button>
                                         </Col>
-                                    )} */}
+                                    )}
                                 </Row>
                             </Form>
                         </Card>
