@@ -2,6 +2,7 @@
 'use strict';
 
 const db = require('../../../config/database');
+const dayjs = require('dayjs');
 
 // ✅ Helper: สร้างเวลาปัจจุบันเป็น Timezone ไทย (UTC+7)
 const getThaiNow = () => {

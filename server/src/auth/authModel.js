@@ -40,6 +40,26 @@ const updateEmployeeStatusById = async (employeeId, status) => {
   await db.query('UPDATE employees SET is_status = ? WHERE employee_id = ?', [status, employeeId]);
 };
 
+/** อัปเดตเวลาเข้าสู่ระบบล่าสุด */
+const updateLastLogin = async (employeeId) => {
+  // 1. ดึงเวลาปัจจุบันโดยบังคับ Time Zone เป็น กรุงเทพฯ (+07:00)
+  const bkkTimeStr = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+  const bkkDate = new Date(bkkTimeStr);
+
+  // 2. จัด Format ให้เป็น YYYY-MM-DD HH:mm:ss สำหรับบันทึกลง MySQL
+  const yyyy = bkkDate.getFullYear();
+  const mm = String(bkkDate.getMonth() + 1).padStart(2, '0');
+  const dd = String(bkkDate.getDate()).padStart(2, '0');
+  const hh = String(bkkDate.getHours()).padStart(2, '0');
+  const min = String(bkkDate.getMinutes()).padStart(2, '0');
+  const ss = String(bkkDate.getSeconds()).padStart(2, '0');
+
+  const mysqlDateTime = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+
+  // 3. ส่ง String วันที่และเวลาที่ถูกต้องไปบันทึกแทนการใช้คำสั่ง NOW()
+  await db.query('UPDATE employees SET last_login = ? WHERE employee_id = ?', [mysqlDateTime, employeeId]);
+};
+
 /** ---------- Token Version helpers ---------- */
 const getTokenVersionByEmployeeId = async (employeeId) => {
   const [rows] = await db.query('SELECT token_version FROM employees WHERE employee_id = ? LIMIT 1', [employeeId]);
@@ -154,6 +174,7 @@ module.exports = {
   isRefreshTokenValid,
   deleteAllRefreshTokensByEmployeeId,
   updateEmployeeStatusById,
+  updateLastLogin,
   getTokenVersionByEmployeeId,
   bumpTokenVersion,
   createFullEmployee,

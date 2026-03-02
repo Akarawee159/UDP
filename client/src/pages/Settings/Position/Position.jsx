@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import ModalForm from "./Modal/ModalForm";
 import ModalDelete from "./Modal/ModalDelete";
 import { getSocket } from '../../../socketClient';
-import DataTable from '../../../components/aggrid/DataTable';
+
+// ✅ นำเข้า DraggableTable
+import DraggableTable from '../../../components/antdtable/DraggableTable';
 
 function Position() {
   const screens = Grid.useBreakpoint();
@@ -28,9 +27,21 @@ function Position() {
   const [rows, setRows] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // ✅ State สำหรับ Pagination และความสูงของตาราง
+  const [page, setPage] = useState({ current: 1, pageSize: 10 });
+  const [tableY, setTableY] = useState(600);
+
   const [modalFormOpen, setModalFormOpen] = useState(false);
   const [currentRecord, setCurrentRecord] = useState(null);
   const [openDelete, setOpenDelete] = useState(false);
+
+  // ✅ คำนวณความสูงตารางอัตโนมัติ
+  useEffect(() => {
+    const onResize = () => setTableY(Math.max(400, window.innerHeight - 300));
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // ====== Fetching & Socket ======
   const fetchData = useCallback(async () => {
@@ -80,7 +91,6 @@ function Position() {
   }, []);
 
   // ====== Actions ======
-
   const handleCreate = () => {
     setCurrentRecord(null);
     setModalFormOpen(true);
@@ -91,7 +101,6 @@ function Position() {
     setModalFormOpen(true);
   };
 
-  // เปิด Modal ลบ (โดยไม่ปิด ModalForm เพื่อให้ซ้อนกัน)
   const openDeleteModal = (record) => {
     setCurrentRecord(record);
     setOpenDelete(true);
@@ -99,73 +108,68 @@ function Position() {
 
   const handleFormSuccess = () => {
     fetchData();
-    // ModalForm จะปิดตัวเอง หรือสั่งปิดที่นี่ก็ได้
   };
 
   const handleDeleteSuccess = () => {
     setOpenDelete(false);
-    setModalFormOpen(false); // ปิดฟอร์มด้วยเมื่อลบเสร็จ
+    setModalFormOpen(false);
     fetchData();
   };
 
-  // ====== AG Grid Definitions ======
-
-  // 2. กำหนด Columns (ตัด Action Column ออก)
-  const columnDefs = useMemo(() => [
+  // ====== Columns (Ant Design Format) ======
+  const baseColumns = useMemo(() => [
     {
-      headerName: 'ลำดับ',
-      width: 140,
-      maxWidth: 140,
-      valueGetter: "node.rowIndex + 1",
-      cellClass: "text-center flex items-center justify-center cursor-pointer",
-      sortable: false,
-      filter: false,
-      pinned: 'left',
-      lockVisible: true,
-      suppressMovable: true,
-      headerComponent: undefined,
-      headerComponentParams: { align: 'center' }
+      title: 'ลำดับ',
+      key: 'index',
+      width: 80,
+      align: 'center',
+      dragDisabled: true,
+      render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
     },
     {
-      headerName: 'รหัสตำแหน่ง',
-      field: 'G_CODE',
-      width: 200,
-      filter: true,
-      cellClass: "font-mono font-semibold text-blue-700 cursor-pointer",
-      filterParams: { buttons: ['reset'] },
-      headerComponentParams: { align: 'center' }
+      title: 'รหัสตำแหน่ง',
+      dataIndex: 'G_CODE',
+      key: 'G_CODE',
+      width: 150,
+      sorter: (a, b) => String(a.G_CODE || '').localeCompare(String(b.G_CODE || '')),
+      filters: [...new Set(rows.map(r => r.G_CODE).filter(Boolean))].map(v => ({ text: v, value: v })),
+      filterSearch: true,
+      onFilter: (value, record) => record.G_CODE === value,
+      render: (val) => <span className="font-mono font-semibold text-blue-700">{val}</span>
     },
     {
-      headerName: 'ชื่อตำแหน่งงาน (ไทย)',
-      field: 'G_NAME',
-      minWidth: 140,
-      flex: 1,
-      filter: true,
-      cellClass: "cursor-pointer",
-      filterParams: { buttons: ['reset'] },
-      headerComponentParams: { align: 'center' }
+      title: 'ชื่อตำแหน่งงาน (ไทย)',
+      dataIndex: 'G_NAME',
+      key: 'G_NAME',
+      width: 250,
+      sorter: (a, b) => String(a.G_NAME || '').localeCompare(String(b.G_NAME || '')),
+      filters: [...new Set(rows.map(r => r.G_NAME).filter(Boolean))].map(v => ({ text: v, value: v })),
+      filterSearch: true,
+      onFilter: (value, record) => record.G_NAME === value,
     },
     {
-      headerName: 'อยู่ภายใต้แผนก',
-      field: 'dept_name',
-      minWidth: 400,
-      valueFormatter: (p) => p.value || '-',
-      filter: true,
-      cellClass: "cursor-pointer",
-      filterParams: { buttons: ['reset'] },
-      headerComponentParams: { align: 'center' }
+      title: 'อยู่ภายใต้แผนก',
+      dataIndex: 'dept_name',
+      key: 'dept_name',
+      width: 300,
+      sorter: (a, b) => String(a.dept_name || '').localeCompare(String(b.dept_name || '')),
+      filters: [...new Set(rows.map(r => r.dept_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+      filterSearch: true,
+      onFilter: (value, record) => record.dept_name === value,
+      render: (val) => val || '-'
     },
     {
-      headerName: 'รหัสแผนก',
-      field: 'dept_code_ref',
-      width: 140,
-      valueFormatter: (p) => p.value || '-',
-      filter: true,
-      cellClass: "cursor-pointer",
-      filterParams: { buttons: ['reset'] },
-      headerComponentParams: { align: 'center' }
+      title: 'รหัสแผนก',
+      dataIndex: 'dept_code_ref',
+      key: 'dept_code_ref',
+      width: 150,
+      sorter: (a, b) => String(a.dept_code_ref || '').localeCompare(String(b.dept_code_ref || '')),
+      filters: [...new Set(rows.map(r => r.dept_code_ref).filter(Boolean))].map(v => ({ text: v, value: v })),
+      filterSearch: true,
+      onFilter: (value, record) => record.dept_code_ref === value,
+      render: (val) => val || '-'
     }
-  ], []);
+  ], [page, rows]);
 
   // Logic กรองข้อมูล
   const filteredRows = useMemo(() => {
@@ -184,7 +188,7 @@ function Position() {
       theme={{
         token: {
           colorPrimary: '#2563eb',
-          borderRadius: 8,
+          borderRadius: 2, // ✅ ปรับเป็น 6px (เท่ากับ rounded-md)
           fontFamily: 'Inter, "Sarabun", sans-serif',
         },
         components: {
@@ -194,42 +198,63 @@ function Position() {
         }
       }}
     >
-      <div style={containerStyle} className="bg-gray-50">
+      <div style={containerStyle} className="bg-gray-50 flex flex-col h-full overflow-hidden">
 
-        {/* Header Section: ปรับ Layout ให้ปุ่มอยู่ซ้าย */}
-        <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
-          <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-            <Input
-              prefix={<SearchOutlined className="text-gray-400" />}
-              placeholder="ค้นหารหัส, ชื่อตำแหน่ง..."
-              allowClear
-              variant="borderless"
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full md:w-64 bg-transparent"
-            />
-            <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleCreate}
-              className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-            >
-              เพิ่มข้อมูลใหม่
-            </Button>
-          </div>
-        </div>
+        {/* ✅ เรียกใช้ DraggableTable */}
+        <DraggableTable
+          columns={baseColumns}
+          dataSource={filteredRows}
+          rowKey="G_ID" // ใช้ G_ID เป็น Key
+          loading={loading}
+          scroll={{ x: 'max-content', y: tableY }}
 
-        {/* Table Content */}
-        <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-          <DataTable
-            rowData={filteredRows}
-            columnDefs={columnDefs}
-            loading={loading}
-            // ✅ คลิกแถวเพื่อแก้ไข
-            onRowClicked={(params) => handleUpdate(params.data)}
-            rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
-          />
-        </div>
+          pagination={{
+            current: page.current,
+            pageSize: page.pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50, 100],
+            showTotal: (t, r) => <span className="text-gray-400 text-xs">แสดง {r[0]}-{r[1]} จาก {t} รายการ</span>,
+            className: 'px-4 pb-4 mt-4'
+          }}
+          onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
+
+          // ✅ คลิกแถวเพื่อแก้ไข
+          onRow={(record) => ({
+            onClick: () => handleUpdate(record),
+            className: "cursor-pointer"
+          })}
+
+          // ✅ Toolbar: ใช้ rounded-md
+          renderToolbar={(ColumnVisibility) => (
+            <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
+                <Input
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  placeholder="ค้นหารหัส, ชื่อตำแหน่ง (ภาพรวม)..."
+                  allowClear
+                  variant="borderless"
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64 bg-transparent"
+                />
+                <div className="w-full h-px bg-gray-100 sm:w-px sm:h-6 sm:mx-1 hidden sm:block"></div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={handleCreate}
+                    className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-md px-4 font-medium w-full sm:w-auto shadow-md whitespace-nowrap"
+                  >
+                    เพิ่มข้อมูลใหม่
+                  </Button>
+
+                  {/* ปุ่มซ่อน/แสดงคอลัมน์ */}
+                  {ColumnVisibility}
+                </div>
+              </div>
+            </div>
+          )}
+        />
 
         {/* Modals */}
         <ModalForm
@@ -237,7 +262,6 @@ function Position() {
           record={currentRecord}
           onClose={() => { setModalFormOpen(false); setCurrentRecord(null); }}
           onSuccess={handleFormSuccess}
-          // ✅ ส่งฟังก์ชัน onDelete ไปให้ ModalForm
           onDelete={() => openDeleteModal(currentRecord)}
         />
 

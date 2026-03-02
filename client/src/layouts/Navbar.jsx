@@ -3,11 +3,12 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { message } from "antd";
 import { useNavigate, useLocation, matchPath } from "react-router-dom";
 import useAuth from "../hooks/useAuth.js";
-import { dispatchLock, LOCK_KEY, BEFORE_LOCK_KEY } from "../hooks/useIdleLock";
+import { dispatchLock, LOCK_KEY, BEFORE_LOCK_KEY, LAST_ACTIVE_KEY } from "../hooks/useIdleLock";
 import api from "../api.js";
 import ModalExpired from "./Modal/ModalExpired.jsx";
 import ModalSetting from "./Modal/ModalSetting.jsx";
 import { disconnect } from '../socketClient';
+
 
 /* =========================
  * Icons (@ant-design/icons)
@@ -53,6 +54,20 @@ export default function Navbar({ onToggleSidebar }) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const handleLogout = useCallback(async () => {
+    try { window.__LOGGING_OUT__ = true; } catch { }
+    isHandlingExpiry.current = false;
+    try {
+      const useLocal = !!localStorage.getItem('refreshToken');
+      const store = useLocal ? localStorage : sessionStorage;
+      const r = store.getItem('refreshToken');
+      if (r) await api.post('/auth/logout', { refreshToken: r });
+    } catch { }
+    disconnect();
+    logout();
+    navigate("/");
+  }, [logout, navigate]);
+
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -76,6 +91,89 @@ export default function Navbar({ onToggleSidebar }) {
     (file) => (file ? `${BE_BASE}/img/profile/${file}?v=${Date.now()}` : null),
     [BE_BASE]
   );
+
+  // ==========================================
+  // Logic: Auto-Logout นับถอยหลัง (Idle Timer)
+  // ==========================================
+  const [timeLeftStr, setTimeLeftStr] = useState("");
+  // ✅ เปลี่ยนมาดึงเวลาล่าสุดจาก LocalStorage (ถ้ามี) ถ้าไม่มีค่อยใช้เวลาปัจจุบัน
+  const lastActiveRef = useRef(
+    Number(localStorage.getItem(LAST_ACTIVE_KEY)) || Date.now()
+  );
+  const animationFrameRef = useRef(null); // ใช้เก็บ ID ของ requestAnimationFrame
+
+  const getTimeoutMs = useCallback(() => {
+    const t = user?.time_login;
+    if (!t) return 0;
+    const [h, m, s] = t.split(':').map(Number);
+    return ((h || 0) * 3600 + (m || 0) * 60 + (s || 0)) * 1000;
+  }, [user?.time_login]);
+
+  useEffect(() => {
+    const timeoutMs = getTimeoutMs();
+    if (timeoutMs <= 0) return;
+
+    // ฟังก์ชันรีเซ็ตเวลาเมื่อมีการเคลื่อนไหว
+    const updateActivity = () => {
+      const now = Date.now();
+      lastActiveRef.current = now;
+      try { localStorage.setItem(LAST_ACTIVE_KEY, String(now)); } catch { }
+    };
+
+    // ผูก Event Listeners จับการขยับเมาส์/คีย์บอร์ด
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, updateActivity, { passive: true }));
+
+    // ฟังก์ชันอัปเดตเวลาแบบ Real-time ด้วย requestAnimationFrame
+    const updateTimer = () => {
+      let lastActive = lastActiveRef.current;
+
+      // ซิงค์เวลาจากแท็บอื่น (ทำอย่างระมัดระวัง ไม่ให้อ่านถี่เกินไปจนหน่วง)
+      try {
+        const storedActive = Number(localStorage.getItem(LAST_ACTIVE_KEY)) || 0;
+        if (storedActive > lastActive) {
+          lastActive = storedActive;
+          lastActiveRef.current = storedActive;
+        }
+      } catch { }
+
+      const now = Date.now();
+      const diff = now - lastActive;
+      const remaining = timeoutMs - diff;
+
+      if (remaining <= 0) {
+        setTimeLeftStr("00:00");
+        message.warning("หมดเวลาการใช้งานระบบ กรุณาเข้าสู่ระบบใหม่อีกครั้ง", 5);
+        handleLogout();
+        return; // หยุดลูป Animation
+      }
+
+      // คำนวณเวลาและจัด Format
+      const totalSeconds = Math.ceil(remaining / 1000); // ใช้ Math.ceil เพื่อให้วินาทีเต็มขึ้นมา
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      const s = totalSeconds % 60;
+
+      const newTimeStr = h > 0
+        ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+      // อัปเดต State เฉพาะเมื่อวินาทีเปลี่ยนจริงๆ เพื่อลดการ Render ซ้ำซ้อน
+      setTimeLeftStr((prev) => (prev !== newTimeStr ? newTimeStr : prev));
+
+      // เรียกตัวเองซ้ำใน Frame ถัดไป
+      animationFrameRef.current = requestAnimationFrame(updateTimer);
+    };
+
+    // เริ่มทำงานครั้งแรกทันที
+    animationFrameRef.current = requestAnimationFrame(updateTimer);
+
+    // Cleanup เมื่อ Component ถูก Unmount
+    return () => {
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      events.forEach(e => window.removeEventListener(e, updateActivity));
+    };
+  }, [getTimeoutMs, handleLogout]);
 
   useEffect(() => {
     let alive = true;
@@ -288,20 +386,6 @@ export default function Navbar({ onToggleSidebar }) {
       }
     }
   }, [navigate]); // อย่าลืมเพิ่ม dependency navigate
-
-  const handleLogout = useCallback(async () => {
-    try { window.__LOGGING_OUT__ = true; } catch { }
-    isHandlingExpiry.current = false;
-    try {
-      const useLocal = !!localStorage.getItem('refreshToken');
-      const store = useLocal ? localStorage : sessionStorage;
-      const r = store.getItem('refreshToken');
-      if (r) await api.post('/auth/logout', { refreshToken: r });
-    } catch { }
-    disconnect();
-    logout();
-    navigate("/");
-  }, [logout, navigate]);
 
   const toggleUserMenu = useCallback(() => setShowUserMenu((v) => !v), []);
   const toggleNotifications = useCallback(() => setShowNotifications((v) => !v), []);
@@ -527,11 +611,14 @@ export default function Navbar({ onToggleSidebar }) {
                 <>
                   <div className="fixed inset-0 z-30" onClick={closeDropdowns} />
                   <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-40 overflow-hidden animate-fade-in-up">
-                    {/* Dropdown Header - เปลี่ยน Gradient เป็นโทนน้ำเงิน */}
+
+                    {/* Dropdown Header */}
                     <div className="p-5 bg-gradient-to-br from-gray-500 to-slate-600 text-white relative overflow-hidden">
                       <div className="absolute top-0 right-0 -mt-2 -mr-2 w-16 h-16 bg-white/10 rounded-full blur-xl"></div>
+
+                      {/* User Info */}
                       <div className="relative z-10 flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full border-2 border-white/30 overflow-hidden shadow-md">
+                        <div className="w-12 h-12 shrink-0 rounded-full border-2 border-white/30 overflow-hidden shadow-md">
                           {avatarUrl ? (
                             <img src={avatarUrl} alt="User" className="w-full h-full object-cover" />
                           ) : (
@@ -540,12 +627,25 @@ export default function Navbar({ onToggleSidebar }) {
                             </div>
                           )}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="font-bold text-lg truncate">{user?.username}</p>
-                          {/* เปลี่ยน Text เป็นสีน้ำเงินอ่อน */}
-                          <p className="text-[16px] text-blue-100 opacity-90">{roleName}</p>
+                          <p className="text-[14px] text-blue-100 opacity-90 truncate">{roleName}</p>
                         </div>
                       </div>
+
+                      {/* Time Left - จัดเรียงใหม่ให้อยู่ด้านล่าง เอาการกระพริบออก */}
+                      {timeLeftStr && (
+                        <div className="relative z-10 mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                          <span className="text-[12px] text-white/80 font-medium tracking-wide">
+                            เวลาคงเหลือ
+                          </span>
+                          {/* ปรับสีให้กลมกลืนกับ Header สีเข้ม และเอา animate-pulse, animate-spin-slow ออก */}
+                          <div className="bg-red-500/20 text-red-200 px-3 py-1 rounded-full text-sm font-bold font-mono border border-red-500/30 flex items-center gap-1.5">
+                            <ClockCircleOutlined className="text-[13px]" />
+                            {timeLeftStr}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Menu Items */}
@@ -556,7 +656,6 @@ export default function Navbar({ onToggleSidebar }) {
                           setOpenSetting(true);
                           setShowUserMenu(false);
                         }}
-                        // เปลี่ยน Hover เป็นธีมสีน้ำเงิน
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors"
                       >
                         <IdcardOutlined className="text-lg" />
@@ -564,7 +663,6 @@ export default function Navbar({ onToggleSidebar }) {
                       </button>
                       <button
                         onClick={handleLockScreen}
-                        // เปลี่ยน Hover เป็นธีมสีน้ำเงิน
                         className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-colors"
                       >
                         <LockOutlined className="text-lg" />

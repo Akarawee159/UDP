@@ -69,7 +69,7 @@ const CustomHeader = (props) => {
                         ref={menuRef}
                         onClick={(e) => {
                             e.stopPropagation();
-                            showColumnMenu(menuRef.current);
+                            showColumnMenu(menuRef.current); // ฟังก์ชันนี้จะเปิด Custom Filter ของเรา
                         }}
                         className={`cursor-pointer hover:bg-gray-200 p-1 rounded transition-colors flex items-center justify-center ${column.isFilterActive() ? 'text-blue-600' : 'text-gray-400'}`}
                         title="กรองข้อมูล"

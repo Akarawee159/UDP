@@ -1,6 +1,7 @@
 // src/hooks/useIdleLock.js
 import { useEffect, useRef, useState } from 'react';
 
+
 export const LOCK_KEY = 'HRMS_LOCKED';
 export const BEFORE_LOCK_KEY = 'HRMS_BEFORE_LOCK';
 export const LAST_ACTIVE_KEY = 'HRMS_LAST_ACTIVE';

@@ -27,6 +27,9 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     // เก็บค่าเดิมไว้เปรียบเทียบตอนแก้ไข
     const [originalCode, setOriginalCode] = useState(null);
 
+    const timerRefCode1 = useRef(null);
+    const timerRefCode2 = useRef(null);
+
     const timerRef = useRef(null);
 
     // ฟังก์ชันดึงรายละเอียด (กรณี Edit)
@@ -73,18 +76,17 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
         return res?.data?.exists;
     };
 
-    const validateField = (fieldName, setChecking) => (_rule, value) => new Promise((resolve, reject) => {
+    const validateField = (fieldName, setChecking, timerRef) => (_rule, value) => new Promise((resolve, reject) => {
+        // ใช้ timerRef ที่ส่งเข้ามา แทนตัวกลาง
         clearTimeout(timerRef.current);
         const inputVal = (value || '').trim();
 
-        // ถ้าไม่มีค่า หรือ (ในโหมดแก้ไข และค่าเท่ากับค่าใน record เดิม) ไม่ต้องเช็ค
         if (!inputVal || (isEditMode && record && inputVal === record[fieldName])) {
             setChecking(false);
             return resolve();
         }
 
         setChecking(true);
-        // Debounce 600ms
         timerRef.current = setTimeout(async () => {
             try {
                 const isDup = await checkDuplicateApi(fieldName, inputVal);
@@ -93,7 +95,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 else resolve();
             } catch (err) {
                 setChecking(false);
-                resolve(); // ถ้า error ให้ผ่านไปก่อน
+                resolve();
             }
         }, 600);
     });
@@ -143,7 +145,6 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 width={1000}
                 closable={false}
                 maskClosable={false}
-                destroyOnClose
                 centered
                 styles={{ content: { padding: 0, borderRadius: '20px', overflow: 'hidden' } }}
             >
@@ -188,7 +189,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             name="supplier_code"
                                             rules={[
                                                 { required: true, message: 'ระบุรหัส' },
-                                                { validator: validateField('supplier_code', setCheckingCode1) }
+                                                { validator: validateField('supplier_code', setCheckingCode1, timerRefCode1) } // ส่ง timerRefCode1
                                             ]}
                                             hasFeedback
                                             validateStatus={checkingCode1 ? 'validating' : undefined}
@@ -202,7 +203,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             label={<span className="text-slate-600 font-medium">รหัสลูกค้า</span>}
                                             name="supplier_code2"
                                             rules={[
-                                                { validator: validateField('supplier_code2', setCheckingCode2) }
+                                                { validator: validateField('supplier_code2', setCheckingCode2, timerRefCode2) } // ส่ง timerRefCode2
                                             ]}
                                             hasFeedback
                                             validateStatus={checkingCode2 ? 'validating' : undefined}
@@ -251,18 +252,18 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
-                                            <Form.Item label="เบอร์โทรบริษัท" name="contact_phone">
-                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} />
-                                            </Form.Item>
-                                        </Col>
-                                        <Col span={12}>
-                                            <Form.Item label="เบอร์โทรศัพท์" name="supplier_phone">
+                                            <Form.Item label="เบอร์โทรบริษัท" name="supplier_phone">
                                                 <Input prefix={<PhoneOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                         <Col span={12}>
                                             <Form.Item label="ชื่อผู้ติดต่อ" name="contact_name">
                                                 <Input prefix={<BranchesOutlined className="text-slate-400" />} />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item label="เบอร์โทรผู้ติดต่อ" name="contact_phone">
+                                                <Input prefix={<PhoneOutlined className="text-slate-400" />} />
                                             </Form.Item>
                                         </Col>
                                     </Row>

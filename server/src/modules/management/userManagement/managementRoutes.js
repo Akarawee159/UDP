@@ -55,6 +55,9 @@ const uploadSignature = multer({
 /** Resource: /management */
 router.get('/', auth, managementController.getAll);
 
+// ดึงคำนำหน้าชื่อ
+router.get('/titlenames', auth, managementController.getTitlenames);
+
 // กลุ่มสิทธิทั้งหมด (สำหรับ dropdown)
 router.get('/groups', auth, managementController.getGroups);
 
@@ -91,6 +94,15 @@ router.patch('/:employee_id/password', auth, managementController.resetPassword)
 // ลบรูปโปรไฟล์และลายเซ็น
 router.delete('/me/profile-image', auth, managementController.deleteProfileImage);
 router.delete('/me/signature', auth, managementController.deleteSignatureImage);
+
+// === Options สำหรับสร้างผู้ใช้งาน ===
+router.get('/options/companies', auth, managementController.getCompanyOptions);
+router.get('/options/branches', auth, managementController.getBranchOptions);
+router.get('/options/departments', auth, managementController.getDepartmentOptions);
+router.get('/options/positions', auth, managementController.getPositionOptions);
+
+// ✅ สร้างผู้ใช้งาน (บริษัทในเครือ) แบบไม่ต้องเลือกพนักงานเดิม
+router.post('/affiliate', auth, managementController.createAffiliate);
 
 
 module.exports = router;

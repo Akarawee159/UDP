@@ -47,7 +47,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         onCancel={onClose}
         // ✅ ป้องกันคลิกปิด
         maskClosable={false}
-        destroyOnClose
+        destroyOnHidden
         width={480}
         centered
         // ✅ เพิ่ม zIndex ให้สูงกว่า ModalForm

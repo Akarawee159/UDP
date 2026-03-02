@@ -19,18 +19,14 @@ function getBangkokNow() {
 
 const COLUMNS_LIST = `
   asset_code, asset_detail, asset_type, asset_date, doc_no, 
-  asset_lot, asset_holder, asset_location, asset_origin,
-  asset_width, asset_width_unit, 
-  asset_length, asset_length_unit, 
-  asset_height, asset_height_unit, 
-  asset_capacity, asset_capacity_unit, 
-  asset_weight, asset_weight_unit, 
-  asset_img, 
-  asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
-  asset_remark, asset_usedfor, asset_brand, asset_feature, asset_supplier_name, label_register, partCode, 
-  print_status, asset_status, is_status, 
-  create_date, created_by, created_at,
-  updated_by, updated_at, asset_action
+  asset_lot, asset_responsible_department, asset_model, asset_holder, asset_location, 
+  asset_origin, asset_width, asset_width_unit, asset_length, asset_length_unit, 
+  asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
+  asset_weight_unit, asset_img, asset_dmg_001, asset_dmg_002, asset_dmg_003, 
+  asset_dmg_004, asset_dmg_005, asset_dmg_006, asset_remark, asset_usedfor, 
+  asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, 
+  print_status, asset_status, is_status, create_date, created_by, 
+  created_at, updated_by, updated_at, asset_action
 `;
 
 /** ดึงรายการทั้งหมด พร้อม Join ตารางสถานะ */
@@ -50,7 +46,7 @@ async function getAll() {
 }
 
 async function getLastLotNumber(dateStr) {
-  const pattern = `LOT${dateStr}%`;
+  const pattern = `${dateStr}%`;
   const sql = `SELECT asset_lot FROM tb_asset_lists WHERE asset_lot LIKE ? ORDER BY asset_lot DESC LIMIT 1`;
   const [rows] = await db.query(sql, [pattern]);
   return rows.length > 0 ? rows[0].asset_lot : null;
@@ -124,45 +120,36 @@ async function incrementPrintStatus(assetCode, user) {
 async function createBulk(dataArray) {
   if (!dataArray || dataArray.length === 0) return;
 
-  // [Timezone Fix] ใช้ item.created_at ที่ Controller ส่งมา (ซึ่งเป็น Bangkok แล้ว)
-  // หรือถ้าไม่มี ให้ใช้ getBangkokNow()
+  // มีทั้งหมด 42 ข้อมูล (ต้องเท่ากับจำนวนคอลัมน์ใน sqlMain)
   const valuesForMain = dataArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
-    item.asset_lot, item.asset_holder, item.asset_location, item.asset_origin,
-    item.asset_width, item.asset_width_unit,
-    item.asset_length, item.asset_length_unit,
-    item.asset_height, item.asset_height_unit,
-    item.asset_capacity, item.asset_capacity_unit,
-    item.asset_weight, item.asset_weight_unit,
-    item.asset_img,
-    item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
-    item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
-    item.print_status, item.asset_status, item.is_status, item.last_used || getBangkokNow(),
-    // created_at, created_by, created_at
-    item.created_at || getBangkokNow(), item.created_by, item.created_at || getBangkokNow()
+    item.asset_lot, item.asset_responsible_department, item.asset_model, item.asset_holder, item.asset_location,
+    item.asset_origin, item.asset_width, item.asset_width_unit, item.asset_length, item.asset_length_unit,
+    item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,
+    item.asset_weight_unit, item.asset_img, item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
+    item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006, item.asset_remark, item.asset_usedfor,
+    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
+    item.print_status, item.asset_status, item.is_status, item.last_used || getBangkokNow(), item.create_date || getBangkokNow(),
+    item.created_by, item.created_at || getBangkokNow()
   ]);
 
+  // มีทั้งหมด 42 คอลัมน์
   const sqlMain = `
     INSERT INTO tb_asset_lists (
       asset_code, asset_detail, asset_type, asset_date, doc_no, 
-      asset_lot, asset_holder, asset_location, asset_origin, 
-      asset_width, asset_width_unit, 
-      asset_length, asset_length_unit, 
-      asset_height, asset_height_unit, 
-      asset_capacity, asset_capacity_unit, 
-      asset_weight, asset_weight_unit, 
-      asset_img, 
-      asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
-      asset_remark, asset_usedfor, asset_brand, asset_feature, asset_supplier_name, label_register, partCode, 
-      print_status, asset_status, is_status, last_used,
-      create_date, created_by, created_at
+      asset_lot, asset_responsible_department, asset_model, asset_holder, asset_location, 
+      asset_origin, asset_width, asset_width_unit, asset_length, asset_length_unit, 
+      asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
+      asset_weight_unit, asset_img, asset_dmg_001, asset_dmg_002, asset_dmg_003, 
+      asset_dmg_004, asset_dmg_005, asset_dmg_006, asset_remark, asset_usedfor, 
+      asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, 
+      print_status, asset_status, is_status, last_used, create_date, 
+      created_by, created_at
     ) VALUES ?
   `;
 
   const [result] = await db.query(sqlMain, [valuesForMain]);
 
-  // ใน Detail Log: updated_by/updated_at เป็น NULL สำหรับ Action 'สร้าง'
   const dataForDetail = dataArray.map(item => ({
     ...item,
     updated_by: null,
@@ -175,35 +162,22 @@ async function createBulk(dataArray) {
   return result;
 }
 
-/** ฟังก์ชัน Helper สำหรับ Insert tb_asset_lists_detail */
 async function insertDetailLog(dataObjArray) {
   if (!dataObjArray || dataObjArray.length === 0) return;
 
   const sql = `INSERT INTO tb_asset_lists_detail (${COLUMNS_LIST}) VALUES ?`;
 
-  // [Timezone Fix] ใช้ getBangkokNow() เป็น default แทน new Date()
+  // มีทั้งหมด 44 ข้อมูล (ต้องเท่ากับ COLUMNS_LIST ด้านบนเป๊ะๆ)
   const values = dataObjArray.map(item => [
     item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
-    item.asset_lot, item.asset_holder, item.asset_location, item.asset_origin,
-    item.asset_width, item.asset_width_unit,
-    item.asset_length, item.asset_length_unit,
-    item.asset_height, item.asset_height_unit,
-    item.asset_capacity, item.asset_capacity_unit,
-    item.asset_weight, item.asset_weight_unit,
-    item.asset_img,
-    item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003, item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006,
-    item.asset_remark, item.asset_usedfor, item.asset_brand, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
-    item.print_status, item.asset_status, item.is_status,
-
-    // create_date / created_at (ถ้าไม่มีค่า ให้ใช้ Bangkok Now)
-    item.create_date || getBangkokNow(),
-    item.created_by,
-    item.created_at || getBangkokNow(),
-
-    // updated_by / updated_at
-    item.updated_by,
-    item.updated_at, // ค่านี้ถ้าส่งมาจะเป็น Bangkok แล้ว หรือถ้าเป็น null ก็ปล่อย null
-    item.asset_action
+    item.asset_lot, item.asset_responsible_department, item.asset_model, item.asset_holder, item.asset_location,
+    item.asset_origin, item.asset_width, item.asset_width_unit, item.asset_length, item.asset_length_unit,
+    item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,
+    item.asset_weight_unit, item.asset_img, item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
+    item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006, item.asset_remark, item.asset_usedfor,
+    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
+    item.print_status, item.asset_status, item.is_status, item.create_date || getBangkokNow(), item.created_by,
+    item.created_at || getBangkokNow(), item.updated_by, item.updated_at, item.asset_action
   ]);
 
   await db.query(sql, [values]);

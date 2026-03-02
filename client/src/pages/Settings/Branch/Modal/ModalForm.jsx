@@ -162,7 +162,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
     return (
         <ConfigProvider
             theme={{
-                token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: "'Prompt', 'Inter', sans-serif" },
+                token: { colorPrimary: '#2563eb', borderRadius: 4, fontFamily: "'Prompt', 'Inter', sans-serif" },
                 components: {
                     Input: { controlHeight: 40 },
                     Select: { controlHeight: 40 },
@@ -180,12 +180,12 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 closable={false}
                 centered
                 footer={null}
-                styles={{ content: { padding: 0, borderRadius: '20px', overflow: 'hidden' } }}
+                styles={{ content: { padding: 0, borderRadius: '4px', overflow: 'hidden' } }}
             >
                 {/* --- Header --- */}
-                <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50">
+                <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-50 ">
                     <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                        <div className={`w-12 h-12 rounded-md flex items-center justify-center shadow-sm text-2xl ${isEditMode ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
                             {isEditMode ? <EditOutlined /> : <PlusCircleOutlined />}
                         </div>
                         <div>
@@ -211,7 +211,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                             {/* LEFT SIDE: Identity */}
                             <div className="w-full md:w-[320px] bg-slate-50 p-6 border-r border-gray-100 flex-shrink-0">
                                 <div className="text-center mb-8 mt-2">
-                                    <div className="w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-400 mb-4 shadow-sm group hover:border-purple-300 transition-colors cursor-default">
+                                    <div className="w-32 h-32 bg-white rounded-md border-2 border-dashed border-slate-200 mx-auto flex flex-col items-center justify-center text-slate-400 mb-4 shadow-sm group hover:border-purple-300 transition-colors cursor-default">
                                         <ShopOutlined style={{ fontSize: '48px' }} className="group-hover:text-purple-500 transition-colors" />
                                         <span className="text-xs mt-3 font-medium tracking-wide uppercase text-slate-400 group-hover:text-purple-500">Branch Profile</span>
                                     </div>
@@ -219,7 +219,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                                    <div className="bg-white p-5 rounded-md shadow-sm border border-gray-100">
                                         <Form.Item
                                             label={<span className="text-slate-600 font-medium">รหัสสาขา <span className="text-red-500">*</span></span>}
                                             name="G_CODE"
@@ -249,7 +249,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 {/* Section 1: Affiliation */}
                                 <div className="mb-8">
                                     <div className="flex items-center gap-3 mb-5">
-                                        <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><ClusterOutlined /></div>
+                                        <div className="p-2 bg-purple-50 text-purple-600 rounded-md"><ClusterOutlined /></div>
                                         <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-widest">Affiliation (สังกัด)</h3>
                                         <div className="flex-1 h-px bg-slate-100 ml-2"></div>
                                     </div>
@@ -281,7 +281,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                 {/* Section 2: Location */}
                                 <div>
                                     <div className="flex items-center gap-3 mb-5">
-                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><EnvironmentOutlined /></div>
+                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-md"><EnvironmentOutlined /></div>
                                         <h3 className="text-sm font-bold text-slate-700 m-0 uppercase tracking-widest">Location (ที่ตั้ง)</h3>
                                         <div className="flex-1 h-px bg-slate-100 ml-2"></div>
                                     </div>
@@ -292,7 +292,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                                 <Input.TextArea
                                                     rows={4}
                                                     placeholder="บ้านเลขที่, ถนน, แขวง/ตำบล, เขต/อำเภอ, จังหวัด"
-                                                    className="rounded-xl"
+                                                    className="rounded-md"
                                                 />
                                             </Form.Item>
                                         </Col>
@@ -305,7 +305,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                 </Spin>
 
                 {/* --- Footer --- */}
-                <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center z-50 rounded-b-2xl">
+                <div className="bg-white px-6 py-4 border-t border-gray-100 flex justify-between items-center z-50 rounded-b-md">
                     <div>
                         {isEditMode && (
                             <Button
@@ -326,14 +326,14 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                             loading={loading}
                             onClick={handleOk}
                             icon={<SaveOutlined />}
-                            className="px-6 rounded-lg shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-500 font-medium"
+                            className="px-6 rounded-md shadow-lg shadow-blue-200 bg-blue-600 hover:bg-blue-500 font-medium"
                         >
                             {isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกข้อมูล'}
                         </Button>
                         <Button
                             onClick={handleCancel}
                             disabled={loading}
-                            className="px-6 rounded-lg border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300"
+                            className="px-6 rounded-md border-slate-200 text-slate-600 hover:text-slate-800 hover:border-slate-300"
                         >
                             ยกเลิก
                         </Button>

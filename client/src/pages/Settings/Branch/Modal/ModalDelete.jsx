@@ -53,12 +53,12 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         // ✅ zIndex สูงกว่าปกติเล็กน้อยเพื่อให้แน่ใจว่าอยู่เหนือ ModalForm
         zIndex={1001}
         className="custom-modal-delete"
-        styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
+        styles={{ content: { padding: 0, borderRadius: '4px', overflow: 'hidden' } }}
       >
         {/* Header (Red for Danger) */}
         <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
           <div className="flex items-center gap-3 text-red-800">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-red-500 text-xl">
+            <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center shadow-sm text-red-500 text-xl">
               <DeleteOutlined />
             </div>
             <div>
@@ -78,7 +78,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         {/* Content */}
         <div className="p-6">
           {/* Warning Banner */}
-          <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6 flex gap-3 items-start">
+          <div className="bg-orange-50 border border-orange-100 rounded-md p-4 mb-6 flex gap-3 items-start">
             <WarningOutlined className="text-orange-500 mt-1 text-lg" />
             <div>
               <div className="font-bold text-orange-800 text-sm mb-1">คำเตือน: การลบข้อมูลถาวร</div>
@@ -90,11 +90,11 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
           {/* Record Details Card */}
           {record && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm relative overflow-hidden">
               <div className="grid grid-cols-1 gap-4">
                 {/* Branch Name */}
                 <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
+                  <div className="w-10 h-10 rounded-md bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
                     <BankOutlined className="text-xl" />
                   </div>
                   <div>
@@ -105,7 +105,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
                 {/* Codes Grid */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                  <div className="bg-gray-50/50 p-2 rounded-md border border-gray-100">
                     <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
                       <BarcodeOutlined /> รหัสสาขา
                     </div>
@@ -113,7 +113,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                       {record.G_CODE || '-'}
                     </div>
                   </div>
-                  <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                  <div className="bg-gray-50/50 p-2 rounded-md border border-gray-100">
                     <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
                       <ApartmentOutlined /> รหัสบริษัท
                     </div>
@@ -135,14 +135,14 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
             onClick={handleOk}
             loading={loading}
             icon={<DeleteOutlined />}
-            className="h-10 px-6 rounded-lg shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none"
+            className="h-10 px-6 rounded-md shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none"
           >
             ยืนยันการลบ
           </Button>
           <Button
             onClick={onClose}
             disabled={loading}
-            className="h-10 px-6 rounded-lg border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white"
+            className="h-10 px-6 rounded-md border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-400 hover:bg-white"
           >
             ยกเลิก
           </Button>

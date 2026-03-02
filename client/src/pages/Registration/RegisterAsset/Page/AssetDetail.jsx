@@ -9,7 +9,6 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
-import 'dayjs/locale/th';
 import api from "../../../../api";
 import DataTable from '../../../../components/aggrid/DataTable';
 import { getSocket } from '../../../../socketClient';
@@ -239,15 +238,15 @@ function AssetDetail() {
         }
 
         modal.confirm({
-            title: 'ยืนยันการลบรายการ',
+            title: 'ยืนยันการยกเลิกรายการ',
             icon: <ExclamationCircleOutlined className="text-red-500" />,
             content: (
                 <div>
-                    <p>คุณต้องการลบที่เลือกจำนวน <b>{selectedRows.length}</b> รายการใช่หรือไม่?</p>
-                    <p className="text-gray-500 text-xs mt-1">*รายการที่ถูกลบจะไม่แสดงในหน้านี้อีก</p>
+                    <p>คุณต้องการยกเลิกรายการที่เลือกจำนวน <b>{selectedRows.length}</b> รายการใช่หรือไม่?</p>
+                    <p className="text-gray-500 text-xs mt-1">*รายการที่ถูกยกเลิกจะไม่แสดงในหน้านี้อีก</p>
                 </div>
             ),
-            okText: 'ยืนยันการลบ',
+            okText: 'ยืนยันการยกเลิก',
             okType: 'danger',
             cancelText: 'ปิด',
             footer: (_, { OkBtn, CancelBtn }) => (
@@ -267,7 +266,7 @@ function AssetDetail() {
                     });
 
                     if (res.data?.success) {
-                        message.success(res.data.message || 'ลบรายการสำเร็จ');
+                        message.success(res.data.message || 'ยกเลิกรายการสำเร็จ');
                         // Socket จะทำงานอัตโนมัติเพื่อลบ row (จาก useEffect ที่เขียนไว้แล้ว)
                         setSelectedRows([]);
                     }
@@ -285,8 +284,8 @@ function AssetDetail() {
                         // เรียก Modal แจ้งเตือน "รับทราบ"
                         setTimeout(() => {
                             modal.warning({
-                                title: 'ไม่สามารถลบรายการได้',
-                                icon: <StopOutlined className="text-red-600" />,
+                                title: 'ไม่สามารถยกเลิกรายการได้',
+                                icon: <StopOutlined className="text-orange-500" />,
                                 content: (
                                     <div className="flex flex-col gap-2 mt-2">
                                         <Text>พบรายการที่มีสถานะไม่ถูกต้อง:</Text>
@@ -389,38 +388,32 @@ function AssetDetail() {
             }
         },
         {
-            // --- แก้ไขจุดที่ 1: สถานะใช้งาน ---
+            // --- เพิ่ม sortable และ filter ---
             headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.asset_status_name,
-            // เพิ่ม cellClass เพื่อจัด layout ให้มี padding รอบๆ
-            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.asset_status_name || params.value;
                 const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    // เพิ่ม w-full เพื่อให้แถบสีขยายเต็มความกว้าง
-                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );
             }
         },
         {
-            // --- แก้ไขจุดที่ 2: สถานะทรัพย์สิน ---
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
+            // --- เพิ่ม sortable และ filter ---
+            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 150,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.is_status_name,
-            // เพิ่ม cellClass เพื่อจัด layout ให้มี padding รอบๆ
-            cellClass: "flex items-center justify-center p-2",
             cellRenderer: (params) => {
                 const name = params.data.is_status_name || params.value;
                 const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return (
-                    // เพิ่ม w-full เพื่อให้แถบสีขยายเต็มความกว้าง
-                    <div className={`w-full px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
+                    <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>
                         {name}
                     </div>
                 );
@@ -438,7 +431,7 @@ function AssetDetail() {
         { headerName: 'Part Name', field: 'partName', width: 150 },
         { headerName: 'Label Code', field: 'label_register', width: 400 },
         { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
-        { headerName: 'วันที่ขึ้นทะเบียน', field: 'create_date', width: 150, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
+        { headerName: 'วันที่ขึ้นทะเบียน', field: 'asset_date', width: 150, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
         { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
     ], [isPrinting, isCanceling]);
 
@@ -524,7 +517,7 @@ function AssetDetail() {
                                 พิมพ์สติ๊กเกอร์ ({selectedRows.length})
                             </Button>
 
-                            {/* [NEW] ปุ่มลบรายการ (Cancel Bulk) */}
+                            {/* [NEW] ปุ่มยกเลิกรายการ (Cancel Bulk) */}
                             <Button
                                 danger
                                 icon={<StopOutlined />}
@@ -533,7 +526,7 @@ function AssetDetail() {
                                 disabled={isPrinting || isCanceling || selectedRows.length === 0}
                                 className="h-9 rounded-lg px-4 font-medium shadow-md border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300"
                             >
-                                ลบรายการที่เลือก ({selectedRows.length})
+                                ยกเลิกรายการที่เลือก ({selectedRows.length})
                             </Button>
                         </div>
                     </div>
@@ -560,45 +553,34 @@ function AssetDetail() {
                 <div ref={printRef}>
                     {printList.map((item, index) => (
                         <div key={index} style={{
-                            width: '5.5cm',
-                            height: '3.5cm',
-                            padding: '0.2cm',
+                            width: '3cm',
+                            height: '3cm',
+                            padding: '0.1cm',
                             boxSizing: 'border-box',
                             display: 'flex',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
+                            flexDirection: 'column', /* เปลี่ยนจาก row เป็น column เพื่อให้อยู่บน-ล่าง */
+                            alignItems: 'center',    /* จัดกึ่งกลางแนวนอน */
+                            justifyContent: 'center',/* จัดกึ่งกลางแนวตั้ง */
                             border: '1px solid #ddd',
                             overflow: 'hidden',
                             pageBreakAfter: 'always',
-                            fontFamily: 'sans-serif'
+                            fontFamily: 'sans-serif',
+                            gap: '4px'               /* ระยะห่างระหว่าง QR Code และข้อความ */
                         }}>
-                            <div style={{ flex: 1, overflow: 'hidden', fontSize: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                {/* ปรับปรุง: ตัดบรรทัดรหัสทรัพย์สิน */}
-                                <div style={{ lineHeight: '1.2' }}>
-                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>รหัสทรัพย์สิน : </span><br />
-                                    <span style={{ fontSize: '10px' }}>{item.asset_code}</span>
-                                </div>
-
-                                <div style={{ lineHeight: '1.2' }}>
-                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>หมายเลขล็อต: </span><br />
-                                    <span style={{ fontSize: '10px' }}>{item.asset_lot}</span>
-                                </div>
-
-                                {/* ปรับปรุง: วันที่ภาษาไทย (วว ดดดด ปปปป) + พ.ศ. */}
-                                <div style={{ lineHeight: '1.2' }}>
-                                    <span style={{ fontSize: '8px', fontWeight: 'bold' }}>วันที่ขึ้นทะเบียน: </span><br />
-                                    <span style={{ fontSize: '10px' }}>{item.create_date
-                                        ? dayjs(item.create_date).locale('th').add(543, 'year').format('D MMMM YYYY')
-                                        : '-'}</span>
-                                </div>
-                            </div>
-                            <div style={{ marginLeft: '5px' }}>
+                            {/* 1. QR Code แสดงอยู่ด้านบน */}
+                            <div>
                                 <QRCodeSVG
                                     value={item.label_register}
-                                    size={90}
+                                    size={90} /* ปรับขนาดให้ใหญ่ขึ้นเล็กน้อยเพื่อให้สแกนง่ายในขนาด 3x3 ซม. */
                                     level={"M"}
                                 />
+                            </div>
+
+                            {/* 2. รหัสทรัพย์สิน แสดงอยู่ด้านล่าง */}
+                            <div style={{ textAlign: 'center', overflow: 'hidden' }}>
+                                <div style={{ fontWeight: 'bold', fontSize: '5px' }}> {/* ปรับ fontSize ให้พอดีกับการพิมพ์ (2px จะเล็กเกินไปตอนพิมพ์จริง) */}
+                                    {item.asset_code}
+                                </div>
                             </div>
                         </div>
                     ))}

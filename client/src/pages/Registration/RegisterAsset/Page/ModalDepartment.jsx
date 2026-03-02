@@ -1,34 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Input, Button, ConfigProvider, Space, Typography, App, Tooltip } from 'antd';
 import { SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import DraggableTable from '../../../../components/antdtable/DraggableTable'; // ตรวจสอบ path
-import api from "../../../../api"; // ตรวจสอบ path
-import { getSocket } from '../../../../socketClient'; // ตรวจสอบ path
+import DraggableTable from '../../../../components/antdtable/DraggableTable';
+import api from "../../../../api";
+import { getSocket } from '../../../../socketClient';
 
-// นำเข้า Modal สำหรับจัดการข้อมูล (ตรวจสอบ path ให้ตรงกับที่อยู่ไฟล์จริง)
-// สมมติว่า ModalAssetList อยู่ในระดับเดียวกับ Material หรือเข้าถึงได้
-import ModalForm from "../../../Masterdata/Material/Modal/ModalForm";
-import ModalDelete from "../../../Masterdata/Material/Modal/ModalDelete";
+// ✅ 1. นำเข้า Modal จัดการข้อมูลจาก Settings/Department ตามที่ต้องการ
+import ModalForm from "../../../Settings/Department/Modal/ModalForm";
+import ModalDelete from "../../../Settings/Department/Modal/ModalDelete";
 
 const { Text } = Typography;
 
-function ModalAssetList({ open, onClose, onSelect }) {
-    // ใช้ App.useApp เพื่อเรียกใช้ message, modal dialog (ถ้ามี App หุ้มที่ root)
+function ModalDepartment({ open, onClose, onSelect }) {
     const { message } = App.useApp?.() || { message: { success: console.log, error: console.error } };
 
     const [loading, setLoading] = useState(false);
     const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // State สำหรับ Pagination
     const [page, setPage] = useState({ current: 1, pageSize: 50 });
 
-    // State สำหรับ Modal จัดการข้อมูล (Add/Edit/Delete)
     const [modalFormOpen, setModalFormOpen] = useState(false);
     const [currentRecord, setCurrentRecord] = useState(null);
     const [openDelete, setOpenDelete] = useState(false);
 
-    // 1. ดึงข้อมูลเมื่อเปิด Modal
     useEffect(() => {
         if (open) {
             fetchData();
@@ -36,16 +31,15 @@ function ModalAssetList({ open, onClose, onSelect }) {
         }
     }, [open]);
 
-    // 2. เชื่อมต่อ Socket (Real-time updates)
     useEffect(() => {
         const s = getSocket();
         if (!s) return;
 
         const onUpsert = (row) => {
             setRows((prev) => {
-                const idx = prev.findIndex((r) => r.material_id === row.material_id);
+                const idx = prev.findIndex((r) => r.G_ID === row.G_ID);
                 if (idx === -1) {
-                    return [...prev, row].sort((a, b) => a.material_id - b.material_id);
+                    return [...prev, row].sort((a, b) => a.G_ID - b.G_ID);
                 }
                 const next = prev.slice();
                 next[idx] = row;
@@ -53,35 +47,35 @@ function ModalAssetList({ open, onClose, onSelect }) {
             });
         };
 
-        const onDelete = ({ material_id }) => {
-            setRows((prev) => prev.filter((r) => r.material_id !== material_id));
+        const onDelete = ({ G_ID }) => {
+            setRows((prev) => prev.filter((r) => r.G_ID !== G_ID));
         };
 
-        s.on('material:upsert', onUpsert);
-        s.on('material:delete', onDelete);
+        // ✅ เปลี่ยน Socket Event เป็น department
+        s.on('department:upsert', onUpsert);
+        s.on('department:delete', onDelete);
 
         return () => {
-            s.off('material:upsert', onUpsert);
-            s.off('material:delete', onDelete);
+            s.off('department:upsert', onUpsert);
+            s.off('department:delete', onDelete);
         };
     }, []);
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            const res = await api.get('/masterdata/material');
-            // เรียงลำดับตาม ID หรือเงื่อนไขที่ต้องการ
+            // ✅ 2. เปลี่ยน API เป็น department เหมือนหน้า Department.jsx
+            const res = await api.get('/settings/department');
             const data = res?.data?.data || [];
             setRows(data);
         } catch (err) {
             console.error(err);
-            message.error('ไม่สามารถดึงข้อมูลได้');
+            message.error('ไม่สามารถดึงข้อมูลแผนกได้');
         } finally {
             setLoading(false);
         }
     };
 
-    // --- Actions ---
     const handleCreate = () => {
         setCurrentRecord(null);
         setModalFormOpen(true);
@@ -98,7 +92,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
     };
 
     const handleFormSuccess = () => {
-        fetchData(); // หรือรอ Socket update ก็ได้
+        fetchData();
     };
 
     const handleDeleteSuccess = () => {
@@ -107,89 +101,47 @@ function ModalAssetList({ open, onClose, onSelect }) {
         fetchData();
     };
 
-    // 3. กำหนด Columns (นำมาจาก Material และเพิ่มปุ่ม Action)
+    // ✅ 3. คอลัมน์แสดงผลให้เหมือนหน้า Department.jsx ทุกประการ
     const columns = useMemo(() => [
         {
             title: 'ลำดับ',
             key: 'index',
             width: 80,
             align: 'center',
-            dragDisabled: true, // ล็อคไม่ให้ลาก
+            dragDisabled: true,
             render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
         },
         {
-            title: 'รหัสกล่อง',
-            dataIndex: 'material_code',
-            key: 'material_code',
+            title: 'รหัสแผนก',
+            dataIndex: 'G_CODE',
+            key: 'G_CODE',
             width: 150,
-            sorter: (a, b) => String(a.material_code || '').localeCompare(String(b.material_code || '')),
-            filters: [...new Set(rows.map(r => r.material_code).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_code === value,
+            sorter: (a, b) => String(a.G_CODE || '').localeCompare(String(b.G_CODE || '')),
             render: (val) => <span className="font-mono font-bold text-blue-700">{val}</span>
         },
         {
-            title: 'ชื่อวัสดุ',
-            dataIndex: 'material_name',
-            key: 'material_name',
+            title: 'ชื่อแผนก',
+            dataIndex: 'G_NAME',
+            key: 'G_NAME',
             width: 250,
-            sorter: (a, b) => String(a.material_name || '').localeCompare(String(b.material_name || '')),
-            filters: [...new Set(rows.map(r => r.material_name).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_name === value,
+            sorter: (a, b) => String(a.G_NAME || '').localeCompare(String(b.G_NAME || '')),
         },
         {
-            title: 'ประเภท',
-            dataIndex: 'material_type',
-            key: 'material_type',
+            title: 'อยู่ภายใต้สาขา',
+            dataIndex: 'branch_name',
+            key: 'branch_name',
+            width: 300,
+            sorter: (a, b) => String(a.branch_name || '').localeCompare(String(b.branch_name || '')),
+            render: (val) => val || '-'
+        },
+        {
+            title: 'รหัสสาขา',
+            dataIndex: 'branch_code',
+            key: 'branch_code',
             width: 150,
-            sorter: (a, b) => String(a.material_type || '').localeCompare(String(b.material_type || '')),
-            filters: [...new Set(rows.map(r => r.material_type).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_type === value,
+            sorter: (a, b) => String(a.branch_code || '').localeCompare(String(b.branch_code || '')),
+            render: (val) => val || '-'
         },
-        {
-            title: 'สี',
-            dataIndex: 'material_color',
-            key: 'material_color',
-            width: 140,
-            sorter: (a, b) => String(a.material_color || '').localeCompare(String(b.material_color || '')),
-            filters: [...new Set(rows.map(r => r.material_color).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_color === value,
-        },
-        {
-            title: 'โมเดล',
-            dataIndex: 'material_model',
-            key: 'material_model',
-            width: 150,
-            sorter: (a, b) => String(a.material_model || '').localeCompare(String(b.material_model || '')),
-            filters: [...new Set(rows.map(r => r.material_model).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_model === value,
-        },
-        {
-            title: 'คุณสมบัติ',
-            dataIndex: 'material_feature',
-            key: 'material_feature',
-            width: 200,
-            sorter: (a, b) => String(a.material_feature || '').localeCompare(String(b.material_feature || '')),
-            filters: [...new Set(rows.map(r => r.material_feature).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_feature === value,
-        },
-        {
-            title: 'รายละเอียด',
-            dataIndex: 'material_remark',
-            key: 'material_remark',
-            width: 250,
-            ellipsis: true,
-            sorter: (a, b) => String(a.material_remark || '').localeCompare(String(b.material_remark || '')),
-            filters: [...new Set(rows.map(r => r.material_remark).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_remark === value,
-        },
-        // ✅ เพิ่ม Column Action สำหรับ Edit/Delete
         {
             title: 'จัดการ',
             key: 'action',
@@ -197,7 +149,6 @@ function ModalAssetList({ open, onClose, onSelect }) {
             align: 'center',
             render: (_, record) => (
                 <Space onClick={(e) => e.stopPropagation()}>
-                    {/* e.stopPropagation() สำคัญมาก เพื่อไม่ให้ไป trigger การ select row */}
                     <Tooltip title="แก้ไข">
                         <Button
                             type="text"
@@ -217,22 +168,18 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 </Space>
             )
         }
-
     ], [page, rows]);
 
-    // Filter Logic
+    // ✅ 4. อัปเดตเงื่อนไขการค้นหาให้ตรงกับฟิลด์ข้อมูลแผนก
     const filteredRows = useMemo(() => {
         if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase();
         return rows.filter(
             (row) =>
-                String(row.material_code || '').toLowerCase().includes(term) ||
-                String(row.material_name || '').toLowerCase().includes(term) ||
-                String(row.material_type || '').toLowerCase().includes(term) ||
-                String(row.material_color || '').toLowerCase().includes(term) ||
-                String(row.material_model || '').toLowerCase().includes(term) ||
-                String(row.material_feature || '').toLowerCase().includes(term) ||
-                String(row.material_remark || '').toLowerCase().includes(term)
+                String(row.G_CODE || '').toLowerCase().includes(term) ||
+                String(row.G_NAME || '').toLowerCase().includes(term) ||
+                String(row.branch_name || '').toLowerCase().includes(term) ||
+                String(row.branch_code || '').toLowerCase().includes(term)
         );
     }, [rows, searchTerm]);
 
@@ -244,13 +191,8 @@ function ModalAssetList({ open, onClose, onSelect }) {
                     fontFamily: "'Prompt', 'Inter', sans-serif"
                 },
                 components: {
-                    Table: {
-                        cellPaddingBlock: 8,
-                        cellFontSize: 13,
-                    },
-                    Modal: {
-                        borderRadius: 0
-                    }
+                    Table: { cellPaddingBlock: 8, cellFontSize: 13 },
+                    Modal: { borderRadius: 0 }
                 }
             }}
         >
@@ -259,7 +201,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 title={
                     <div className="flex items-center gap-2 text-slate-700">
                         <SearchOutlined />
-                        <span className="text-lg font-bold">จัดการและเลือกทรัพย์สิน</span>
+                        <span className="text-lg font-bold">จัดการและเลือกแผนกที่รับผิดชอบ</span>
                     </div>
                 }
                 onCancel={onClose}
@@ -271,7 +213,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 styles={{
                     body: {
                         padding: 0,
-                        height: 'calc(100vh - 55px)', // ความสูงจอ - ความสูง Header ของ Modal
+                        height: 'calc(100vh - 55px)',
                         overflow: 'hidden'
                     }
                 }}
@@ -279,11 +221,9 @@ function ModalAssetList({ open, onClose, onSelect }) {
                 <DraggableTable
                     columns={columns}
                     dataSource={filteredRows}
-                    rowKey="material_id"
+                    rowKey="G_ID"
                     loading={loading}
                     scroll={{ x: 'max-content', y: 'max-content' }}
-
-                    // Pagination
                     pagination={{
                         current: page.current,
                         pageSize: page.pageSize,
@@ -293,26 +233,22 @@ function ModalAssetList({ open, onClose, onSelect }) {
                         onChange: (p, s) => setPage({ current: p, pageSize: s }),
                         className: "px-4 pb-4"
                     }}
-
-                    // Row Selection Logic
                     onRow={(record) => ({
                         onClick: () => {
-                            // ถ้าคลิกที่แถว (ไม่ใช่ปุ่ม Edit/Delete) ให้ทำการ Select และปิด Modal
                             if (onSelect) {
+                                // ⭐️ คืนค่า record ของแผนกที่ถูกเลือกกลับไปให้ AssetList.jsx
                                 onSelect(record);
                                 onClose();
                             }
                         },
                         style: { cursor: 'pointer' }
                     })}
-
-                    // Toolbar
                     renderToolbar={(ColumnVisibilityPopover) => (
                         <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
                                 <Input
                                     prefix={<SearchOutlined className="text-gray-400" />}
-                                    placeholder="ค้นหา..."
+                                    placeholder="ค้นหารหัส, ชื่อแผนก..."
                                     allowClear
                                     variant="borderless"
                                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -326,10 +262,8 @@ function ModalAssetList({ open, onClose, onSelect }) {
                                         onClick={handleCreate}
                                         className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
                                     >
-                                        เพิ่มรายการใหม่
+                                        เพิ่มแผนกใหม่
                                     </Button>
-
-                                    {/* นำปุ่มซ่อน/แสดงคอลัมน์มาแสดงตรงนี้ */}
                                     {ColumnVisibilityPopover}
                                 </div>
                             </div>
@@ -337,7 +271,7 @@ function ModalAssetList({ open, onClose, onSelect }) {
                     )}
                 />
 
-                {/* --- Modals สำหรับการจัดการ (Insert/Edit/Delete) --- */}
+                {/* ใช้งาน Modal จาก Settings/Department */}
                 <ModalForm
                     open={modalFormOpen}
                     record={currentRecord}
@@ -357,4 +291,4 @@ function ModalAssetList({ open, onClose, onSelect }) {
     );
 }
 
-export default ModalAssetList;
+export default ModalDepartment;

@@ -14,7 +14,9 @@ async function getAll() {
       username,
       permission_role,
       profileImg,
-      is_status
+      is_status,
+      time_login,
+      last_login
     FROM employees
     WHERE username IS NOT NULL AND TRIM(username) <> ''
     ORDER BY employee_id ASC
@@ -63,7 +65,7 @@ async function updateStatus(employee_id, nextStatus) {
  * อัปเดตกลุ่มสิทธิของพนักงาน → บันทึกลง employees.permission_role
  * ตรวจสอบก่อนว่า group_name มีอยู่จริงในตาราง permission_group
  */
-async function updatePermissionRole(employee_id, group_name) {
+async function updatePermissionRole(employee_id, group_name, time_login) { // ✅ เพิ่ม parameter time_login
   const name = String(group_name || '').trim();
   if (!name) {
     const err = new Error('Invalid group_name');
@@ -87,13 +89,14 @@ async function updatePermissionRole(employee_id, group_name) {
     throw err;
   }
 
+  // ✅ อัปเดตทั้ง permission_role และ time_login
   const sql = `
     UPDATE employees
-    SET permission_role = ?
+    SET permission_role = ?, time_login = ?
     WHERE employee_id = ?
     LIMIT 1
   `;
-  const [result] = await db.query(sql, [name, employee_id]);
+  const [result] = await db.query(sql, [name, time_login, employee_id]);
   return { affectedRows: result.affectedRows };
 }
 
@@ -232,7 +235,7 @@ async function getEmployeeById(employee_id) {
   // ✅ เพิ่ม employee_code และ is_status ในการ select
   const [rows] = await db.query(
     `SELECT employee_id, employee_code, titlename_th, firstname_th, lastname_th,
-            company, branch, username, permission_role, profileImg, signature, is_status
+            company, branch, username, permission_role, profileImg, signature, is_status, time_login, last_login
      FROM employees
      WHERE employee_id = ?
      LIMIT 1`,
@@ -345,38 +348,50 @@ async function createAffiliateUser(payload) {
     employee_id, employee_code,
     titlename_th, firstname_th, lastname_th,
     username, password, permission_role,
-    password_expiry_days,
-    created_by // ✅ 1. รับค่า created_by
+    password_expiry_days, created_by,
+
+    // ข้อมูลสังกัดและเวลาที่เพิ่มมา
+    company, company_code, branch, branch_code,
+    department, dep_code, position, position_code,
+    time_login
   } = payload;
 
-  // คำนวณวันหมดอายุรหัสผ่าน
   const days = Number(password_expiry_days || 90);
   const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-  // ✅ 2. เพิ่ม created_by ลงใน SQL
   const sql = `
     INSERT INTO employees (
       employee_id, employee_code,
       titlename_th, firstname_th, lastname_th,
       username, password, permission_role,
-      is_status, company, branch,
+      is_status, company, company_code, branch, branch_code,
+      department, dep_code, position, position_code, time_login,
       password_changed_at, password_expires_at, password_expiry_days, must_change_password,
       created_by, created_at
     ) VALUES (
       ?, ?,
       ?, ?, ?,
       ?, ?, ?,
-      1, 'Affiliate', 'สำนักงานใหญ่',
+      1, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, 0,
       ?, ?
     )
   `;
 
-  // ✅ 3. เพิ่ม created_by ลงใน Array ของ Parameters (ลำดับต้องตรงกับ ? ใน SQL)
+  // Map ลำดับตัวแปรให้ตรงกับ ? ใน Query
   const [result] = await db.query(sql, [
     employee_id, employee_code,
     titlename_th, firstname_th, lastname_th,
     username, password, permission_role,
+
+    // หากไม่ได้เลือก จะกำหนดค่า Default พื้นฐานให้
+    company || 'Affiliate', company_code || null,
+    branch || 'สำนักงานใหญ่', branch_code || null,
+    department || null, dep_code || null,
+    position || null, position_code || null,
+    time_login || null,
+
     now, expiresAt, days,
     created_by, now
   ]);
@@ -414,6 +429,24 @@ async function generateAffiliateCode() {
   return `99${seq}`;
 }
 
+/** (เพิ่มใหม่) ดึงลิสต์ต่างๆ เพื่อเป็นตัวเลือก Dropdown */
+async function getCompanyList() {
+  const [rows] = await db.query(`SELECT company_code, company_name_th FROM tb_company ORDER BY company_name_th ASC`);
+  return rows;
+}
+async function getBranchList() {
+  const [rows] = await db.query(`SELECT G_CODE, G_NAME FROM tb_branch ORDER BY G_NAME ASC`);
+  return rows;
+}
+async function getDepartmentList() {
+  const [rows] = await db.query(`SELECT G_CODE, G_NAME FROM tb_department ORDER BY G_NAME ASC`);
+  return rows;
+}
+async function getPositionList() {
+  const [rows] = await db.query(`SELECT G_CODE, G_NAME FROM tb_position ORDER BY G_NAME ASC`);
+  return rows;
+}
+
 module.exports = {
   getAll,
   getPermissionGroups,
@@ -436,4 +469,8 @@ module.exports = {
   createAffiliateUser,
   getTitlenames,
   generateAffiliateCode,
+  getCompanyList,
+  getBranchList,
+  getDepartmentList,
+  getPositionList
 };

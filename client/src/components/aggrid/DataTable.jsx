@@ -112,8 +112,14 @@ const DataTable = ({
     }
     
     /* กรณีมี label ว่างๆ กวนใจ ให้ซ่อน หรือจัดระเบียบ */
-    .ag-theme-alpine .header-center-checkbox .ag-header-cell-label {
+.ag-theme-alpine .header-center-checkbox .ag-header-cell-label {
         justify-content: center !important;
+    }
+
+    /* 🟢 11. (เพิ่มใหม่) ซ่อนปุ่มไอคอนกรวยฟิลเตอร์ที่อยู่หลังช่องค้นหา (Floating Filter) */
+    .ag-theme-alpine .ag-floating-filter-button {
+        display: none !important;
+    }
     }
   `;
 

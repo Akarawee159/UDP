@@ -41,7 +41,6 @@ import PackagingSize from "./pages/Settings/PackagingSize/PackagingSize";
 // SMART PACKAGE TRACKING
 import SystemOut from "./pages/SmartPackage/SystemOut/SystemOut";
 import SystemOutList from "./pages/SmartPackage/SystemOut/Page/SystemOutList";
-import SystemOutRepair from "./pages/SmartPackage/SystemOut/Page/SystemOutRepair";
 import SystemIn from "./pages/SmartPackage/SystemIn/SystemIn";
 import SystemRepair from "./pages/SmartPackage/SystemRepair/SystemRepair";
 import SystemDefective from "./pages/SmartPackage/SystemDefective/SystemDefective";
@@ -186,7 +185,7 @@ export default function App() {
           <Route path="/settings/position" element={<ProtectedRoute mainId="30" subId="303"><AdminLayout><Position /></AdminLayout></ProtectedRoute>} />
           <Route path="/settings/zone" element={<ProtectedRoute mainId="30" subId="304"><AdminLayout><Zone /></AdminLayout></ProtectedRoute>} />
           <Route path="/settings/location" element={<ProtectedRoute mainId="30" subId="305"><AdminLayout><Location /></AdminLayout></ProtectedRoute>} />
-          <Route path="/settings/counting-unit" element={<ProtectedRoute mainId="30" subId="306"><AdminLayout><CountingUnit /></AdminLayout></ProtectedRoute>} />
+          <Route path="/settings/counting-unit" element={<ProtectedRoute mainId="40" subId="406"><AdminLayout><CountingUnit /></AdminLayout></ProtectedRoute>} />
           <Route path="/settings/packaging-size" element={<ProtectedRoute mainId="30" subId="307"><AdminLayout><PackagingSize /></AdminLayout></ProtectedRoute>} />
 
           {/* ข้อมูลหลัก main=40 */}
@@ -215,7 +214,7 @@ export default function App() {
           <Route
             path="/suppliers"
             element={
-              <ProtectedRoute mainId="40" subId="403">
+              <ProtectedRoute mainId="60" subId="600">
                 <AdminLayout>
                   <Suppliers />
                 </AdminLayout>
@@ -223,11 +222,11 @@ export default function App() {
             }
           />
 
-          {/* รายงาน main=50 */}
+          {/* รายงาน main=40 */}
           <Route
             path="/registration/register-asset"
             element={
-              <ProtectedRoute mainId="50" subId="501">
+              <ProtectedRoute mainId="40" subId="407">
                 <AdminLayout>
                   <RegisterAsset />
                 </AdminLayout>
@@ -238,7 +237,7 @@ export default function App() {
           <Route
             path="/registration/register-asset/create"
             element={
-              <ProtectedRoute mainId="50" subId="501">
+              <ProtectedRoute mainId="40" subId="407">
                 <AdminLayout>
                   <AssetList />
                 </AdminLayout>
@@ -249,7 +248,7 @@ export default function App() {
           <Route
             path="/registration/register-asset/detail"
             element={
-              <ProtectedRoute mainId="50" subId="501">
+              <ProtectedRoute mainId="40" subId="407">
                 <AdminLayout>
                   <AssetDetail />
                 </AdminLayout>
@@ -260,7 +259,7 @@ export default function App() {
           <Route
             path="/registration/register-asset/log"
             element={
-              <ProtectedRoute mainId="50" subId="501">
+              <ProtectedRoute mainId="40" subId="407">
                 <AdminLayout>
                   <AssetLog />
                 </AdminLayout>
@@ -286,17 +285,6 @@ export default function App() {
               <ProtectedRoute mainId="60" subId="601">
                 <AdminLayout>
                   <SystemOutList />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/smart-package/system-out/repair"
-            element={
-              <ProtectedRoute mainId="60" subId="601">
-                <AdminLayout>
-                  <SystemOutRepair />
                 </AdminLayout>
               </ProtectedRoute>
             }

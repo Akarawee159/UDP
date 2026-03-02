@@ -25,12 +25,21 @@ import {
 
 /* Menu Config (โครงสร้างเดิม) */
 export const menuItems = [
-  // {
-  //   id: "10", label: "แดชบอร์ด",
-  //   icon: <DashboardOutlined />,
-  //   path: "/dashboard",
-  //   type: "single"
-  // },
+  {
+    id: "10", label: "แดชบอร์ด",
+    icon: <DashboardOutlined />,
+    path: "/dashboard",
+    type: "single"
+  },
+  {
+    id: "20", label: "การจัดการผู้ใช้งาน",
+    icon: <TeamOutlined />,
+    type: "dropdown",
+    children: [
+      { id: "201", label: "กำหนดสิทธิผู้ใช้งาน", path: "/management" },
+      { id: "202", label: "กำหนดสิทธิการใช้งาน", path: "/permission" },
+    ]
+  },
   {
     id: "30",
     label: "ข้อมูลตั้งค่า",
@@ -42,19 +51,10 @@ export const menuItems = [
       { id: "301", label: "สาขา", path: "/settings/branch" },
       { id: "302", label: "แผนก", path: "/settings/department" },
       { id: "303", label: "ตำแหน่งงาน", path: "/settings/position" },
-      // { id: "304", label: "โซน", path: "/settings/zone" },
-      // { id: "305", label: "โลเคชั่น", path: "/settings/location" },
-      // { id: "306", label: "หน่วยนับ", path: "/settings/counting-unit" },
-      // { id: "307", label: "ขนาดบรรจุภัณฑ์", path: "/settings/packaging-size" },
-    ]
-  },
-  {
-    id: "20", label: "การจัดการผู้ใช้งาน",
-    icon: <TeamOutlined />,
-    type: "dropdown",
-    children: [
-      { id: "202", label: "สร้างกลุ่มสิทธิ", path: "/permission" },
-      { id: "201", label: "สร้างผู้ใช้งาน", path: "/management" },
+      { id: "304", label: "โซน", path: "/settings/zone" },
+      { id: "305", label: "โลเคชั่น", path: "/settings/location" },
+      { id: "306", label: "หน่วยนับ", path: "/settings/counting-unit" },
+      { id: "307", label: "ขนาดบรรจุภัณฑ์", path: "/settings/packaging-size" },
     ]
   },
   {
@@ -63,33 +63,30 @@ export const menuItems = [
     icon: <DatabaseOutlined />,
     type: "dropdown",
     children: [
-      // { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
-      { id: "406", label: "หน่วยนับ", path: "/settings/counting-unit" },
+      { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
       { id: "402", label: "สร้างข้อมูลกล่อง", path: "/material" },
-      { id: "407", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
-
+      { id: "403", label: "ข้อมูลผู้ส่ง-ผู้รับ", path: "/suppliers" },
     ]
   },
-  // {
-  //   id: "50",
-  //   label: "การจัดการทรัพย์สิน",
-  //   icon: <DropboxOutlined />,
-  //   type: "dropdown",
-  //   children: [
-  //     // { id: "501", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
-  //   ]
-  // },
+  {
+    id: "50",
+    label: "การจัดการทรัพย์สิน",
+    icon: <DropboxOutlined />,
+    type: "dropdown",
+    children: [
+      { id: "501", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
+    ]
+  },
   {
     id: "60",
     label: "SMART PACKAGE TRACKING",
     icon: <CodeSandboxOutlined />,
     type: "dropdown",
     children: [
-      { id: "600", label: "ข้อมูลผู้ส่ง-ผู้รับ", path: "/suppliers" },
       { id: "601", label: "ระบบจ่ายออก", path: "/smart-package/system-out" },
-      { id: "602", label: "ระบบรับเข้า", path: "/smart-package/system-in" },
-      { id: "603", label: "ระบบแจ้งชำรุด", path: "/smart-package/system-defective" },
-      // { id: "604", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
+      { id: "602", label: "ระบบรับเข้าของดี", path: "/smart-package/system-in" },
+      { id: "603", label: "ระบบรับเข้าของชำรุด", path: "/smart-package/system-defective" },
+      { id: "604", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
     ]
   },
   {

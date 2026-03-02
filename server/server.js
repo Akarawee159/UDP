@@ -92,7 +92,7 @@ app.use("/api/settings/department", auth, permit({ mainId: "30", subId: "302" })
 app.use("/api/settings/position", auth, permit({ mainId: "30", subId: "303" }), positionRoutes);
 app.use("/api/settings/zone", auth, permit({ mainId: "30", subId: "304" }), zoneRoutes);
 app.use("/api/settings/area", auth, permit({ mainId: "30", subId: "305" }), areaRoutes);
-app.use("/api/settings/countingunit", auth, permit({ mainId: "30", subId: "306" }), countingunitRoutes);
+// app.use("/api/settings/countingunit", auth, permit({ mainId: "30", subId: "306" }), countingunitRoutes);
 app.use("/api/settings/packaging", auth, permit({ mainId: "30", subId: "307" }), packagingRoutes);
 
 /**
@@ -105,20 +105,21 @@ app.use("/api/workhistory", auth, permit({ mainId: "40", subId: "401" }), workhi
 app.use("/api/relatives", auth, permit({ mainId: "40", subId: "401" }), relativesRoutes);
 app.use("/api/location", auth, permit({ mainId: "40", subId: "401" }), locationRoutes);
 app.use("/api/masterdata/material", auth, permit({ mainId: "40", subId: "402" }), materialRoutes);
-app.use("/api/masterdata/supplier", auth, permit({ mainId: "40", subId: "402" }), supplierRoutes);
+app.use("/api/settings/countingunit", auth, permit({ mainId: "40", subId: "406" }), countingunitRoutes);
 
 /**
  * =========================
  * Registration (main=50)
  * =========================
  */
-app.use("/api/registration/registerasset", auth, permit({ mainId: "50", subId: "501" }), registerassetRoutes);
+app.use("/api/registration/registerasset", auth, permit({ mainId: "40", subId: "407" }), registerassetRoutes);
 
 /**
  * =========================
  * Smartpackage (main=60)
  * =========================
  */
+app.use("/api/masterdata/supplier", auth, permit({ mainId: "60", subId: "600" }), supplierRoutes);
 app.use("/api/smartpackage/systemout", auth, permit({ mainId: "60", subId: "601" }), systemOutRoutes);
 app.use("/api/smartpackage/systemin", auth, permit({ mainId: "60", subId: "601" }), systemInRoutes);
 app.use("/api/smartpackage/systemdefective", auth, permit({ mainId: "60", subId: "601" }), systemDefectiveRoutes);

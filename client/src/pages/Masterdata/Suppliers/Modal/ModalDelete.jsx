@@ -38,7 +38,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         closable={false}
         onCancel={onClose}
         maskClosable={false} // ✅ ห้ามคลิกนอกกรอบเพื่อปิด
-        destroyOnClose
+        destroyOnHidden
         width={480}
         centered
         // ✅ z-index สูงกว่า Modal ปกติ (antd ปกติจัดการให้อยู่แล้วถ้าเปิดทีหลัง แต่ใส่เผื่อไว้ได้)

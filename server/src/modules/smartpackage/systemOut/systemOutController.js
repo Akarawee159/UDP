@@ -41,28 +41,26 @@ async function getScannedList(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function generateBookingRef(req, res, next) {
+// เพิ่มฟังก์ชันใหม่
+async function editHeader(req, res, next) {
   try {
     const { draft_id } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
-    const result = await model.generateRefID(draft_id, user_id);
-
-    // Notify
+    await model.editHeaderBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemout:update', { action: 'ref_generated', draft_id });
-
-    res.json({ success: true, data: result });
+    if (io) io.emit('systemout:update', { action: 'header_update', draft_id });
+    res.json({ success: true, message: 'Status updated to 116' });
   } catch (err) { next(err); }
 }
 
+// นำฟังก์ชันนี้ไปแทนที่ของเดิม (เพื่อส่ง refID กลับไปให้ UI ทันทีตอนเซฟ Header)
 async function confirmBooking(req, res, next) {
   try {
     const { draft_id, booking_remark, origin, destination } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 111
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -194,20 +192,21 @@ async function getBookingDetail(req, res, next) {
     if (booking) {
       const status = String(booking.is_status);
 
-      // ✅ แยกเงื่อนไข 115 (จ่ายออกสำเร็จ) -> ดึงจาก Detail
       if (status === '115') {
-        assets = await model.getAssetsDetailByRefID(booking.refID);
-      }
-      // ✅ เงื่อนไข 112 (รอตรวจสอบ) หรือ 114 (แก้ไข) -> ดึงจาก Master
-      else if (status === '112' || status === '114') {
+        // 1. ลองดึงข้อมูลจากตารางหลัก (Master: tb_asset_lists) ก่อน
         assets = await model.getAssetsByMasterRefID(booking.refID);
-      }
-      // Draft -> ดึงจาก Master โดยใช้ draft_id
-      else {
+
+        // 2. ถ้าในตารางหลักไม่มีข้อมูลที่ผูกกับ refID นี้แล้ว (assets.length === 0) 
+        // ค่อยดึงจากประวัติ (Detail: tb_asset_lists_detail)
+        if (!assets || assets.length === 0) {
+          assets = await model.getAssetsDetailByRefID(booking.refID);
+        }
+      } else if (status === '114' || status === '111' || status === '116') {
+        assets = await model.getAssetsByMasterRefID(booking.refID);
+      } else {
         assets = await model.getAssetsByDraft(draft_id);
       }
     }
-
     res.json({ success: true, booking, assets });
   } catch (err) { next(err); }
 }
@@ -255,8 +254,8 @@ module.exports = {
   confirmBooking,
   getDropdowns,
   getBookingList,
+  editHeader,
   getBookingDetail,
-  generateBookingRef,
   cancelBooking,
   finalizeBooking,
   unlockBooking,

@@ -1,0 +1,45 @@
+# Dependencies (ไฟล์ไลบรารี)
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing (ไฟล์ Report การรันเทส)
+coverage/
+.nyc_output/
+
+# Production & Build (ไฟล์ที่ผ่านการ Build เช่น กรณีใช้ TypeScript)
+build/
+dist/
+
+# Logs (ไฟล์เก็บ Log ระบบ)
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime & PM2 (ไฟล์สถานะการรันโปรเซส)
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Environment Variables (ไฟล์เก็บความลับ - ห้ามเอาขึ้น Git เด็ดขาด!)
+.env
+.env.test
+.env.production
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS Files (ไฟล์ขยะจากระบบปฏิบัติการ)
+.DS_Store
+Thumbs.db
+
+# IDE / Editor (ไฟล์การตั้งค่าส่วนตัวของโปรแกรมเขียนโค้ด)
+.idea/
+.vscode/
+*.swp
+*.swo

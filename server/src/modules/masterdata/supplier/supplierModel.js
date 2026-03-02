@@ -83,6 +83,7 @@ async function update(oldCode, data) {
   try {
     await conn.beginTransaction();
 
+    // อย่าลืมประกาศ SQL ตรงนี้ครับ
     const sql = `
       UPDATE suppliers
       SET supplier_code=?, supplier_code2=?, supplier_type=?, branch_name=?, 
@@ -90,15 +91,16 @@ async function update(oldCode, data) {
           supplier_address=?, contact_name=?, supplier_phone=?, contact_phone=?, tax_id=?
       WHERE supplier_code = ?
     `;
-    const [result] = await conn.query(sql, [
+
+    await conn.query(sql, [
       data.supplier_code, data.supplier_code2, data.supplier_type, data.branch_name,
       data.supplier_name, data.remark,
       data.supplier_address, data.contact_name, data.supplier_phone, data.contact_phone, data.tax_id,
-      oldCode // ใช้ oldCode ใน Where Clause
+      oldCode
     ]);
 
     await conn.commit();
-    return result.affectedRows > 0;
+    return true; // สำเร็จเสมอถ้าไม่มี Error
 
   } catch (err) {
     await conn.rollback();

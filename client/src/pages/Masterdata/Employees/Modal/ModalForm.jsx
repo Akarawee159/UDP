@@ -145,9 +145,6 @@ export default function ModalForm({
   const ssoRegistered = Form.useWatch('sso_registered', form);
   const disabledPerson = Form.useWatch('disabled_person', form);
   const disabledGuarantor = Form.useWatch('has_guarantor', form);
-  const selectedCompanyCode = Form.useWatch('company_code', form);
-  const selectedBranchCode = Form.useWatch('branch_code', form);
-  const selectedDepCode = Form.useWatch('dep_code', form);
 
   const irisOk = isAlnumRange(irisVal, 13, 13);
   const irisShow = irisVal.length > 0;
@@ -177,35 +174,11 @@ export default function ModalForm({
   const depByName = useMemo(() => { const m = new Map(); (options.departments || []).forEach(d => m.set(String(d.department), d.dep_code)); return m; }, [options.departments]);
 
   const onCompanyCodeChange = (code) => form.setFieldsValue({ company: companyByCode.get(String(code)) || null });
-  const onCompanyNameChange = (name) => {
-    const code = companyByName.get(String(name));
-    form.setFieldsValue({
-      company_code: code || null,
-      // เคลียร์ค่าลูกโซ่ทั้งหมดเมื่อเปลี่ยนบริษัท
-      branch: null, branch_code: null,
-      department: null, dep_code: null,
-      position: null
-    });
-  };
+  const onCompanyNameChange = (name) => form.setFieldsValue({ company_code: companyByName.get(String(name)) || null });
   const onBranchCodeChange = (code) => form.setFieldsValue({ branch: branchByCode.get(String(code)) || null });
-  const onBranchNameChange = (name) => {
-    const code = branchByName.get(String(name));
-    form.setFieldsValue({
-      branch_code: code || null,
-      // เคลียร์ค่าแผนกและตำแหน่งเมื่อเปลี่ยนสาขา
-      department: null, dep_code: null,
-      position: null
-    });
-  };
+  const onBranchNameChange = (name) => form.setFieldsValue({ branch_code: branchByName.get(String(name)) || null });
   const onDepCodeChange = (code) => form.setFieldsValue({ department: depByCode.get(String(code)) || null });
-  const onDepNameChange = (name) => {
-    const code = depByName.get(String(name));
-    form.setFieldsValue({
-      dep_code: code || null,
-      // เคลียร์ตำแหน่งเมื่อเปลี่ยนแผนก
-      position: null
-    });
-  };
+  const onDepNameChange = (name) => form.setFieldsValue({ dep_code: depByName.get(String(name)) || null });
 
   // ... (Fetch Logic - คงเดิม) ...
   const fetchOptions = useCallback(async () => {
@@ -290,26 +263,6 @@ export default function ModalForm({
       setWorkStatusTouched(true);
     }
   }, [fetchOptions, fetchNextCode, fetchDetail, loadWorkHistory, loadRelatives, isEdit, employee, form]);
-
-  // List ตัวเลือกที่ถูกกรอง (Filtered Options)
-  // กรองสาขา: แสดงเฉพาะที่ company_code ตรงกับบริษัทที่เลือก
-  const filteredBranches = useMemo(() => {
-    if (!options.branches) return [];
-    if (!selectedCompanyCode) return []; // ถ้าไม่เลือกบริษัท ไม่แสดงสาขา
-    return options.branches.filter(b => String(b.company_code) === String(selectedCompanyCode));
-  }, [options.branches, selectedCompanyCode]);
-  // กรองแผนก: แสดงเฉพาะที่ branch_code ตรงกับสาขาที่เลือก
-  const filteredDepartments = useMemo(() => {
-    if (!options.departments) return [];
-    if (!selectedBranchCode) return []; // ถ้าไม่เลือกสาขา ไม่แสดงแผนก
-    return options.departments.filter(d => String(d.branch_code) === String(selectedBranchCode));
-  }, [options.departments, selectedBranchCode]);
-  // กรองตำแหน่ง: แสดงเฉพาะที่ department_code ตรงกับแผนกที่เลือก
-  const filteredPositions = useMemo(() => {
-    if (!options.positions) return [];
-    if (!selectedDepCode) return []; // ถ้าไม่เลือกแผนก ไม่แสดงตำแหน่ง
-    return options.positions.filter(p => String(p.department_code) === String(selectedDepCode));
-  }, [options.positions, selectedDepCode]);
 
   // ... (Handlers - คงเดิม) ...
   const checkDup = useCallback(async (code) => {
@@ -456,62 +409,59 @@ export default function ModalForm({
           <Input placeholder="เช่น 100001" disabled={isEdit && !workStatusTouched} />
         </Form.Item>
         <Form.Item hidden label="รหัสบริษัท" name="company_code" {...fullLayout} style={compactStyle}><S {...selProps} options={(options.companies || []).map(c => ({ value: c.company_code, label: c.company_code }))} onChange={onCompanyCodeChange} /></Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">บริษัท</span>} name="company" rules={[{ required: true, message: 'กรุณาเลือกบริษัท' }]} {...fullLayout} style={compactStyle}>
+        <Form.Item label={<span className="text-red-500 font-bold">ชื่อบริษัท</span>} name="company" rules={[{ required: true, message: 'กรุณาเลือกชื่อบริษัท' }]} {...fullLayout} style={compactStyle}>
           <S
             {...selProps}
-            disabled={isEdit && !workStatusTouched}
+            disabled={isEdit && !workStatusTouched} // ล็อค
             options={(options.companies || []).map(c => ({ value: c.company_name_th, label: c.company_name_th }))}
             onChange={onCompanyNameChange}
             placeholder="กรุณาเลือก"
           />
         </Form.Item>
         <Form.Item hidden label="รหัสสาขา" name="branch_code" {...fullLayout} style={compactStyle}><S {...selProps} options={(options.branches || []).map(b => ({ value: b.branch_code, label: b.branch_code }))} onChange={onBranchCodeChange} /></Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">สาขา</span>} name="branch" rules={[{ required: true, message: 'กรุณาเลือกสาขา' }]} {...fullLayout} style={compactStyle}>
+        <Form.Item label={<span className="text-red-500 font-bold">ชื่อสาขา</span>} name="branch" rules={[{ required: true, message: 'กรุณาเลือกชื่อสาขา' }]} {...fullLayout} style={compactStyle}>
           <S
             {...selProps}
-            disabled={(!selectedCompanyCode) || (isEdit && !workStatusTouched)} // ล็อคถ้ายังไม่เลือกบริษัท
-            // ❗ ใช้ filteredBranches แทน options.branches
-            options={filteredBranches.map(b => ({ value: b.branch, label: b.branch }))}
+            disabled={isEdit && !workStatusTouched} // ล็อค
+            options={(options.branches || []).map(b => ({ value: b.branch, label: b.branch }))}
             onChange={onBranchNameChange}
-            placeholder={selectedCompanyCode ? "กรุณาเลือก" : "กรุณาเลือกบริษัทก่อน"}
+            placeholder="กรุณาเลือก"
           />
         </Form.Item>
         <Form.Item hidden label="รหัสแผนก" name="dep_code" {...fullLayout} style={compactStyle}><S {...selProps} options={(options.departments || []).map(d => ({ value: d.dep_code, label: d.dep_code }))} onChange={onDepCodeChange} /></Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">แผนก</span>} name="department" rules={[{ required: true, message: 'กรุณาเลือกแผนก' }]} {...fullLayout} style={compactStyle}>
+        <Form.Item label={<span className="text-red-500 font-bold">ชื่อแผนก</span>} name="department" rules={[{ required: true, message: 'กรุณาเลือกชื่อแผนก' }]} {...fullLayout} style={compactStyle}>
           <S
             {...selProps}
-            disabled={(!selectedBranchCode) || (isEdit && !workStatusTouched)} // ล็อคถ้ายังไม่เลือกสาขา
-            // ❗ ใช้ filteredDepartments แทน options.departments
-            options={filteredDepartments.map(d => ({ value: d.department, label: d.department }))}
+            disabled={isEdit && !workStatusTouched} // ล็อค
+            options={(options.departments || []).map(d => ({ value: d.department, label: d.department }))}
             onChange={onDepNameChange}
-            placeholder={selectedBranchCode ? "กรุณาเลือก" : "กรุณาเลือกสาขาก่อน"}
+            placeholder="กรุณาเลือก"
           />
         </Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">ตำแหน่ง</span>} name="position" rules={[{ required: true, message: 'กรุณาเลือกตำแหน่ง' }]} {...fullLayout} style={compactStyle}>
-          <S
-            {...selProps}
-            disabled={(!selectedDepCode) || (isEdit && !workStatusTouched)} // ล็อคถ้ายังไม่เลือกแผนก
-            // ❗ ใช้ filteredPositions แทน options.positions
-            options={filteredPositions.map(p => ({ value: p.position, label: p.position }))}
-            placeholder={selectedDepCode ? "กรุณาเลือก" : "กรุณาเลือกแผนกก่อน"}
-          />
-        </Form.Item>
-        <Form.Item label="ไซต์งาน" name="worksites" {...fullLayout} style={compactStyle}>
+        {/* <Form.Item label={<span className="text-red-500 font-bold">ไซต์งาน</span>} name="worksites" rules={[{ required: true, message: 'กรุณาเลือกไซต์งาน' }]} {...fullLayout} style={compactStyle}>
           <S
             {...selProps}
             disabled={isEdit && !workStatusTouched} // ล็อค
             options={(options.worksites || []).map(w => ({ value: w.worksites, label: w.worksites }))}
             placeholder="กรุณาเลือก"
           />
+        </Form.Item> */}
+        <Form.Item label={<span className="text-red-500 font-bold">ตำแหน่ง</span>} name="position" rules={[{ required: true, message: 'กรุณาเลือกตำแหน่ง' }]} {...fullLayout} style={compactStyle}>
+          <S
+            {...selProps}
+            disabled={isEdit && !workStatusTouched} // ล็อค
+            options={(options.positions || []).map(p => ({ value: p.position, label: p.position }))}
+            placeholder="กรุณาเลือก"
+          />
         </Form.Item>
-        <Form.Item label="ประเภทพนักงาน" name="employee_type" {...fullLayout} style={compactStyle}>
+        {/* <Form.Item label={<span className="text-red-500 font-bold">ประเภทพนักงาน</span>} name="employee_type" rules={[{ required: true, message: 'กรุณาเลือกประเภทพนักงาน' }]} {...fullLayout} style={compactStyle}>
           <S
             {...selProps}
             disabled={isEdit && !workStatusTouched} // ล็อค
             options={(options.employeeTypes || []).map(e => ({ value: e.employee_type, label: e.employee_type }))}
             placeholder="กรุณาเลือก"
           />
-        </Form.Item>
+        </Form.Item> */}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <Title level={5} underline style={{ color: '#0916C8', margin: 0 }}>ข้อมูลระบุตัวบุคคล</Title>
@@ -536,28 +486,29 @@ export default function ModalForm({
         <Form.Item label="วันหมดอายุ" name="idcard_edate" {...fullLayout} style={compactStyle}><ThaiDateInput /></Form.Item>
 
         <Title level={5} underline style={{ color: '#0916C8', margin: 0 }}>ประวัติส่วนตัว</Title>
+        <Form.Item name="over_age" valuePropName="checked" label="อายุเกิน 60 ปี" style={compactStyle} {...fullLayout}><Checkbox>อายุเกิน 60 ปี</Checkbox></Form.Item>
         <Form.Item label="วันเกิด" name="birthdate" {...fullLayout} style={compactStyle}><ThaiDateInput onValueChange={onBirthdateChange} /></Form.Item>
         <Form.Item label="อายุ (ปี)" name="age" {...fullLayout} style={compactStyle}><Input style={{ width: '100%' }} readOnly /></Form.Item>
         <Form.Item label="สถานที่เกิด" name="birthplace" {...fullLayout} style={compactStyle}><Input /></Form.Item>
-        <Form.Item label="สัญชาติ" name="nationality" rules={[{ required: false, message: 'กรุณาเลือกสัญชาติ' }]} {...fullLayout} style={compactStyle}>
-          <S {...selProps} options={(options.nationalities || []).map(x => ({ value: x.nationality, label: x.nationality }))} placeholder="กรุณาเลือก" />
-        </Form.Item>
-        <Form.Item label="เชื้อชาติ" name="ethnicity" rules={[{ required: false, message: 'กรุณาเลือกเชื้อชาติ' }]} {...fullLayout} style={compactStyle}>
-          <S {...selProps} options={(options.ethnicities || []).map(x => ({ value: x.ethnicity, label: x.ethnicity }))} placeholder="กรุณาเลือก" />
-        </Form.Item>
         <Form.Item label={<span className="text-red-500 font-bold">เพศ</span>} name="gender" rules={[{ required: true, message: 'กรุณาเลือกเพศ' }]} {...fullLayout} style={compactStyle}>
           <S {...selProps} options={(options.genders || []).map(g => ({ value: g.gender, label: g.gender }))} placeholder="กรุณาเลือก" />
         </Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">คำนำหน้า (ไทย)</span>} name="titlename_th" rules={[{ required: true, message: 'กรุณาเลือกคำนำหน้าชื่อ (ไทย)' }]} {...fullLayout} style={compactStyle}>
+        <Form.Item label={<span className="text-red-500 font-bold">สัญชาติ</span>} name="nationality" rules={[{ required: true, message: 'กรุณาเลือกสัญชาติ' }]} {...fullLayout} style={compactStyle}>
+          <S {...selProps} options={(options.nationalities || []).map(x => ({ value: x.nationality, label: x.nationality }))} placeholder="กรุณาเลือก" />
+        </Form.Item>
+        <Form.Item label={<span className="text-red-500 font-bold">เชื้อชาติ</span>} name="ethnicity" rules={[{ required: true, message: 'กรุณาเลือกเชื้อชาติ' }]} {...fullLayout} style={compactStyle}>
+          <S {...selProps} options={(options.ethnicities || []).map(x => ({ value: x.ethnicity, label: x.ethnicity }))} placeholder="กรุณาเลือก" />
+        </Form.Item>
+        <Form.Item label={<span className="text-red-500 font-bold">คำนำหน้าชื่อ (ไทย)</span>} name="titlename_th" rules={[{ required: true, message: 'กรุณาเลือกคำนำหน้าชื่อ (ไทย)' }]} {...fullLayout} style={compactStyle}>
           <S {...selProps} options={(options.titlename || []).map(t => ({ value: t.name_th, label: t.name_th }))} placeholder="กรุณาเลือก" />
         </Form.Item>
         <Form.Item label={<span className="text-red-500 font-bold">ชื่อ (ไทย)</span>} name="firstname_th" rules={[{ required: true, message: 'กรุณากรอกชื่อ (ไทย)' }]} {...fullLayout} style={compactStyle}><Input /></Form.Item>
         <Form.Item label={<span className="text-red-500 font-bold">นามสกุล (ไทย)</span>} name="lastname_th" rules={[{ required: true, message: 'กรุณากรอกนามสกุล (ไทย)' }]} {...fullLayout} style={compactStyle}><Input /></Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">คำนำหน้า (อังกฤษ)</span>} name="titlename_en" rules={[{ required: true, message: 'กรุณากรอกชื่อ (ไทย)' }]} {...fullLayout} style={compactStyle}>
+        <Form.Item label={<span className="text-red-500 font-bold">คำนำหน้าชื่อ (อังกฤษ)</span>} name="titlename_en" {...fullLayout} style={compactStyle}>
           <S {...selProps} options={(options.titlename || []).map(t => ({ value: t.name_en, label: t.name_en }))} placeholder="กรุณาเลือก" />
         </Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">ชื่อ (อังกฤษ)</span>} name="firstname_en" rules={[{ required: true, message: 'กรุณากรอกชื่อ (อังกฤษ)' }]} {...fullLayout} style={compactStyle}><Input /></Form.Item>
-        <Form.Item label={<span className="text-red-500 font-bold">นามสกุล (อังกฤษ)</span>} name="lastname_en" rules={[{ required: true, message: 'กรุณากรอกนามสกุล (อังกฤษ)' }]} {...fullLayout} style={compactStyle}><Input /></Form.Item>
+        <Form.Item label={<span className="text-red-500 font-bold">ชื่อ (อังกฤษ)</span>} name="firstname_en" {...fullLayout} style={compactStyle}><Input /></Form.Item>
+        <Form.Item label={<span className="text-red-500 font-bold">นามสกุล (อังกฤษ)</span>} name="lastname_en" {...fullLayout} style={compactStyle}><Input /></Form.Item>
         <Form.Item label="น้ำหนัก (กก.)" name="weight_kg" {...fullLayout} style={compactStyle}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
         <Form.Item label="ส่วนสูง (ซม.)" name="height_cm" {...fullLayout} style={compactStyle}><InputNumber min={0} style={{ width: '100%' }} /></Form.Item>
         <Form.Item label="ศาสนา" name="religion" {...fullLayout} style={compactStyle}>

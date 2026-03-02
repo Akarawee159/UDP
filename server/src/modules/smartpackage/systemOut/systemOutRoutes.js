@@ -6,7 +6,6 @@ const router = express.Router();
 const auth = require('../../../auth/middleware/authMiddleware');
 const controller = require('./systemOutController');
 
-router.post('/generate-ref', auth, controller.generateBookingRef); // Generate RefID
 router.get('/', auth, controller.getBookingList);             // Main Table (Bookings)
 router.get('/detail', auth, controller.getBookingDetail);     // Booking Detail (Header + Assets)
 router.post('/init-booking', auth, controller.initBooking);   // Create Draft ID
@@ -17,6 +16,7 @@ router.post('/return', auth, controller.returnAssets);        // Batch Return
 router.post('/confirm', auth, controller.confirmBooking);     // Save/Gen RefID
 router.post('/cancel', auth, controller.cancelBooking);       // Cancel Booking
 router.post('/finalize', auth, controller.finalizeBooking);   //  จ่ายออก
+router.post('/edit-header', auth, controller.editHeader); // กดแก้ไขข้อมูลจ่ายออก
 router.post('/unlock', auth, controller.unlockBooking);       //  ปลดล็อค
 router.post('/confirm-output', auth, controller.confirmOutput); // ยืนยันการจ่ายออก (112 -> 115)
 router.get('/dropdowns', auth, controller.getDropdowns);      // Dropdowns

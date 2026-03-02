@@ -5,7 +5,7 @@ import api from '../api';
 const read = (k) => localStorage.getItem(k) || sessionStorage.getItem(k);
 
 export default function useAuth() {
-  const [user, setUser]   = useState(null);
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(read('token'));
   const [loading, setLoading] = useState(true);
 
@@ -21,12 +21,15 @@ export default function useAuth() {
 
   const login = (accessToken, userData, { remember = true, refreshToken } = {}) => {
     const storage = remember ? localStorage : sessionStorage;
-    const other   = remember ? sessionStorage : localStorage;
-    ['token','user','refreshToken'].forEach(k => other.removeItem(k));
+    const other = remember ? sessionStorage : localStorage;
+    ['token', 'user', 'refreshToken'].forEach(k => other.removeItem(k));
 
     storage.setItem('token', accessToken);
     storage.setItem('user', JSON.stringify(userData));
     if (refreshToken) storage.setItem('refreshToken', refreshToken);
+
+    // ✅ เพิ่มบรรทัดนี้: รีเซ็ตเวลานับถอยหลังให้เริ่มใหม่ตอน Login เสมอ
+    localStorage.setItem('HRMS_LAST_ACTIVE', String(Date.now()));
 
     setToken(accessToken);
     setUser(userData);

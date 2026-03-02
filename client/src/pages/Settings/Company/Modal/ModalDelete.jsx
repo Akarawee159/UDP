@@ -39,17 +39,17 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
         closable={false}
         onCancel={onClose}
         maskClosable={false} // ✅ ห้ามคลิกนอกกรอบเพื่อปิด
-        destroyOnClose
+        destroyOnHidden
         width={480}
         centered
         // ✅ z-index สูงกว่า Modal ปกติ (antd ปกติจัดการให้อยู่แล้วถ้าเปิดทีหลัง แต่ใส่เผื่อไว้ได้)
         zIndex={1001}
-        styles={{ content: { padding: 0, borderRadius: '16px', overflow: 'hidden' } }}
+        styles={{ content: { padding: 0, borderRadius: '4px', overflow: 'hidden' } }}
       >
         {/* Header (Red for Danger) */}
         <div className="bg-red-50 px-6 py-4 border-b border-red-100 flex items-center justify-between">
           <div className="flex items-center gap-3 text-red-800">
-            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-red-500 text-xl">
+            <div className="w-10 h-10 bg-white rounded-md flex items-center justify-center shadow-sm text-red-500 text-xl">
               <DeleteOutlined />
             </div>
             <div>
@@ -62,7 +62,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Content */}
         <div className="p-6">
-          <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-6 flex gap-3 items-start">
+          <div className="bg-orange-50 border border-orange-100 rounded-md p-4 mb-6 flex gap-3 items-start">
             <WarningOutlined className="text-orange-500 mt-1 text-lg" />
             <div>
               <div className="font-bold text-orange-800 text-sm mb-1">คำเตือน: การลบข้อมูลถาวร</div>
@@ -74,10 +74,10 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
           {/* Record Details */}
           {record && (
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm relative overflow-hidden">
+            <div className="bg-white border border-gray-200 rounded-md p-4 shadow-sm relative overflow-hidden">
               <div className="grid grid-cols-1 gap-4">
                 <div className="flex items-start gap-3 pb-3 border-b border-gray-100">
-                  <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
+                  <div className="w-10 h-10 rounded-md bg-gray-50 flex items-center justify-center text-gray-400 mt-1">
                     <BankOutlined className="text-xl" />
                   </div>
                   <div>
@@ -89,7 +89,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                   </div>
                 </div>
 
-                <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                <div className="bg-gray-50/50 p-2 rounded-md border border-gray-100">
                   <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
                     <BarcodeOutlined /> รหัสบริษัท
                   </div>
@@ -104,10 +104,10 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
 
         {/* Footer */}
         <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <Button key="submit" danger type="primary" onClick={handleOk} loading={loading} icon={<DeleteOutlined />} className="h-10 px-6 rounded-lg shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none">
+          <Button key="submit" danger type="primary" onClick={handleOk} loading={loading} icon={<DeleteOutlined />} className="h-10 px-6 rounded-md shadow-md font-semibold bg-red-600 hover:bg-red-500 border-none">
             ยืนยันการลบ
           </Button>
-          <Button key="back" onClick={onClose} disabled={loading} className="h-10 px-6 rounded-lg border-gray-300">
+          <Button key="back" onClick={onClose} disabled={loading} className="h-10 px-6 rounded-md border-gray-300">
             ยกเลิก
           </Button>
         </div>

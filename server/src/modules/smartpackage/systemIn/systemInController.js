@@ -6,14 +6,14 @@ const dayjs = require('dayjs');
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการรับเข้าของดี' } = req.body;
+    const { draft_id, objective = 'ทำรายการรับเข้า' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการรับเข้าของดี') {
+    if (objective === 'ทำรายการรับเข้า') {
       booking_type = 'RC';
     }
 
@@ -41,28 +41,26 @@ async function getScannedList(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function generateBookingRef(req, res, next) {
+// เพิ่มฟังก์ชันใหม่
+async function editHeader(req, res, next) {
   try {
     const { draft_id } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
-    const result = await model.generateRefID(draft_id, user_id);
-
-    // Notify
+    await model.editHeaderBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemin:update', { action: 'ref_generated', draft_id });
-
-    res.json({ success: true, data: result });
+    if (io) io.emit('systemin:update', { action: 'header_update', draft_id });
+    res.json({ success: true, message: 'Status updated to 136' });
   } catch (err) { next(err); }
 }
 
+// นำฟังก์ชันนี้ไปแทนที่ของเดิม (เพื่อส่ง refID กลับไปให้ UI ทันทีตอนเซฟ Header)
 async function confirmBooking(req, res, next) {
   try {
     const { draft_id, booking_remark, origin, destination } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 131
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -72,7 +70,7 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: รับเข้าของดี (Finalize)
+// ✅ ใหม่: รับเข้า (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
@@ -193,21 +191,14 @@ async function getBookingDetail(req, res, next) {
 
     if (booking) {
       const status = String(booking.is_status);
-
-      // ✅ แยกเงื่อนไข 135 (รับเข้าของดีสำเร็จ) -> ดึงจาก Detail
       if (status === '135') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
-      }
-      // ✅ เงื่อนไข 132 (รอตรวจสอบ) หรือ 134 (แก้ไข) -> ดึงจาก Master
-      else if (status === '132' || status === '134') {
+      } else if (status === '134' || status === '131' || status === '136') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
-      }
-      // Draft -> ดึงจาก Master โดยใช้ draft_id
-      else {
+      } else {
         assets = await model.getAssetsByDraft(draft_id);
       }
     }
-
     res.json({ success: true, booking, assets });
   } catch (err) { next(err); }
 }
@@ -255,8 +246,8 @@ module.exports = {
   confirmBooking,
   getDropdowns,
   getBookingList,
+  editHeader,
   getBookingDetail,
-  generateBookingRef,
   cancelBooking,
   finalizeBooking,
   unlockBooking,

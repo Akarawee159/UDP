@@ -59,10 +59,27 @@ async function updateStatus(req, res, next) {
 async function updatePermissionRole(req, res, next) {
   try {
     const { employee_id } = req.params;
-    const { group_name } = req.body; // ชื่อกลุ่มจาก permission_group.group_name
-    await model.updatePermissionRole(employee_id, group_name);
+    // ✅ รับค่าเวลาที่ส่งมาจากหน้าบ้าน
+    const { group_name, time_login_value, time_login_unit } = req.body;
+
+    // ✅ แปลงเวลาให้เป็นรูปแบบ HH:MM:00 เพื่อเก็บลง Database (Time type)
+    let time_login = null;
+    if (time_login_value) {
+      let totalMins = Number(time_login_value);
+      if (time_login_unit === 'hour') totalMins *= 60;
+
+      const h = Math.floor(totalMins / 60).toString().padStart(2, '0');
+      const m = (totalMins % 60).toString().padStart(2, '0');
+      time_login = `${h}:${m}:00`;
+    }
+
+    // ✅ ส่ง time_login เข้าไปอัปเดตใน Model
+    await model.updatePermissionRole(employee_id, group_name, time_login);
+
+    // อัปเดตตารางหน้าบ้านผ่าน Socket
     await emitUpsert(req, employee_id);
-    res.json({ success: true, employee_id, permission_role: group_name });
+
+    res.json({ success: true, employee_id, permission_role: group_name, time_login });
   } catch (err) {
     next(err);
   }
@@ -214,11 +231,18 @@ async function updateUsername(req, res, next) {
 async function clearAccount(req, res, next) {
   try {
     const { employee_id } = req.params;
-    await model.clearUserAccount(employee_id);
+
+    // ✅ 1. ดึง ID ของผู้ที่ทำรายการลบ (deleted_by)
+    const deleted_by = req.user.employee_id;
+
+    // ✅ 2. ส่ง deleted_by ไปที่ Model
+    await model.clearUserAccount(employee_id, deleted_by);
+
     await emitUpsert(req, employee_id);
 
-    // แจ้งสถานะให้เป็นออฟไลน์ (1) เผื่อหน้าอื่นๆ ที่ยังเห็นผู้ใช้นี้อยู่
+    // แจ้งสถานะให้เป็นออฟไลน์ (หรือ 99 สำหรับ Affiliate)
     const io = req.app.get('io');
+    // หมายเหตุ: ถ้าเป็น Affiliate สถานะจะเป็น 99 แต่ในที่นี้ส่ง 1 เพื่อให้ Frontend รับรู้ว่า Offline/Inactive ไปก่อนได้
     io?.emit('user:status', { employee_id: Number(employee_id), is_status: 1 });
 
     res.json({ success: true, employee_id });
@@ -356,6 +380,125 @@ async function acknowledgeReset(req, res, next) {
   }
 }
 
+/** (เพิ่มใหม่) POST /management/affiliate */
+async function createAffiliate(req, res, next) {
+  try {
+    const {
+      titlename_th, firstname_th, lastname_th,
+      username, password, permission_role, policy_days,
+
+      // ข้อมูลสังกัดใหม่
+      company, company_code, branch, branch_code,
+      department, dep_code, position, position_code,
+
+      // ข้อมูลเวลา
+      time_login_value, time_login_unit
+    } = req.body;
+
+    const created_by = req.user.employee_id;
+
+    if (!firstname_th || !username || !password) {
+      const e = new Error('กรุณากรอกข้อมูลให้ครบถ้วน');
+      e.status = 400; throw e;
+    }
+
+    const taken = await model.isUsernameTaken(username);
+    if (taken) {
+      const e = new Error('ชื่อผู้ใช้งานนี้ถูกใช้แล้ว');
+      e.status = 409; throw e;
+    }
+
+    // แปลงเวลา time_login เป็น format HH:MM:00 สำหรับบันทึกลง SQL (time)
+    let time_login = null;
+    if (time_login_value) {
+      let totalMins = Number(time_login_value);
+      if (time_login_unit === 'hour') totalMins *= 60;
+
+      const h = Math.floor(totalMins / 60).toString().padStart(2, '0');
+      const m = (totalMins % 60).toString().padStart(2, '0');
+      time_login = `${h}:${m}:00`;
+    }
+
+    const employee_id = await model.generateAffiliateId();
+    const employee_code = await model.generateAffiliateCode();
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(String(password), salt);
+
+    await model.createAffiliateUser({
+      employee_id, employee_code,
+      titlename_th, firstname_th, lastname_th,
+      username, password: hash, permission_role,
+      password_expiry_days: policy_days,
+      company, company_code, branch, branch_code,
+      department, dep_code, position, position_code,
+      time_login,
+      created_by
+    });
+
+    await emitUpsert(req, employee_id);
+
+    res.status(201).json({
+      success: true,
+      data: { employee_id, employee_code, username, firstname_th, lastname_th }
+    });
+
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** (เพิ่มใหม่) GET /management/titlenames */
+async function getTitlenames(_req, res, next) {
+  try {
+    const rows = await model.getTitlenames();
+    res.json({ success: true, data: rows });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ===== Options Controllers สำหรับ Dropdown =====
+async function getCompanyOptions(_req, res, next) {
+  try {
+    res.json({
+      success: true, data: await model.getCompanyList()
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+async function getBranchOptions(_req, res, next) {
+  try {
+    res.json({
+      success: true, data: await model.getBranchList()
+
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+async function getDepartmentOptions(_req, res, next) {
+  try {
+    res.json({
+      success: true, data: await model.getDepartmentList()
+
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+async function getPositionOptions(_req, res, next) {
+  try {
+    res.json({
+      success: true, data: await model.getPositionList()
+
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAll,
   getGroups,
@@ -374,4 +517,10 @@ module.exports = {
   deleteProfileImage,
   deleteSignatureImage,
   acknowledgeReset,
+  createAffiliate,
+  getTitlenames,
+  getCompanyOptions,
+  getBranchOptions,
+  getDepartmentOptions,
+  getPositionOptions
 };

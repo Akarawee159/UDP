@@ -1,14 +1,13 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid } from 'antd';
-import {
-    PlusOutlined,
-    SearchOutlined
-} from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import ModalForm from "./Modal/ModalForm";
 import ModalDelete from "./Modal/ModalDelete";
 import { getSocket } from '../../../socketClient';
-import DataTable from '../../../components/aggrid/DataTable';
+
+// ✅ นำเข้า DraggableTable
+import DraggableTable from '../../../components/antdtable/DraggableTable';
 
 function Material() {
     const screens = Grid.useBreakpoint();
@@ -26,9 +25,22 @@ function Material() {
     const [loading, setLoading] = useState(false);
     const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // ✅ เพิ่ม State สำหรับ Pagination และความสูงของตาราง
+    const [page, setPage] = useState({ current: 1, pageSize: 50 });
+    const [tableY, setTableY] = useState(600);
+
     const [modalFormOpen, setModalFormOpen] = useState(false);
     const [currentRecord, setCurrentRecord] = useState(null);
     const [openDelete, setOpenDelete] = useState(false);
+
+    // ✅ คำนวณความสูงตารางอัตโนมัติให้พอดีจอ
+    useEffect(() => {
+        const onResize = () => setTableY(Math.max(400, window.innerHeight - 300));
+        onResize();
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     // ✅ Fetch API
     const fetchData = useCallback(async () => {
@@ -82,7 +94,6 @@ function Material() {
     const handleCreate = () => { setCurrentRecord(null); setModalFormOpen(true); };
     const handleUpdate = (record) => { setCurrentRecord(record); setModalFormOpen(true); };
 
-    // ✅ เปิด Modal ลบ (โดยไม่ปิด ModalForm เพื่อให้ซ้อนกัน)
     const openDeleteModal = (record) => { setCurrentRecord(record); setOpenDelete(true); };
 
     const handleFormSuccess = () => {
@@ -91,35 +102,33 @@ function Material() {
 
     const handleDeleteSuccess = () => {
         setOpenDelete(false);
-        setModalFormOpen(false); // ปิดฟอร์มด้วยเมื่อลบเสร็จ
+        setModalFormOpen(false);
         fetchData();
     };
 
-    // ✅ Columns: ลบคอลัมน์จัดการออก
-    // ✅ Columns: แสดงข้อมูลครบทุก Field
-    const columnDefs = useMemo(() => [
+    // ✅ Columns: แปลงเป็นโครงสร้าง Ant Design พร้อม Filter & Sorter ครบทุกฟิลด์
+    const baseColumns = useMemo(() => [
         {
-            headerName: 'ลำดับ',
-            width: 140,
-            valueGetter: "node.rowIndex + 1",
-            cellClass: "text-center",
-            pinned: 'left',
-            headerComponentParams: { align: 'center' }
+            title: 'ลำดับ',
+            key: 'index',
+            width: 80,
+            align: 'center',
+            dragDisabled: true, // ล็อคไม่ให้ลาก
+            render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
         },
         {
-            headerName: 'สถานะ',
-            field: 'status_name', // เปลี่ยน field หลักเป็นชื่อสถานะ (Optional)
+            title: 'สถานะ',
+            dataIndex: 'status_name',
+            key: 'status_name',
             width: 140,
-            cellClass: "text-center",
-            headerComponentParams: { align: 'center' },
-            cellRenderer: (params) => {
-                // ดึงค่าจากที่ Join มา (ถ้าไม่มีข้อมูล ให้ใช้ค่า Default)
-                const statusName = params.data.status_name || 'ไม่ระบุ';
-
-                // ดึง Class สีจาก DB
-                // ถ้าใน DB เป็น null ให้ใส่สีเทาเป็น Default
-                const statusClass = params.data.status_class || 'bg-gray-100 text-gray-500 border-gray-200';
-
+            align: 'center',
+            sorter: (a, b) => String(a.status_name || '').localeCompare(String(b.status_name || '')),
+            filters: [...new Set(rows.map(r => r.status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.status_name === value,
+            render: (val, record) => {
+                const statusName = val || 'ไม่ระบุ';
+                const statusClass = record.status_class || 'bg-gray-100 text-gray-500 border-gray-200';
                 return (
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}`}>
                         {statusName}
@@ -127,65 +136,109 @@ function Material() {
                 );
             }
         },
+        // {
+        //     title: 'รูปภาพ',
+        //     dataIndex: 'material_image',
+        //     key: 'material_image',
+        //     width: 100,
+        //     align: 'center',
+        //     render: (val) => {
+        //         if (!val) {
+        //             return <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400 border border-gray-200 mx-auto">No Img</div>;
+        //         }
+        //         const url = `${import.meta.env.VITE_API_PATH?.replace('/api', '') || ''}/img/material/${val}`;
+        //         return (
+        //             <img
+        //                 src={url}
+        //                 alt="img"
+        //                 className="w-10 h-10 object-cover rounded border border-gray-200 cursor-pointer hover:scale-[2] transition-transform mx-auto z-10 relative"
+        //                 onError={(e) => { e.target.style.display = 'none'; }}
+        //             />
+        //         );
+        //     }
+        // },
         {
-            headerName: 'รูปภาพ',
-            field: 'material_image',
-            width: 140,
-            cellClass: "flex items-center justify-center py-1",
-            headerComponentParams: { align: 'center' },
-            cellRenderer: (params) => {
-                // ถ้าไม่มีรูป หรือรูปเป็นค่าว่าง ให้แสดง No Img
-                if (!params.value) {
-                    return <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400 border border-gray-200">No Img</div>;
-                }
-                // ใช้ Path ที่ชี้ไปหา Server (ต้องตรงกับที่ตั้งใน server.js)
-                const url = `${import.meta.env.VITE_API_PATH.replace('/api', '')}/img/material/${params.value}`;
-                return (
-                    <img
-                        src={url}
-                        alt="img"
-                        className="w-10 h-10 object-cover rounded border border-gray-200 cursor-pointer hover:scale-150 transition-transform"
-                        onError={(e) => { e.target.style.display = 'none'; }} // ซ่อนถ้าโหลดไม่ได้
-                    />
-                );
-            }
+            title: 'รหัสกล่อง',
+            dataIndex: 'material_code',
+            key: 'material_code',
+            width: 150,
+            sorter: (a, b) => String(a.material_code || '').localeCompare(String(b.material_code || '')),
+            filters: [...new Set(rows.map(r => r.material_code).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_code === value,
+            render: (val) => <span className="font-mono font-bold text-blue-700">{val}</span>
         },
         {
-            headerName: 'รหัสกล่อง',
-            field: 'material_code',
-            width: 140,
-            filter: true,
-            cellClass: "font-mono font-bold text-blue-700 cursor-pointer",
-            pinned: 'left',
-            headerComponentParams: { align: 'center' }
+            title: 'ชื่อวัสดุ',
+            dataIndex: 'material_name',
+            key: 'material_name',
+            width: 250,
+            sorter: (a, b) => String(a.material_name || '').localeCompare(String(b.material_name || '')),
+            filters: [...new Set(rows.map(r => r.material_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_name === value,
         },
-        { headerName: 'ชื่อวัสดุ', field: 'material_name', minWidth: 180, filter: true, headerComponentParams: { align: 'center' } },
-        { headerName: 'ประเภท', field: 'material_type', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'ผู้ผลิต', field: 'supplier_name', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'แบรนด์', field: 'material_brand', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'สี', field: 'material_color', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'รุ่น', field: 'material_model', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'คุณสมบัติ', field: 'material_feature', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'รายละเอียด', field: 'material_remark', width: 200, headerComponentParams: { align: 'center' } },
-        { headerName: 'แหล่งที่มา', field: 'material_source', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'ใช้สำหรับงาน', field: 'material_usedfor', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'สกุลเงิน', field: 'currency', width: 140, cellClass: "text-center", headerComponentParams: { align: 'center' } },
-        { headerName: 'จน./หน่วยหลัก', field: 'quantity_mainunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right", headerComponentParams: { align: 'center' } },
-        { headerName: 'หน่วยหลัก', field: 'mainunit_name', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'จน./หน่วยย่อย', field: 'quantity_subunit', width: 160, valueFormatter: p => p.value ? Number(p.value).toLocaleString() : '0', cellClass: "text-right", headerComponentParams: { align: 'center' } },
-        { headerName: 'หน่วยย่อย', field: 'subunit_name', width: 140, headerComponentParams: { align: 'center' } },
-        { headerName: 'ปริมาณสั่งซื้อขั้นต่ำ', field: 'minimum_order', width: 200, cellClass: "text-right", headerComponentParams: { align: 'center' } },
-        { headerName: 'ปริมาณต่ำสุด', field: 'minstock', width: 160, cellClass: "text-right text-orange-600", headerComponentParams: { align: 'center' } },
-        { headerName: 'ปริมาณสูงสุด', field: 'maxstock', width: 160, cellClass: "text-right text-green-600", headerComponentParams: { align: 'center' } }
-    ], []);
+        {
+            title: 'ประเภท',
+            dataIndex: 'material_type',
+            key: 'material_type',
+            width: 150,
+            sorter: (a, b) => String(a.material_type || '').localeCompare(String(b.material_type || '')),
+            filters: [...new Set(rows.map(r => r.material_type).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_type === value,
+        },
+        {
+            title: 'สี',
+            dataIndex: 'material_color',
+            key: 'material_color',
+            width: 140,
+            sorter: (a, b) => String(a.material_color || '').localeCompare(String(b.material_color || '')),
+            filters: [...new Set(rows.map(r => r.material_color).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_color === value,
+        },
+        {
+            title: 'รุ่น',
+            dataIndex: 'material_model',
+            key: 'material_model',
+            width: 150,
+            sorter: (a, b) => String(a.material_model || '').localeCompare(String(b.material_model || '')),
+            filters: [...new Set(rows.map(r => r.material_model).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_model === value,
+        },
+        {
+            title: 'คุณสมบัติ',
+            dataIndex: 'material_feature',
+            key: 'material_feature',
+            width: 200,
+            sorter: (a, b) => String(a.material_feature || '').localeCompare(String(b.material_feature || '')),
+            filters: [...new Set(rows.map(r => r.material_feature).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_feature === value,
+        },
+        {
+            title: 'รายละเอียด',
+            dataIndex: 'material_remark',
+            key: 'material_remark',
+            width: 250,
+            ellipsis: true,
+            sorter: (a, b) => String(a.material_remark || '').localeCompare(String(b.material_remark || '')),
+            filters: [...new Set(rows.map(r => r.material_remark).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_remark === value,
+        },
+    ], [page, rows]);
 
-    // Logic กรองข้อมูล
+    // Logic กรองข้อมูลช่องค้นหา (เพิ่มค้นหาจากชื่อวัสดุด้วย)
     const filteredRows = useMemo(() => {
         if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase();
         return rows.filter(
             (row) =>
                 String(row.material_code || '').toLowerCase().includes(term) ||
+                String(row.material_name || '').toLowerCase().includes(term) ||
                 String(row.material_type || '').toLowerCase().includes(term)
         );
     }, [rows, searchTerm]);
@@ -193,46 +246,66 @@ function Material() {
     return (
         <ConfigProvider
             theme={{
-                token: { colorPrimary: '#2563eb', borderRadius: 8, fontFamily: 'Inter, "Sarabun", sans-serif' },
+                token: { colorPrimary: '#2563eb', borderRadius: 2, fontFamily: 'Inter, "Sarabun", sans-serif' },
                 components: { Button: { primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)' } }
             }}
         >
-            <div style={containerStyle} className="bg-gray-50">
+            <div style={containerStyle} className="bg-gray-50 flex flex-col h-full overflow-hidden">
 
-                {/* Header Section: ปรับ Layout ให้ปุ่มอยู่ซ้าย */}
-                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
-                    <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                        <Input
-                            prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหารหัส, ชื่อวัสดุ..."
-                            allowClear
-                            variant="borderless"
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full md:w-64 bg-transparent"
-                        />
-                        <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                        <Button
-                            type="primary"
-                            icon={<PlusOutlined />}
-                            onClick={handleCreate}
-                            className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                        >
-                            เพิ่มรายการใหม่
-                        </Button>
-                    </div>
-                </div>
+                {/* ✅ เรียกใช้ DraggableTable และนำ Toolbar มาใส่ใน renderToolbar */}
+                <DraggableTable
+                    columns={baseColumns}
+                    dataSource={filteredRows}
+                    rowKey="material_id" // ใช้ material_id เป็น Key
+                    loading={loading}
+                    scroll={{ x: 'max-content', y: tableY }}
 
-                {/* Table Content */}
-                <div className="w-full flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-                    <DataTable
-                        rowData={filteredRows}
-                        columnDefs={columnDefs}
-                        loading={loading}
-                        // ✅ คลิกแถวเพื่อแก้ไข
-                        onRowClicked={(params) => handleUpdate(params.data)}
-                        rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
-                    />
-                </div>
+                    pagination={{
+                        current: page.current,
+                        pageSize: page.pageSize,
+                        showSizeChanger: true,
+                        pageSizeOptions: [50, 100, 200, 500, 1000],
+                        showTotal: (t, r) => <span className="text-gray-400 text-xs">แสดง {r[0]}-{r[1]} จาก {t} รายการ</span>,
+                        className: 'px-4 pb-4 mt-4'
+                    }}
+                    onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
+
+                    // ✅ ทำให้เมื่อคลิกที่แถวแล้วเปิดหน้าต่าง Edit
+                    onRow={(record) => ({
+                        onClick: () => handleUpdate(record),
+                        className: "cursor-pointer"
+                    })}
+
+                    // ✅ วาดแถบ Toolbar ด้านบน (ปุ่ม Search, Add, Show/Hide Columns)
+                    renderToolbar={(ColumnVisibility) => (
+                        <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
+                                <Input
+                                    prefix={<SearchOutlined className="text-gray-400" />}
+                                    placeholder="ค้นหารหัส, ชื่อวัสดุ..."
+                                    allowClear
+                                    variant="borderless"
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full sm:w-64 bg-transparent"
+                                />
+                                <div className="w-full h-px bg-gray-100 sm:w-px sm:h-6 sm:mx-1 hidden sm:block"></div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <Button
+                                        type="primary"
+                                        icon={<PlusOutlined />}
+                                        onClick={handleCreate}
+                                        className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
+                                    >
+                                        เพิ่มรายการใหม่
+                                    </Button>
+
+                                    {/* นำปุ่มซ่อน/แสดงคอลัมน์มาแสดงตรงนี้ */}
+                                    {ColumnVisibility}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                />
 
                 {/* Modals */}
                 <ModalForm
@@ -240,7 +313,6 @@ function Material() {
                     record={currentRecord}
                     onClose={() => { setModalFormOpen(false); setCurrentRecord(null); }}
                     onSuccess={handleFormSuccess}
-                    // ✅ ส่งฟังก์ชัน onDelete ไปให้ ModalForm
                     onDelete={() => openDeleteModal(currentRecord)}
                 />
 

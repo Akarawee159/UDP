@@ -1,8 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
-import { Table, Button, Typography, message, Grid, Switch, Dropdown, Modal, Input, ConfigProvider, Card, Tag } from "antd";
+import { Button, Typography, message, Grid, Switch, Dropdown, Modal, Input, ConfigProvider, Tag } from "antd";
 import {
   PlusOutlined,
-  MoreOutlined,
   EditOutlined,
   DeleteOutlined,
   SearchOutlined,
@@ -16,12 +15,13 @@ import ModalCreate from "./Modal/ModalCreate";
 import ModalUpdate from "./Modal/ModalUpdate";
 import PermissionTags from './PermissionTags';
 
-// ✅ 1. Import getSocket จาก socketClient
+// ✅ Import DraggableTable
+import DraggableTable from '../../../components/antdtable/DraggableTable';
+
 import { getSocket } from '../../../socketClient';
 
 const { Text } = Typography;
 
-// Helper function to build menu index from sidebar config
 function buildMenuIndex(items) {
   const mains = [];
   const subs = [];
@@ -43,28 +43,36 @@ export default function PermissionRole() {
   const containerStyle = useMemo(() => ({
     margin: isMd ? '-8px' : '0',
     padding: isMd ? '16px' : '12px',
-    minHeight: '100vh', // ให้สูงเต็มจอ
-    display: 'flex',    // จัด layout ภายใน
+    height: '100vh',
+    display: 'flex',
     flexDirection: 'column',
   }), [isMd]);
 
   const { mains, subs } = useMemo(() => buildMenuIndex(menuItems), []);
   const mainMap = useMemo(() => Object.fromEntries(mains.map((m) => [m.id, m])), [mains]);
   const subMap = useMemo(() => Object.fromEntries(subs.map((s) => [s.id, s])), [subs]);
+
   const [page, setPage] = useState({ current: 1, pageSize: 10 });
+  const [tableY, setTableY] = useState(600);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [openCreate, setOpenCreate] = useState(false);
   const [editing, setEditing] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // ✅ State สำหรับ Modal ลบ
   const [deleting, setDeleting] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const takenNames = useMemo(() => (rows || []).map(r => String(r.groupName || "")).filter(Boolean), [rows]);
 
-  // 🔧 utils: normalize + upsert/remove
+  // ✅ คำนวณความสูงตารางอัตโนมัติ
+  useEffect(() => {
+    const onResize = () => setTableY(Math.max(400, window.innerHeight - 300));
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const normalizeRow = (r) => ({
     id: Number(r?.id),
     groupName: String(r?.groupName || ''),
@@ -106,7 +114,6 @@ export default function PermissionRole() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ✅ subscribe realtime events
   useEffect(() => {
     const onUpsert = (e) => {
       const dto = normalizeRow(e.detail || {});
@@ -156,10 +163,7 @@ export default function PermissionRole() {
   };
 
   const openDeleteModal = (record) => {
-    const isAdmin =
-      Number(record?.id) === 1 ||
-      String(record?.groupName || "").trim().toLowerCase() === "administrator";
-
+    const isAdmin = Number(record?.id) === 1 || String(record?.groupName || "").trim().toLowerCase() === "administrator";
     if (isAdmin) {
       message.warning('กลุ่ม administrator ถูกป้องกัน ไม่สามารถลบได้');
       return;
@@ -169,7 +173,6 @@ export default function PermissionRole() {
 
   const handleConfirmDelete = async () => {
     if (!deleting?.id) return;
-
     setDeleteLoading(true);
     try {
       await api.delete(`/permission/${deleting.id}`);
@@ -198,17 +201,29 @@ export default function PermissionRole() {
     }
   };
 
-  const columns = [
+  // ✅ 2. แปลง Columns ให้มี Filter/Sorter และใช้รูปแบบ DraggableTable
+  const baseColumns = useMemo(() => [
+    {
+      title: 'ลำดับ',
+      key: 'index',
+      width: 80,
+      align: 'center',
+      dragDisabled: true,
+      render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
+    },
     {
       title: "ชื่อกลุ่มสิทธิ",
       dataIndex: "groupName",
       key: "groupName",
       width: 200,
+      sorter: (a, b) => String(a.groupName || '').localeCompare(String(b.groupName || '')),
+      filters: [...new Set(rows.map(r => r.groupName).filter(Boolean))].map(n => ({ text: n, value: n })),
+      filterSearch: true,
+      onFilter: (value, record) => record.groupName === value,
       render: (v, record) => {
         const isAdmin = Number(record?.id) === 1 || String(v || "").trim().toLowerCase() === "administrator";
         return (
           <div className="flex items-center gap-2">
-            {/* เปลี่ยนธีมไอคอนจากเขียว (Emerald) เป็นน้ำเงิน (Blue) แต่คงสีพิเศษของ Admin ไว้ (หรือปรับให้เข้ากัน) */}
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isAdmin ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
               {isAdmin ? <SafetyCertificateFilled /> : <TeamOutlined />}
             </div>
@@ -254,8 +269,13 @@ export default function PermissionRole() {
       key: "is_status",
       align: "center",
       width: 120,
+      sorter: (a, b) => Number(a.is_status) - Number(b.is_status),
+      filters: [
+        { text: 'เปิดใช้งาน', value: 1 },
+        { text: 'ปิดการใช้งาน', value: 0 }
+      ],
+      onFilter: (value, record) => Number(record.is_status) === value,
       render: (_v, record) => (
-        // เปลี่ยนสี Switch เป็น Blue 500
         <ConfigProvider theme={{ components: { Switch: { colorPrimary: '#10b981' } } }}>
           <Switch
             size="small"
@@ -266,53 +286,35 @@ export default function PermissionRole() {
       ),
     },
     {
-      title: "",
+      title: "จัดการ",
       key: "action",
       align: "center",
       width: 80,
+      dragDisabled: true,
       render: (_, record) => {
-        const isAdmin =
-          Number(record?.id) === 1 ||
-          String(record?.groupName || "").trim().toLowerCase() === "administrator";
-
+        const isAdmin = Number(record?.id) === 1 || String(record?.groupName || "").trim().toLowerCase() === "administrator";
         return (
           <Dropdown
             menu={{
               items: [
-                {
-                  key: 'edit',
-                  label: 'แก้ไข',
-                  icon: <EditOutlined />,
-                  onClick: () => setEditing(record),
-                },
-                {
-                  key: 'delete',
-                  label: 'ลบ',
-                  icon: <DeleteOutlined />,
-                  danger: true,
-                  disabled: isAdmin,
-                  onClick: () => openDeleteModal(record),
-                },
+                { key: 'edit', label: 'แก้ไข', icon: <EditOutlined />, onClick: () => setEditing(record) },
+                { key: 'delete', label: 'ลบ', icon: <DeleteOutlined />, danger: true, disabled: isAdmin, onClick: () => openDeleteModal(record) },
               ]
             }}
             trigger={['click']}
             placement="bottomRight"
           >
-            {/* เปลี่ยน Hover เป็นสีน้ำเงิน */}
-            <Button type="text" shape="circle" icon={<MoreOutlined className="text-gray-400 text-lg" />} className="hover:bg-blue-50 hover:text-blue-600" />
+            <Button type="text" shape="circle" icon={<EditOutlined className="text-gray-400 text-lg" />} className="hover:!bg-blue-50 hover:!text-blue-600" />
           </Dropdown>
         );
       },
     },
-  ];
+  ], [rows, mainMap, subMap, page]);
 
   const filteredRows = useMemo(() => {
     if (!searchTerm) return rows;
     const term = searchTerm.toLowerCase().trim();
-    return rows.filter(
-      (row) =>
-        row.groupName?.toLowerCase().includes(term)
-    );
+    return rows.filter((row) => row.groupName?.toLowerCase().includes(term));
   }, [rows, searchTerm]);
 
   return (
@@ -320,86 +322,77 @@ export default function PermissionRole() {
       theme={{
         token: {
           fontFamily: 'Inter, "Sarabun", sans-serif',
-          // เปลี่ยน Primary Color เป็น Blue 600
           colorPrimary: '#2563eb',
-          borderRadius: 8,
+          borderRadius: 2, // ✅ ปรับเป็น 6px (เท่ากับ rounded-md)
         },
         components: {
-          Table: {
-            // เปลี่ยนธีม Table เป็นสีฟ้า/น้ำเงิน
-            headerBg: '#e5e7eb',
-            headerColor: '#000000',
-            headerBorderRadius: 8,
-            borderColor: '#f1f5f9',
-            rowHoverBg: '#f8fafc',
-          },
-          Button: {
-            // เงาสีน้ำเงิน
-            primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)',
-          }
+          Button: { primaryShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.3)' }
         }
       }}
     >
-      {/* ✅ 1. นำ containerStyle มาใช้ตรงนี้ และลบ class เดิมที่ซ้ำซ้อนออก */}
-      <div style={containerStyle} className="bg-gray-50">
+      <div style={containerStyle} className="bg-gray-50 flex flex-col h-full overflow-hidden">
 
-        {/* Header Section */}
-        {/* ✅ 2. ลบ max-w-screen-2xl mx-auto ออก เปลี่ยนเป็น w-full */}
-        <div className="w-full mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            {/* เปลี่ยน Text เป็นสีน้ำเงิน */}
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <SafetyCertificateFilled className="text-blue-600" />
-              จัดการกลุ่มสิทธิ
-            </h1>
-            <p className="text-slate-600/80 text-sm mt-1">
-              กำหนดบทบาทหน้าที่และการเข้าถึงเมนูต่างๆ ของผู้ใช้งานในระบบ
-            </p>
-          </div>
+        {/* ✅ เรียกใช้ DraggableTable พร้อมย้าย Toolbar */}
+        <DraggableTable
+          columns={baseColumns}
+          dataSource={filteredRows}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 'max-content', y: tableY }}
 
-          <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-            <Input
-              prefix={<SearchOutlined className="text-gray-400" />}
-              placeholder="ค้นหากลุ่มสิทธิ..."
-              allowClear
-              variant="borderless"
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full md:w-64 bg-transparent"
-            />
-            {/* ปุ่มเพิ่ม เป็นสีน้ำเงิน */}
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setOpenCreate(true)}
-              className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium"
-            >
-              เพิ่มกลุ่มสิทธิ
-            </Button>
-          </div>
-        </div>
+          pagination={{
+            current: page.current,
+            pageSize: page.pageSize,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50, 100],
+            showTotal: (t, r) => <span className="text-gray-400 text-xs">แสดง {r[0]}-{r[1]} จาก {t} รายการ</span>,
+            className: 'px-4 pb-4 mt-4'
+          }}
+          onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
 
-        {/* Table Card */}
-        {/* ✅ 3. ลบ max-w-screen-2xl mx-auto ออก และเพิ่ม flex-1 */}
-        <div className="w-full flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <Table
-            rowKey="id"
-            loading={loading}
-            columns={columns}
-            dataSource={filteredRows}
-            pagination={{
-              current: page.current,
-              pageSize: page.pageSize,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
-              showTotal: (t, r) => <span className="text-gray-400 text-xs">แสดง {r[0]}-{r[1]} จาก {t} รายการ</span>,
-              className: 'px-4 pb-4'
-            }}
-            onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
-            className="custom-blue-table"
-          />
-        </div>
+          // ✅ Render Toolbar
+          renderToolbar={(ColumnVisibility) => (
+            <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 flex-none">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                  <SafetyCertificateFilled className="text-blue-600" />
+                  จัดการกลุ่มสิทธิ
+                </h1>
+                <p className="text-slate-600/80 text-sm mt-1">
+                  กำหนดบทบาทหน้าที่และการเข้าถึงเมนูต่างๆ ของผู้ใช้งานในระบบ
+                </p>
+              </div>
 
-        {/* Modals (เหมือนเดิม) */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
+                <Input
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  placeholder="ค้นหากลุ่มสิทธิ..."
+                  allowClear
+                  variant="borderless"
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-64 bg-transparent"
+                />
+                <div className="w-full h-px bg-gray-100 sm:w-px sm:h-6 sm:mx-1 hidden sm:block"></div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setOpenCreate(true)}
+                    className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-md px-4 font-medium w-full sm:w-auto"
+                  >
+                    เพิ่มกลุ่มสิทธิ
+                  </Button>
+
+                  {/* ปุ่มซ่อน/แสดงคอลัมน์ */}
+                  {ColumnVisibility}
+                </div>
+              </div>
+            </div>
+          )}
+        />
+
+        {/* Modals */}
         <ModalCreate
           open={openCreate}
           onCancel={() => setOpenCreate(false)}
@@ -419,7 +412,6 @@ export default function PermissionRole() {
           takenNames={takenNames.filter(name => name !== editing?.groupName)}
         />
 
-        {/* Modal Confirm Delete (สีแดงเหมือนเดิม เพื่อสื่อความหมาย Danger) */}
         <Modal
           open={!!deleting}
           title={null}
@@ -434,12 +426,9 @@ export default function PermissionRole() {
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-red-500 text-xl">
                 <DeleteOutlined />
               </div>
-              <div>
-                <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบ</h3>
-              </div>
+              <div><h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบ</h3></div>
             </div>
           </div>
-
           <div className="p-6">
             <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 flex gap-3 items-start mb-4">
               <WarningOutlined className="text-orange-500 mt-1" />
@@ -448,26 +437,14 @@ export default function PermissionRole() {
                 กลุ่มสิทธิ <span className="font-bold text-gray-900">"{deleting?.groupName}"</span> ?
               </p>
             </div>
-            <p className="text-xs text-red-500 text-center">
-              การดำเนินการนี้ไม่สามารถกู้คืนได้ และ<br /> อาจส่งผลกระทบต่อผู้ใช้งานที่อยู่ในกลุ่มนี้
-            </p>
+            <p className="text-xs text-red-500 text-center">การดำเนินการนี้ไม่สามารถกู้คืนได้ และ<br /> อาจส่งผลกระทบต่อผู้ใช้งานที่อยู่ในกลุ่มนี้</p>
           </div>
-
           <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-            <Button
-              type="primary"
-              danger
-              loading={deleteLoading}
-              onClick={handleConfirmDelete}
-              className="rounded-lg h-10 px-6 shadow-md"
-            >
-              ยืนยันลบ
-            </Button>
-            <Button onClick={() => setDeleting(null)} className="rounded-lg h-10 px-6">
-              ยกเลิก
-            </Button>
+            <Button type="primary" danger loading={deleteLoading} onClick={handleConfirmDelete} className="rounded-md h-10 px-6 shadow-md">ยืนยันลบ</Button>
+            <Button onClick={() => setDeleting(null)} className="rounded-md h-10 px-6">ยกเลิก</Button>
           </div>
         </Modal>
+
       </div>
     </ConfigProvider>
   );
