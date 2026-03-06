@@ -48,6 +48,7 @@ export default function Navbar({ onToggleSidebar }) {
   const [resetToken, setResetToken] = useState(null);
   const isHandlingExpiry = useRef(false);
   const isFetchingPing = useRef(false);
+  const isLoggingOutRef = useRef(false);
   const [openSetting, setOpenSetting] = useState(false);
   const [settingTabKey, setSettingTabKey] = useState("profile");
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -143,8 +144,14 @@ export default function Navbar({ onToggleSidebar }) {
 
       if (remaining <= 0) {
         setTimeLeftStr("00:00");
-        message.warning("หมดเวลาการใช้งานระบบ กรุณาเข้าสู่ระบบใหม่อีกครั้ง", 5);
-        handleLogout();
+
+        // ✅ เพิ่ม if เช็กตรงนี้ เพื่อให้มันทำงานแค่รอบเดียว
+        if (!isLoggingOutRef.current) {
+          isLoggingOutRef.current = true; // ล็อกป้ายไว้ว่าแจ้งเตือนแล้ว
+          message.warning("หมดเวลาการใช้งานระบบ กรุณาเข้าสู่ระบบใหม่อีกครั้ง", 5);
+          handleLogout();
+        }
+
         return; // หยุดลูป Animation
       }
 

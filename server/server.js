@@ -20,6 +20,7 @@ const forgotpasswordRoutes = require("./src/modules/management/forgotPassword/fo
 const permissionRoutes = require("./src/modules/management/permissionRole/permissionRoutes");
 const managementRoutes = require("./src/modules/management/userManagement/managementRoutes");
 
+const dashboardRoutes = require("./src/modules/dashboard/dashboard/dashboardRoutes");
 const employeeRoutes = require("./src/modules/masterdata/employee/employeeRoutes");
 const workhistoryRoutes = require("./src/modules/masterdata/workhistory/workhistoryRoutes");
 const relativesRoutes = require("./src/modules/masterdata/relatives/relativesRoutes");
@@ -44,7 +45,6 @@ const systemDefectiveRoutes = require("./src/modules/smartpackage/systemDefectiv
 const systemRepairRoutes = require("./src/modules/smartpackage/systemRepair/systemRepairRoutes");
 
 const boxstatusRoutes = require("./src/modules/reports/boxstatus/boxstatusRoutes");
-const nonmoveRoutes = require("./src/modules/reports/nonmove/nonmoveRoutes");
 const db = require("./src/config/database");
 const path = require("path");
 const app = express();
@@ -81,6 +81,7 @@ app.use("/api/permission", permissionRoutes);
 // Management routes: ❗ไม่ครอบ permit ที่นี่ เพราะมี /management/me ที่ทุกคนต้องเรียกได้ (ตาม Sidebar คุณเรียกอยู่)
 app.use("/api/management", managementRoutes);
 
+app.use("/api/dashboard", auth, permit({ mainId: "10"}), dashboardRoutes); 
 /**
  * =========================
  * Settings (main=30)
@@ -131,7 +132,6 @@ app.use("/api/smartpackage/systemrepair", auth, permit({ mainId: "60", subId: "6
  * =========================
  */
 app.use("/api/report/boxstatus", auth, permit({ mainId: "70", subId: "701" }), boxstatusRoutes);
-app.use("/api/report/nonmove", auth, permit({ mainId: "70", subId: "702" }), nonmoveRoutes);
 
 /* --------------------- Static File Serving ------------------- */
 app.use("/img/profile", express.static(path.join(__dirname, "src/img/profile")));

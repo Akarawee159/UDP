@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Grid, Tag, Popconfirm, DatePicker } from 'antd';
-import { SearchOutlined, CheckCircleOutlined, CalendarOutlined, CaretLeftOutlined, ToolOutlined } from '@ant-design/icons';
+import { App, Button, Input, ConfigProvider, Grid, Tag, DatePicker, Tabs } from 'antd';
+import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined, CalendarOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
-import DataTable from '../../../components/aggrid/DataTable';
 import SystemDefectiveList from './Page/SystemDefectiveList';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import thTH from 'antd/locale/th_TH';
+import TabDefective from './TabDefective';
+
+// ✅ นำเข้า DraggableTable
+import DraggableTable from '../../../components/antdtable/DraggableTable';
+
 dayjs.locale('th');
 
 function SystemDefective() {
@@ -24,17 +28,29 @@ function SystemDefective() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState(null);
 
+    // ✅ State สำหรับ Pagination และความสูงของตาราง
+    const [page, setPage] = useState({ current: 1, pageSize: 10 });
+    const [tableY, setTableY] = useState(600);
+
+    // ✅ คำนวณความสูงตารางอัตโนมัติ
+    useEffect(() => {
+        const onResize = () => setTableY(Math.max(400, window.innerHeight - 300));
+        onResize();
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const dateParam = selectedDate ? dayjs(selectedDate).format('YYYY-MM-DD') : undefined;
+            const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : '';
             const res = await api.get('/smartpackage/systemdefective', {
-                params: { date: dateParam }
+                params: { date: dateStr }
             });
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลรายการรับเข้าของชำรุดไม่สำเร็จ');
+            message.error('ดึงข้อมูลรายการแจ้งชำรุดไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -49,14 +65,8 @@ function SystemDefective() {
         if (!s) return;
 
         const onUpdate = (event) => {
-            // แกะ payload จาก event.detail
             const payload = event.detail;
             const action = payload?.action;
-
-            // รายการ Action ที่ควรสั่งให้ Refresh ตารางหลัก
-            // 'ref_generated' คือตอนที่กดสร้างเลขใบเบิก (Generate Ref)
-            // 'header_update' คือตอนที่กดบันทึก ต้นทาง-สถานที่รับเข้า (Save Header)
-            // 'finalized' คือตอนกดยืนยันรับเข้าของชำรุด
             const acts = ['ref_generated', 'header_update', 'finalized', 'unlocked', 'cancel', 'scan', 'return', 'output_confirmed'];
 
             if (acts.includes(action)) {
@@ -70,28 +80,27 @@ function SystemDefective() {
     }, [fetchData]);
 
     const handleCreate = () => {
-        // 1. ดึงข้อมูล User ปัจจุบัน (ปกติมักเก็บใน localStorage ชื่อ 'user')
         const storedUser = localStorage.getItem('user');
         const currentUser = storedUser ? JSON.parse(storedUser) : null;
-
         let foundDraft = null;
 
-        // 2. ถ้ามีข้อมูล User ให้ทำการค้นหา Draft ที่ค้างอยู่
         if (currentUser && currentUser.employee_id) {
-            // ค้นหาจาก rows (ซึ่งเรียงลำดับล่าสุดมาแล้วจาก BE)
             foundDraft = rows.find(r =>
-                String(r.created_by) === String(currentUser.employee_id) && // เป็นของผู้ใช้คนนี้
-                String(r.is_status) === '140' &&                             // สถานะยังเป็น Draft
-                (!r.refID || r.refID === '')                                // ยังไม่ได้ Gen เลขที่ใบเบิก
+                String(r.created_by) === String(currentUser.employee_id) &&
+                String(r.is_status) === '140' &&
+                (!r.refID || r.refID === '')
             );
         }
 
-        // 3. กำหนด Logic การเปิด Modal
         if (foundDraft) {
-            message.info('ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ');
-            setSelectedDraftId(foundDraft.draft_id); // ใช้ ID เดิมเพื่อ Resume
+            // ✅ ปรับรูปแบบ message.info ให้เป็นแบบ Object และใส่ key เข้าไป
+            message.info({
+                content: 'ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ',
+                key: 'draft_found_msg' // <-- กำหนด key แบบนี้
+            });
+            setSelectedDraftId(foundDraft.draft_id);
         } else {
-            setSelectedDraftId(null); // เป็น null เพื่อให้ Modal ไปสร้างใหม่ (init-booking)
+            setSelectedDraftId(null);
         }
 
         setIsModalOpen(true);
@@ -117,13 +126,12 @@ function SystemDefective() {
         );
     }, [rows, searchTerm]);
 
-    // ฟังก์ชันสำหรับเรียก API เมื่อกดยืนยัน
     const handleConfirmOutput = async (draft_id) => {
         try {
             setLoading(true);
             await api.post('/smartpackage/systemdefective/confirm-output', { draft_id });
-            message.success('ยืนยันการรับเข้าของชำรุดสำเร็จ');
-            fetchData(); // รีโหลดข้อมูลทันที (เผื่อ socket ช้า)
+            message.success('ยืนยันการแจ้งชำรุดสำเร็จ');
+            fetchData();
         } catch (err) {
             console.error(err);
             message.error('ไม่สามารถยืนยันรายการได้');
@@ -132,164 +140,235 @@ function SystemDefective() {
         }
     };
 
-    const columnDefs = useMemo(() => [
-        { headerName: 'ลำดับ', width: 60, valueGetter: "node.rowIndex + 1", cellClass: "flex items-center justify-center py-1" },
-        { headerName: 'เลขที่เอกสาร', field: 'refID', width: 180, cellClass: "font-bold text-blue-600" },
+    // ====== Columns (Ant Design Format) ======
+    const baseColumns = useMemo(() => [
         {
-            headerName: 'การดำเนินการ',
-            width: 180,
-            cellClass: "flex items-center justify-center py-1",
-            cellRenderer: (params) => {
-                // 1. กรณีสถานะ '142' แสดงปุ่มกด (Logic เดิม)
-                if (String(params.data.is_status) === '142') {
+            title: 'ลำดับ',
+            key: 'index',
+            width: 80,
+            align: 'center',
+            dragDisabled: true,
+            render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
+        },
+        {
+            title: 'การดำเนินการ',
+            key: 'action',
+            width: 140,
+            align: 'center',
+            dragDisabled: true,
+            render: (_, record) => {
+                // ✅ แสดงไอคอนเมื่อสถานะเป็น 145 ตามเงื่อนไขข้อ 9
+                if (String(record.is_status) === '145' || record.is_status_name === 'รับเข้าเรียบร้อย') {
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
-                            <Popconfirm
-                                title="ยืนยันการรับเข้าของชำรุด"
-                                description="คุณต้องการยืนยันรายการนี้เป็น 'รับเข้าของชำรุดสำเร็จ' ใช่หรือไม่?"
-                                onCancel={(e) => {
-                                    e?.stopPropagation();
-                                    handleConfirmOutput(params.data.draft_id);
-                                }}
-                                onConfirm={(e) => e?.stopPropagation()}
-                                cancelText="ยืนยัน"
-                                cancelButtonProps={{ type: 'primary', className: "!bg-teal-600 hover:!bg-teal-500" }}
-                                okText="ยกเลิก"
-                                okButtonProps={{ type: 'default', danger: true }}
-                            >
-                                <Button
-                                    type="primary"
-                                    size="small"
-                                    icon={<CheckCircleOutlined />}
-                                    className="!bg-teal-600 hover:!bg-teal-500"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    ยืนยันรับเข้าของชำรุด
-                                </Button>
-                            </Popconfirm>
+                            <CheckCircleOutlined className="text-green-600 text-2xl" />
                         </div>
                     );
                 }
-
-                // ✅ แก้ไขจุดที่ 1: ถ้าสถานะเป็น "รับเข้าของชำรุดเรียบร้อย" ให้แสดงไอคอนสีเขียว
-                if (params.data.is_status_name === 'รับเข้าของชำรุดเรียบร้อย') {
-                    return (
-                        <CheckCircleOutlined className="text-green-700 text-xl" />
-                    );
-                }
-
-                return null;
+                return <span className="text-gray-300">-</span>;
             }
         },
+        // {
+        //     title: 'เลขที่เอกสาร',
+        //     dataIndex: 'refID',
+        //     key: 'refID',
+        //     width: 180,
+        //     sorter: (a, b) => String(a.refID || '').localeCompare(String(b.refID || '')),
+        //     filters: [...new Set(rows.map(r => r.refID).filter(Boolean))].map(v => ({ text: v, value: v })),
+        //     filterSearch: true,
+        //     onFilter: (value, record) => record.refID === value,
+        //     render: (val) => <span className="font-bold text-blue-600">{val}</span>
+        // },
         {
-            headerName: 'สถานะ',
-            field: 'is_status_name',
+            title: 'สถานะ',
+            dataIndex: 'is_status_name',
+            key: 'is_status_name',
             width: 150,
-            filter: true,
-            cellClass: "flex items-center justify-center p-2",
-            cellRenderer: p => {
-                return (
-                    <div className={`w-full text-center py-1 rounded text-xs border ${p.data.is_status_color || 'bg-gray-100'}`}>
-                        {p.value || '-'}
-                    </div>
-                );
-            }
+            align: 'center',
+            sorter: (a, b) => String(a.is_status_name || '').localeCompare(String(b.is_status_name || '')),
+            filters: [...new Set(rows.map(r => r.is_status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.is_status_name === value,
+            render: (val, record) => (
+                <div className={`w-full text-center py-1 rounded-md text-xs border ${record.is_status_color || 'bg-gray-100'}`}>
+                    {val || '-'}
+                </div>
+            )
         },
         {
-            headerName: 'รับเข้าจากปลายทาง',
-            field: 'origin',
+            title: 'รับเข้าจาก (ปลายทาง)',
+            dataIndex: 'origin',
+            key: 'origin',
             width: 160,
-            cellClass: "text-center text-gray-600"
+            align: 'center',
+            sorter: (a, b) => String(a.origin || '').localeCompare(String(b.origin || '')),
+            render: (val) => <span className="text-gray-600">{val || '-'}</span>
         },
         {
-            headerName: 'สถานที่รับเข้า',
-            field: 'destination',
+            title: 'ต้นทางที่รับ',
+            dataIndex: 'destination',
+            key: 'destination',
             width: 160,
-            cellClass: "text-center text-gray-600"
+            align: 'center',
+            sorter: (a, b) => String(a.destination || '').localeCompare(String(b.destination || '')),
+            render: (val) => <span className="text-gray-600">{val || '-'}</span>
         },
         {
-            headerName: 'จำนวน',
-            field: 'attendees',
+            title: 'จำนวน',
+            dataIndex: 'attendees',
+            key: 'attendees',
             width: 100,
-            cellClass: "flex items-center justify-center p-2",
-            cellRenderer: (params) => (
-                <Tag color="blue" className="w-full text-center text-sm m-0">
-                    {params.value || 0}
+            align: 'center',
+            sorter: (a, b) => Number(a.attendees || 0) - Number(b.attendees || 0),
+            render: (val) => (
+                <Tag color="blue" className="w-full text-center text-sm m-0 border-0 rounded-md">
+                    {val || 0}
                 </Tag>
             )
         },
-        { headerName: 'ผู้ทำรายการ', field: 'created_by_name', width: 180 }, // ✅ Show Joined Name
         {
-            headerName: 'วันที่', field: 'create_date', width: 120,
-            valueFormatter: p => p.value ? new Date(p.value).toLocaleDateString('th-TH') : '-' // ✅ Thai Date
+            title: 'ผู้ทำรายการ',
+            dataIndex: 'created_by_name',
+            key: 'created_by_name',
+            width: 180,
+            sorter: (a, b) => String(a.created_by_name || '').localeCompare(String(b.created_by_name || '')),
+            filters: [...new Set(rows.map(r => r.created_by_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.created_by_name === value,
         },
-        { headerName: 'เวลา', field: 'create_time', width: 100 }, // ✅ Show Time
         {
-            headerName: 'หมายเหตุ',
-            field: 'booking_remark',
-            flex: 1,
-            width: 180
+            title: 'วันที่',
+            dataIndex: 'create_date',
+            key: 'create_date',
+            width: 140,
+            align: 'center',
+            sorter: (a, b) => new Date(a.create_date || 0) - new Date(b.create_date || 0),
+            render: (val) => val ? new Date(val).toLocaleDateString('th-TH') : '-'
         },
-    ], []);
+        {
+            title: 'เวลา',
+            dataIndex: 'create_time',
+            key: 'create_time',
+            width: 100,
+            align: 'center',
+            sorter: (a, b) => String(a.create_time || '').localeCompare(String(b.create_time || '')),
+            render: (val) => val || '-'
+        },
+        {
+            title: 'หมายเหตุ',
+            dataIndex: 'booking_remark',
+            key: 'booking_remark',
+            width: 250,
+            ellipsis: true,
+            sorter: (a, b) => String(a.booking_remark || '').localeCompare(String(b.booking_remark || '')),
+        },
+    ], [page, rows]);
 
     return (
         <ConfigProvider
             locale={thTH}
-            theme={{ token: { colorPrimary: '#fe9a00', borderRadius: 8 } }}
+            theme={{
+                token: {
+                    colorPrimary: '#f54a00', // สีตรงวันที่ และ ปุ่ม "แสดง/ซ่อนคอลัมน์"
+                    borderRadius: 2,
+                    fontFamily: 'Inter, "Sarabun", sans-serif',
+                }
+            }}
         >
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
-                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
-                    <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
-                        <Input
-                            prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหา เลขที่เอกสาร..."
-                            allowClear
-                            variant="borderless"
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full md:w-64 bg-transparent"
-                        />
-                        <div className="h-6 w-px bg-gray-200 mx-1 hidden md:block"></div>
-                        <Button
-                            type="primary"
-                            icon={<ToolOutlined />}
-                            onClick={handleCreate}
-                            className="bg-amber-600 hover:bg-amber-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
-                        >
-                            สร้างรายการรับเข้าของชำรุด
-                        </Button>
-                        <div className="flex items-center gap-2 px-2">
-                            <span className="text-gray-500 text-sm hidden lg:inline">วันที่:</span>
-                            <DatePicker
-                                value={selectedDate}
-                                onChange={(date) => setSelectedDate(date)}
-                                format="DD/MM/YYYY"  // แสดงผลเป็น 04/02/2026
-                                allowClear={false}
-                                className="w-40 border-gray-200 hover:border-amber-500 focus:border-amber-500"
-                                suffixIcon={<CalendarOutlined className="text-amber-600" />}
-                            />
-                        </div>
-                    </div>
-                </div>
 
-                <div className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-                    <DataTable
-                        rowData={filteredRows}
-                        columnDefs={columnDefs}
-                        loading={loading}
+                {/* ✅ ครอบด้วยส่วนของ Tabs เพื่อแยกหน้าต่าง */}
+                <div className="bg-white p-2 rounded-md shadow-sm flex-1 flex flex-col overflow-hidden">
+                    <Tabs
+                        defaultActiveKey="1"
+                        className="flex-1 overflow-hidden"
+                        items={[
+                            {
+                                key: '1',
+                                label: 'แจ้งชำรุด',
+                                children: (
+                                    <div className="pt-2 h-full">
+                                        {/* ✅ เรียกใช้ DraggableTable (ตารางเดิมของคุณ) */}
+                                        <DraggableTable
+                                            columns={baseColumns}
+                                            dataSource={filteredRows}
+                                            rowKey="draft_id" // ใช้ draft_id เป็น Key
+                                            loading={loading}
+                                            scroll={{ x: 'max-content', y: tableY - 60 }} // ลบความสูงออกเล็กน้อยเพื่อเผื่อที่ให้แถบ Tabs ด้านบน
 
-                        // 🔴 แก้ไข: เปลี่ยนจาก onRowClicked เป็น onCellClicked
-                        onCellClicked={(params) => {
-                            // ป้องกัน Error โดยเช็คว่ามี colDef หรือไม่
-                            if (!params.colDef) return;
+                                            pagination={{
+                                                current: page.current,
+                                                pageSize: page.pageSize,
+                                                showSizeChanger: true,
+                                                pageSizeOptions: [10, 20, 50, 100],
+                                                showTotal: (t, r) => <span className="text-gray-400 text-xs">แสดง {r[0]}-{r[1]} จาก {t} รายการ</span>,
+                                                className: 'px-4 pb-4 mt-4'
+                                            }}
+                                            onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
 
-                            // ถ้าคลิกที่คอลัมน์ "การดำเนินการ" ให้ return ออกไปเลย (ไม่เปิด Modal)
-                            if (params.colDef.headerName === 'การดำเนินการ') return;
+                                            // ✅ คลิกแถวเพื่อเปิด Modal
+                                            onRow={(record) => ({
+                                                onClick: () => handleRowClick(record),
+                                                className: "cursor-pointer"
+                                            })}
 
-                            // ถ้าเป็นคอลัมน์อื่น ให้เปิด Modal ตามปกติ
-                            handleRowClick(params.data);
-                        }}
+                                            // ✅ Toolbar
+                                            renderToolbar={(ColumnVisibility) => (
+                                                <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
+                                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
+                                                        <Input
+                                                            prefix={<SearchOutlined className="text-gray-400" />}
+                                                            placeholder="ค้นหา เลขที่เอกสาร..."
+                                                            allowClear
+                                                            variant="borderless"
+                                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                                            className="w-full sm:w-64 bg-transparent"
+                                                        />
+                                                        <div className="w-full h-px bg-gray-100 sm:w-px sm:h-6 sm:mx-1 hidden sm:block"></div>
 
-                        rowClass="cursor-pointer hover:bg-blue-50 transition-colors"
+                                                        <div className="flex flex-col sm:flex-row gap-2">
+                                                            <Button
+                                                                type="primary"
+                                                                icon={<CaretRightOutlined />}
+                                                                onClick={handleCreate}
+                                                                className="bg-orange-600 hover:!bg-orange-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
+                                                            >
+                                                                สร้างรายการแจ้งชำรุด
+                                                            </Button>
+
+                                                            <div className="flex items-center gap-2 px-2 h-9 border border-gray-200 rounded-md bg-white">
+                                                                <span className="text-gray-500 text-sm hidden lg:inline">วันที่:</span>
+                                                                <DatePicker
+                                                                    value={selectedDate}
+                                                                    onChange={(date) => setSelectedDate(date)}
+                                                                    format="DD/MM/YYYY"
+                                                                    allowClear={false}
+                                                                    variant="borderless"
+                                                                    className="w-32 cursor-pointer"
+                                                                    suffixIcon={<CalendarOutlined className="text-orange-600" />}
+                                                                />
+                                                            </div>
+
+                                                            {/* ปุ่มซ่อน/แสดงคอลัมน์ */}
+                                                            {ColumnVisibility}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        />
+                                    </div>
+                                )
+                            },
+                            {
+                                key: '2',
+                                label: 'รายการชำรุด',
+                                children: (
+                                    <div className="pt-2 h-full">
+                                        {/* ✅ เรียกใช้คอมโพเนนต์ใหม่ที่คุณจะสร้าง */}
+                                        <TabDefective />
+                                    </div>
+                                )
+                            }
+                        ]}
                     />
                 </div>
 
@@ -301,6 +380,7 @@ function SystemDefective() {
             </div>
         </ConfigProvider>
     );
+
 }
 
 export default SystemDefective;

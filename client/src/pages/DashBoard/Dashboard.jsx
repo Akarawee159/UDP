@@ -1,384 +1,246 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, TrendingDown, Calendar, AlertCircle, Box, PackageCheck, Truck } from 'lucide-react';
 import { 
-  Users, UserPlus, UserCheck, UserX, TrendingUp, 
-  TrendingDown, Briefcase, Award, Calendar, Clock,
-  Target, Activity, DollarSign, AlertCircle
-} from 'lucide-react';
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, 
-  AreaChart, Area, Cell, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer, RadialBarChart, RadialBar
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 
-// Mock Data
-const departmentData = [
-  { name: 'วิศวกรรม', value: 45, employees: 68, color: '#3b82f6' },
-  { name: 'ฝ่ายขาย', value: 25, employees: 38, color: '#10b981' },
-  { name: 'การตลาด', value: 15, employees: 23, color: '#f59e0b' },
-  { name: 'HR', value: 10, employees: 15, color: '#ef4444' },
-  { name: 'อื่นๆ', value: 5, employees: 6, color: '#8b5cf6' },
-];
+import api from '../../api';
 
-const monthlyTrendData = [
-  { month: 'ม.ค.', เข้า: 8, ออก: 3, พนักงาน: 142 },
-  { month: 'ก.พ.', เข้า: 5, ออก: 4, พนักงาน: 143 },
-  { month: 'มี.ค.', เข้า: 7, ออก: 2, พนักงาน: 148 },
-  { month: 'เม.ย.', เข้า: 6, ออก: 5, พนักงาน: 149 },
-  { month: 'พ.ค.', เข้า: 9, ออก: 3, พนักงาน: 155 },
-  { month: 'มิ.ย.', เข้า: 4, ออก: 2, พนักงาน: 157 },
-];
+const COLORS = {
+  inStock: '#6b7280',     
+  dispatched: '#16a34a',  
+  damaged: '#f97316',     
+  inactive1m: '#2563eb',  
+  inactive2m: '#9333ea',  
+  inactive3m: '#b91c1c'   
+};
 
-const ageDistribution = [
-  { range: '20-29', value: 30, fill: '#3b82f6' },
-  { range: '30-39', value: 45, fill: '#10b981' },
-  { range: '40-49', value: 20, fill: '#f59e0b' },
-  { range: '50+', value: 5, fill: '#ef4444' },
-];
-
-const performanceData = [
-  { name: 'ยอดเยี่ยม', value: 25, fill: '#10b981' },
-  { name: 'ดีมาก', value: 45, fill: '#3b82f6' },
-  { name: 'ดี', value: 25, fill: '#f59e0b' },
-  { name: 'ปรับปรุง', value: 5, fill: '#ef4444' },
-];
-
-const attendanceData = [
-  { day: 'จ.', rate: 98 },
-  { day: 'อ.', rate: 95 },
-  { day: 'พ.', rate: 97 },
-  { day: 'พฤ.', rate: 96 },
-  { day: 'ศ.', rate: 94 },
-];
-
-const leaveTypeData = [
-  { type: 'ลาป่วย', count: 45, color: '#ef4444' },
-  { type: 'ลาพักร้อน', count: 89, color: '#3b82f6' },
-  { type: 'ลากิจ', count: 32, color: '#f59e0b' },
-  { type: 'อื่นๆ', count: 12, color: '#8b5cf6' },
-];
-
-// Stat Card Component
 const StatCard = ({ icon: Icon, title, value, change, trend, color, bgColor }) => (
-  <div className={`${bgColor} rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 hover:scale-105`}>
-    <div className="flex items-start justify-between">
-      <div className="flex-1">
-        <p className="text-sm font-medium text-gray-600 mb-2">{title}</p>
-        <h3 className="text-3xl font-bold text-gray-800 mb-3">{value}</h3>
-        {change && (
-          <div className={`flex items-center gap-1 text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-            {trend === 'up' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-            <span>{change}</span>
-            <span className="text-gray-500 text-xs">จากเดือนก่อน</span>
-          </div>
-        )}
-      </div>
-      <div className={`${color} p-4 rounded-lg`}>
-        <Icon size={28} className="text-white" />
-      </div>
-    </div>
-  </div>
-);
-
-// Chart Card Wrapper
-const ChartCard = ({ title, children, info }) => (
-  <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border border-gray-100">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-      {info && (
-        <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-          {info}
-        </span>
+  <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
+    <div>
+      <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
+      <h3 className="text-3xl font-bold text-gray-800">{value}</h3>
+      {change && (
+        <p className={`text-sm mt-2 flex items-center gap-1 ${trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+          {trend === 'up' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+          {change}
+        </p>
       )}
     </div>
-    {children}
+    <div className={`p-4 rounded-full ${bgColor} ${color.replace('bg-', 'text-')}`}>
+      <Icon size={32} className={color.replace('bg-', 'text-')} />
+    </div>
   </div>
 );
 
+// Custom Tooltip สำหรับแสดงข้อมูลตอนเอาเมาส์ชี้กราฟแท่ง
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload; 
+    return (
+      <div className="bg-white p-4 rounded-lg shadow-lg border border-gray-100 text-sm min-w-[220px]">
+        <p className="font-bold text-gray-800 mb-3 border-b pb-2">รุ่น: {label}</p>
+        <div className="space-y-1.5">
+          <p className="flex justify-between font-bold text-gray-800">
+            <span>จำนวนทั้งหมด:</span> <span>{data.total}</span>
+          </p>
+          <div className="my-1 border-t border-dashed border-gray-200"></div>
+          <p className="flex justify-between text-gray-500">
+            <span>คงคลัง:</span> <span>{data.inStock}</span>
+          </p>
+          <p className="flex justify-between text-green-500">
+            <span>จ่ายออก:</span> <span>{data.dispatched}</span>
+          </p>
+          <p className="flex justify-between text-orange-500">
+            <span>ชำรุด:</span> <span>{data.damaged}</span>
+          </p>
+          <div className="my-1 border-t border-dashed border-gray-200"></div>
+          <p className="flex justify-between text-blue-500">
+            <span>ไม่เคลื่อนไหว 1 เดือน:</span> <span>{data.inactive1m}</span>
+          </p>
+          <p className="flex justify-between text-purple-500">
+            <span>ไม่เคลื่อนไหว 2 เดือน:</span> <span>{data.inactive2m}</span>
+          </p>
+          <p className="flex justify-between text-red-700">
+            <span>ไม่เคลื่อนไหว 3 เดือน:</span> <span>{data.inactive3m}</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 function Dashboard() {
-  const [timeRange, setTimeRange] = useState('6m');
+  const [kpi, setKpi] = useState({ total: 0, inStock: 0, dispatched: 0, damaged: 0 });
+  const [pieData, setPieData] = useState([]);
+  const [barData, setBarData] = useState([]);
+
+  const calculateInactiveDays = (dateString) => {
+    if (!dateString) return 0;
+    const lastUpdate = new Date(dateString);
+    const today = new Date();
+    const diffTime = Math.abs(today - lastUpdate);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      const res = await api.get('/dashboard');
+
+      if (res.data && res.data.success) {
+        const rawData = res.data.data;
+
+        // 1. KPI ด้านบนสุด
+        const inStockCount = rawData.filter(item => String(item.asset_status) === '100').length;
+        const dispatchedCount = rawData.filter(item => String(item.asset_status) === '101').length;
+        const damagedCount = rawData.filter(item => String(item.asset_status) === '147').length;
+
+        let inactive1mTotal = 0;
+        let inactive2mTotal = 0;
+        let inactive3mTotal = 0;
+
+        rawData.forEach(item => {
+          const inactiveDays = calculateInactiveDays(item.updated_at || item.scan_at || item.created_at);
+          if (inactiveDays >= 90) inactive3mTotal++;
+          else if (inactiveDays >= 60) inactive2mTotal++;
+          else if (inactiveDays >= 30) inactive1mTotal++;
+        });
+
+        setKpi({
+          total: rawData.length,
+          inStock: inStockCount,
+          dispatched: dispatchedCount,
+          damaged: damagedCount,
+          inactive1m: inactive1mTotal,
+          inactive2m: inactive2mTotal,
+          inactive3m: inactive3mTotal
+        });
+
+        // 2. ข้อมูลสำหรับ Pie Chart (ภาพรวมทั้งหมด)
+        setPieData([
+          { name: 'คงคลัง', value: inStockCount, color: COLORS.inStock },
+          { name: 'จ่ายออก', value: dispatchedCount, color: COLORS.dispatched },
+          { name: 'ชำรุด', value: damagedCount, color: COLORS.damaged },
+          { name: 'ไม่เคลื่อนไหว 1 เดือน', value: inactive1mTotal, color: COLORS.inactive1m },
+          { name: 'ไม่เคลื่อนไหว 2 เดือน', value: inactive2mTotal, color: COLORS.inactive2m },
+          { name: 'ไม่เคลื่อนไหว 3 เดือน', value: inactive3mTotal, color: COLORS.inactive3m }
+        ].filter(item => item.value > 0)); // กรองค่า 0 ออกเพื่อให้กราฟไม่แสดงส่วนที่ไม่มีข้อมูล
+
+        // 3. ข้อมูลสำหรับ Bar Chart (แยกราย asset_model แต่รวมเป็นแท่งเดียว)
+        const modelGroups = rawData.reduce((acc, item) => {
+          const modelName = item.asset_model || 'ไม่ระบุรุ่น'; 
+          
+          if (!acc[modelName]) {
+            acc[modelName] = { 
+              name: modelName, total: 0, 
+              inStock: 0, dispatched: 0, damaged: 0, 
+              inactive1m: 0, inactive2m: 0, inactive3m: 0 
+            };
+          }
+
+          acc[modelName].total++;
+
+          if (String(item.asset_status) === '100') acc[modelName].inStock++;
+          if (String(item.asset_status) === '101') acc[modelName].dispatched++;
+          if (String(item.asset_status) === '147') acc[modelName].damaged++;
+
+          const inactiveDays = calculateInactiveDays(item.updated_at || item.scan_at || item.created_at);
+          if (inactiveDays >= 90) acc[modelName].inactive3m++;
+          else if (inactiveDays >= 60) acc[modelName].inactive2m++;
+          else if (inactiveDays >= 30) acc[modelName].inactive1m++;
+
+          return acc;
+        }, {});
+
+        // แปลง Object ให้เป็น Array สำหรับ Recharts
+        setBarData(Object.values(modelGroups));
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+    const handleSocketUpdate = () => fetchDashboardData();
+    window.addEventListener('hrms:registerasset-upsert', handleSocketUpdate);
+    window.addEventListener('hrms:registerasset-delete', handleSocketUpdate);
+    return () => {
+      window.removeEventListener('hrms:registerasset-upsert', handleSocketUpdate);
+      window.removeEventListener('hrms:registerasset-delete', handleSocketUpdate);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
-      
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800 mb-2">ระบบบริหารทรัพยากรบุคคล</h1>
-        <p className="text-gray-600 flex items-center gap-2">
-          <Calendar size={18} />
-          วันที่ {new Date().toLocaleDateString('th-TH', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </p>
-      </div>
-
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          icon={Users}
-          title="พนักงานทั้งหมด"
-          value="157"
-          change="+8 คน"
-          trend="up"
-          color="bg-blue-500"
-          bgColor="bg-blue-50"
-        />
-        <StatCard
-          icon={UserPlus}
-          title="พนักงานเข้าใหม่"
-          value="9"
-          change="+3 คน"
-          trend="up"
-          color="bg-green-500"
-          bgColor="bg-green-50"
-        />
-        <StatCard
-          icon={UserCheck}
-          title="พนักงานทดลองงาน"
-          value="12"
-          change="+4 คน"
-          trend="up"
-          color="bg-orange-500"
-          bgColor="bg-orange-50"
-        />
-        <StatCard
-          icon={UserX}
-          title="พนักงานลาออก"
-          value="3"
-          change="-1 คน"
-          trend="down"
-          color="bg-red-500"
-          bgColor="bg-red-50"
-        />
+        <StatCard icon={Box} title="กล่องทั้งหมด" value={kpi.total} color="bg-gray-500" bgColor="bg-gray-50" />
+        <StatCard icon={Truck} title="จ่ายออก" value={kpi.dispatched} color="bg-green-500" bgColor="bg-green-50" />
+        <StatCard icon={AlertCircle} title="ชำรุด" value={kpi.damaged} color="bg-orange-500" bgColor="bg-orange-50" />
+        <StatCard icon={PackageCheck} title="คงคลัง" value={kpi.inStock} color="bg-blue-500" bgColor="bg-blue-50" />
       </div>
 
-      {/* Main Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Employee Trend Chart */}
-        <ChartCard title="แนวโน้มพนักงาน" info="6 เดือนล่าสุด">
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={monthlyTrendData}>
-              <defs>
-                <linearGradient id="colorพนักงาน" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  padding: '8px'
-                }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="พนักงาน" 
-                stroke="#3b82f6" 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorพนักงาน)" 
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* Department Distribution */}
-        <ChartCard title="การกระจายตามแผนก">
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
+      {/* ฝั่งซ้าย: Pie Chart */}
+      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm lg:col-span-1 flex flex-col">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">ภาพรวมสถานะและเคลื่อนไหว</h3>
+        <div className="flex-1 min-h-[350px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
               <Pie
-                data={departmentData}
+                data={pieData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name} ${value}%`}
-                outerRadius={90}
-                fill="#8884d8"
+                innerRadius={90}  // ขยายวงในให้ใหญ่ขึ้น (จากเดิม 60)
+                outerRadius={130} // ขยายวงนอกให้ใหญ่ขึ้น (จากเดิม 90)
+                paddingAngle={3}
                 dataKey="value"
               >
-                {departmentData.map((entry, index) => (
+                {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip />
+              {/* นำเมาส์ไปชี้เพื่อดูข้อมูล */}
+              <Tooltip /> 
+              {/* แสดงรายละเอียดด้านล่างว่าแต่ละสีคืออะไร */}
+              <Legend verticalAlign="bottom" height={36} /> 
             </PieChart>
           </ResponsiveContainer>
-        </ChartCard>
-
-        {/* In/Out Trend */}
-        <ChartCard title="พนักงานเข้า-ออก">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyTrendData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px'
-                }}
-              />
-              <Legend />
-              <Bar dataKey="เข้า" fill="#10b981" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="ออก" fill="#ef4444" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-      </div>
-
-      {/* Secondary Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-        
-        {/* Age Distribution */}
-        <ChartCard title="การกระจายตามอายุ">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={ageDistribution} layout="vertical">
-              <XAxis type="number" tick={{ fontSize: 12 }} />
-              <YAxis dataKey="range" type="category" tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                {ageDistribution.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* Performance Distribution */}
-        <ChartCard title="การประเมินผลงาน">
-          <ResponsiveContainer width="100%" height={250}>
-            <RadialBarChart 
-              cx="50%" 
-              cy="50%" 
-              innerRadius="20%" 
-              outerRadius="90%" 
-              data={performanceData}
-              startAngle={90}
-              endAngle={-270}
-            >
-              <RadialBar
-                minAngle={15}
-                background
-                clockWise
-                dataKey="value"
-                cornerRadius={10}
-              />
-              <Legend 
-                iconSize={10} 
-                layout="vertical" 
-                verticalAlign="bottom" 
-                align="center"
-                wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
-              />
-              <Tooltip />
-            </RadialBarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* Attendance Rate */}
-        <ChartCard title="อัตราการมาทำงาน" info="สัปดาห์นี้">
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={attendanceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-              <YAxis domain={[90, 100]} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Line 
-                type="monotone" 
-                dataKey="rate" 
-                stroke="#3b82f6" 
-                strokeWidth={3}
-                dot={{ fill: '#3b82f6', r: 5 }}
-                activeDot={{ r: 8 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* Leave Types */}
-        <ChartCard title="สถิติการลา">
-          <div className="space-y-4">
-            {leaveTypeData.map((leave) => (
-              <div key={leave.type}>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">{leave.type}</span>
-                  <span className="text-sm font-bold text-gray-800">{leave.count}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="h-2 rounded-full transition-all duration-500"
-                    style={{ 
-                      width: `${(leave.count / 180) * 100}%`,
-                      backgroundColor: leave.color 
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </ChartCard>
-      </div>
-
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-100 p-3 rounded-lg">
-              <Award className="text-purple-600" size={24} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">ค่าเฉลี่ยผลงาน</p>
-              <p className="text-xl font-bold text-gray-800">4.2/5.0</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all">
-          <div className="flex items-center gap-3">
-            <div className="bg-cyan-100 p-3 rounded-lg">
-              <Clock className="text-cyan-600" size={24} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">ชั่วโมง OT เฉลี่ย</p>
-              <p className="text-xl font-bold text-gray-800">12.5 ชม.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-100 p-3 rounded-lg">
-              <Target className="text-green-600" size={24} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">บรรลุเป้าหมาย</p>
-              <p className="text-xl font-bold text-gray-800">87%</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg p-4 shadow-md border border-gray-100 hover:shadow-lg transition-all">
-          <div className="flex items-center gap-3">
-            <div className="bg-pink-100 p-3 rounded-lg">
-              <Activity className="text-pink-600" size={24} />
-            </div>
-            <div>
-              <p className="text-xs text-gray-600">อัตราคงอยู่</p>
-              <p className="text-xl font-bold text-gray-800">94.2%</p>
-            </div>
-          </div>
         </div>
       </div>
 
+        {/* ฝั่งขวา: Aging Chart (แยกราย asset_model แต่รวมเป็นแท่งเดียว) */}
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm lg:col-span-2">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">สถานะและการเคลื่อนไหวแยกตามโมเดล</h3>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={barData}
+                margin={{ top: 20, right: 30, left: 0, bottom: 50 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                {/* หมุนแกน X เผื่อกรณีที่มีชื่อรุ่นยาวๆ หรือมีหลายรุ่น */}
+                <XAxis dataKey="name" height={60} tick={{ fontSize: 16, fontWeight: 'bold' }} />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} cursor={{fill: 'transparent'}} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                
+                {/* สังเกตว่าใช้ stackId="a" เหมือนกันหมด เพื่อให้ต่อเป็นแท่งเดียวกัน */}
+                <Bar maxBarSize={60} dataKey="inStock" name="คงคลัง" stackId="a" fill={COLORS.inStock} />
+                <Bar maxBarSize={60} dataKey="dispatched" name="จ่ายออก" stackId="a" fill={COLORS.dispatched} />
+                <Bar maxBarSize={60} dataKey="damaged" name="ชำรุด" stackId="a" fill={COLORS.damaged} />
+                <Bar maxBarSize={60} dataKey="inactive1m" name="ไม่เคลื่อนไหว 1 เดือน" stackId="a" fill={COLORS.inactive1m} />
+                <Bar maxBarSize={60} dataKey="inactive2m" name="ไม่เคลื่อนไหว 2 เดือน" stackId="a" fill={COLORS.inactive2m} />
+                <Bar maxBarSize={60} dataKey="inactive3m" name="ไม่เคลื่อนไหว 3 เดือน" stackId="a" fill={COLORS.inactive3m} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

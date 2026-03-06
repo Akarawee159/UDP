@@ -6,14 +6,14 @@ const dayjs = require('dayjs');
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการรับเข้าของชำรุด' } = req.body;
+    const { draft_id, objective = 'ทำรายการแจ้งชำรุด' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการรับเข้าของชำรุด') {
+    if (objective === 'ทำรายการแจ้งชำรุด') {
       booking_type = 'DF';
     }
 
@@ -41,28 +41,26 @@ async function getScannedList(req, res, next) {
   } catch (err) { next(err); }
 }
 
-async function generateBookingRef(req, res, next) {
+// เพิ่มฟังก์ชันใหม่
+async function editHeader(req, res, next) {
   try {
     const { draft_id } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
-    const result = await model.generateRefID(draft_id, user_id);
-
-    // Notify
+    await model.editHeaderBooking(draft_id, user_id);
     const io = req.app.get('io');
-    if (io) io.emit('systemdefective:update', { action: 'ref_generated', draft_id });
-
-    res.json({ success: true, data: result });
+    if (io) io.emit('systemdefective:update', { action: 'header_update', draft_id });
+    res.json({ success: true, message: 'Status updated to 146' });
   } catch (err) { next(err); }
 }
 
+// นำฟังก์ชันนี้ไปแทนที่ของเดิม (เพื่อส่ง refID กลับไปให้ UI ทันทีตอนเซฟ Header)
 async function confirmBooking(req, res, next) {
   try {
     const { draft_id, booking_remark, origin, destination } = req.body;
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
-    // บันทึกและเปลี่ยน status -> 141
     const result = await model.updateBookingHeader(draft_id, { booking_remark, origin, destination }, user_id);
 
     const io = req.app.get('io');
@@ -72,7 +70,7 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: เบิกขอซ่อม (Finalize)
+// ✅ ใหม่: แจ้งชำรุด (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา
@@ -193,21 +191,14 @@ async function getBookingDetail(req, res, next) {
 
     if (booking) {
       const status = String(booking.is_status);
-
-      // ✅ แยกเงื่อนไข 145 (เบิกขอซ่อมสำเร็จ) -> ดึงจาก Detail
       if (status === '145') {
         assets = await model.getAssetsDetailByRefID(booking.refID);
-      }
-      // ✅ เงื่อนไข 142 (รอตรวจสอบ) หรือ 144 (แก้ไข) -> ดึงจาก Master
-      else if (status === '142' || status === '144') {
+      } else if (status === '144' || status === '141' || status === '146') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
-      }
-      // Draft -> ดึงจาก Master โดยใช้ draft_id
-      else {
+      } else {
         assets = await model.getAssetsByDraft(draft_id);
       }
     }
-
     res.json({ success: true, booking, assets });
   } catch (err) { next(err); }
 }
@@ -246,6 +237,29 @@ async function confirmOutput(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function getDefectiveItems(req, res, next) {
+  try {
+    const rows = await model.getDefectiveItems();
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+async function receiveToStock(req, res, next) {
+  try {
+    const { asset_codes } = req.body;
+    const user_id = req.user?.employee_id;
+    if (!asset_codes || asset_codes.length === 0) throw new Error("ไม่พบรายการที่เลือก");
+
+    await model.receiveToStock(asset_codes, user_id);
+
+    // Broadcast ให้เครื่องอื่นรู้ว่ามีการดึงกลับเข้าคลัง
+    const io = req.app.get('io');
+    if (io) io.emit('systemdefective:update', { action: 'receive_stock' });
+
+    res.json({ success: true, message: 'รับเข้าคลังสำเร็จ' });
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   initBooking,
   getScannedList,
@@ -255,10 +269,12 @@ module.exports = {
   confirmBooking,
   getDropdowns,
   getBookingList,
+  editHeader,
   getBookingDetail,
-  generateBookingRef,
   cancelBooking,
   finalizeBooking,
   unlockBooking,
-  confirmOutput
+  confirmOutput,
+  getDefectiveItems,
+  receiveToStock
 };

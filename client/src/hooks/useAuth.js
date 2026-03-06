@@ -1,5 +1,5 @@
 // src/hooks/useAuth.js
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import api from '../api';
 
 const read = (k) => localStorage.getItem(k) || sessionStorage.getItem(k);
@@ -35,7 +35,7 @@ export default function useAuth() {
     setUser(userData);
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       const rt = read('refreshToken');
       if (rt) {
@@ -49,9 +49,10 @@ export default function useAuth() {
       sessionStorage.clear();
       setToken(null);
       setUser(null);
-      if (window.location.pathname !== '/') window.location.replace('/'); // กลับหน้าแรกเสมอ
+      // บังคับ Hard Reload ทิ้งไปเลย เพื่อเคลียร์ State และ Memory ทุกอย่างในเบราว์เซอร์
+      window.location.replace('/');
     }
-  };
+  }, []);
 
   return { user, token, loading, login, logout };
 }

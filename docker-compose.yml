@@ -45,6 +45,7 @@ services:
     volumes:
       - ./server:/app
       - /app/node_modules
+      - ./server/src/img:/app/src/img
     networks:
       - shared-network
 

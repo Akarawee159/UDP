@@ -1,7 +1,7 @@
-// src/modules/reports/boxstatus/boxstatusController.js
+// src/modules/dashboard/dashboard/dashboardController.js
 'use strict';
 
-const model = require('./boxstatusModel');
+const model = require('./dashboardModel');
 
 async function getAll(req, res, next) {
   try {

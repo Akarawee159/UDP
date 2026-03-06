@@ -1,10 +1,10 @@
-// src/modules/reports/boxstatus/boxstatusRoutes.js
+// src/modules/dashboard/dashboard/dashboardRoutes.js
 'use strict';
 
 const express = require('express');
 const router = express.Router();
 const auth = require('../../../auth/middleware/authMiddleware');
-const controller = require('./boxstatusController');
+const controller = require('./dashboardController');
 
 router.get('/', auth, controller.getAll);
 

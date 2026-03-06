@@ -88,6 +88,7 @@ async function create(req, res, next) {
 
         asset_holder: body.asset_holder || '',
         asset_location: body.asset_location || '',
+        current_address: body.current_address || '',
         asset_origin: body.asset_origin || '',
         asset_width: body.asset_width || 0,
         asset_width_unit: body.asset_width_unit || '',

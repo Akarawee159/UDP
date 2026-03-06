@@ -1,13 +1,12 @@
-// src/modules/reports/boxstatus/boxstatusModel.js
+// src/modules/dashboard/dashboard/dashboardModel.js
 'use strict';
 
 const db = require('../../../config/database');
 
-/** ดึงรายการทรัพย์สินทั้งหมด พร้อมชื่อพนักงานและสถานะ (รองรับการกรองด้วยช่วงวันที่ scan_at) */
 async function getAll(startDate, endDate) {
   let sql = `
     SELECT 
-        a.asset_code, a.asset_detail, a.doc_no, a.asset_lot, a.asset_type, 
+        a.asset_code, a.asset_model, a.asset_detail, a.doc_no, a.asset_lot, a.asset_type, 
         a.asset_usedfor, a.asset_brand, a.asset_feature, a.partCode, a.asset_remark,
         a.asset_status, a.is_status, a.asset_origin, a.asset_destination, a.current_address,
         a.refID, a.scan_at, a.last_used, a.create_date, a.created_at, a.updated_at, a.updated_by,

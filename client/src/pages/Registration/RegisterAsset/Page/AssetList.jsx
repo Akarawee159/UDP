@@ -213,9 +213,10 @@ function AssetList() {
         message.success(`เลือกรายการ: ${material.material_code} เรียบร้อย`);
     };
 
-    const handleDepartmentSelect = (dept) => {
+const handleDepartmentSelect = (dept) => {
         form.setFieldsValue({
-            asset_responsible_department: dept.G_CODE
+            asset_responsible_department: dept.G_CODE,
+            current_address: dept.branch_code
         });
         message.success(`เลือกฝ่าย: ${dept.G_CODE} เรียบร้อย`);
     };
@@ -404,6 +405,7 @@ function AssetList() {
                                 <Form.Item name="asset_remark" hidden><Input /></Form.Item>
                                 <Form.Item name="asset_feature" hidden><Input /></Form.Item>
                                 <Form.Item name="asset_type" hidden><Input /></Form.Item>
+                                <Form.Item name="current_address" hidden><Input /></Form.Item>
 
                                 {/* ใช้ xs={24} sm={12} เพื่อให้ช่อง input เรียงซ้อนบนมือถือ เรียงคู่บน Desktop/Tablet */}
                                 <Row gutter={12}>

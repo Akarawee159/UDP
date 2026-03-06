@@ -143,7 +143,7 @@ function RegisterAsset() {
             }
 
             // สถานะเสีย/ซ่อม/ซาก
-            if (status === '103') {
+            if (status === '147') {
                 groups[key].count_damaged++;
             } else if (status === '104') {
                 groups[key].count_repair++;
@@ -233,19 +233,19 @@ function RegisterAsset() {
                     cellClass: "text-center cell-green-bold cursor-pointer"
                 },
                 {
-                    headerName: 'ชำรุด', // Status 103
+                    headerName: 'ชำรุด', // Status 147
                     width: 100,
                     field: 'count_damaged',
                     cellRenderer: p => valUnit(p.value),
                     cellClass: "text-center cell-orange-bold cursor-pointer"
                 },
-                {
-                    headerName: 'กำลังซ่อม', // Status 104
-                    width: 100,
-                    field: 'count_repair',
-                    cellRenderer: p => valUnit(p.value),
-                    cellClass: "text-center cell-orange-bold cursor-pointer"
-                },
+                // {
+                //     headerName: 'กำลังซ่อม', // Status 104
+                //     width: 100,
+                //     field: 'count_repair',
+                //     cellRenderer: p => valUnit(p.value),
+                //     cellClass: "text-center cell-orange-bold cursor-pointer"
+                // },
                 {
                     headerName: 'คงเหลือ',
                     width: 100,

@@ -24,7 +24,7 @@ const COLUMNS_LIST = `
   asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
   asset_weight_unit, asset_img, asset_dmg_001, asset_dmg_002, asset_dmg_003, 
   asset_dmg_004, asset_dmg_005, asset_dmg_006, asset_remark, asset_usedfor, 
-  asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, 
+  asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, current_address, 
   print_status, asset_status, is_status, create_date, created_by, 
   created_at, updated_by, updated_at, asset_action
 `;
@@ -128,7 +128,7 @@ async function createBulk(dataArray) {
     item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,
     item.asset_weight_unit, item.asset_img, item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006, item.asset_remark, item.asset_usedfor,
-    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
+    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode, item.current_address,
     item.print_status, item.asset_status, item.is_status, item.last_used || getBangkokNow(), item.create_date || getBangkokNow(),
     item.created_by, item.created_at || getBangkokNow()
   ]);
@@ -142,7 +142,7 @@ async function createBulk(dataArray) {
       asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
       asset_weight_unit, asset_img, asset_dmg_001, asset_dmg_002, asset_dmg_003, 
       asset_dmg_004, asset_dmg_005, asset_dmg_006, asset_remark, asset_usedfor, 
-      asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, 
+      asset_brand, asset_source, asset_feature, asset_supplier_name, label_register, partCode, current_address,
       print_status, asset_status, is_status, last_used, create_date, 
       created_by, created_at
     ) VALUES ?
@@ -175,7 +175,7 @@ async function insertDetailLog(dataObjArray) {
     item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,
     item.asset_weight_unit, item.asset_img, item.asset_dmg_001, item.asset_dmg_002, item.asset_dmg_003,
     item.asset_dmg_004, item.asset_dmg_005, item.asset_dmg_006, item.asset_remark, item.asset_usedfor,
-    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode,
+    item.asset_brand, item.asset_source, item.asset_feature, item.asset_supplier_name, item.label_register, item.partCode, item.current_address,
     item.print_status, item.asset_status, item.is_status, item.create_date || getBangkokNow(), item.created_by,
     item.created_at || getBangkokNow(), item.updated_by, item.updated_at, item.asset_action
   ]);

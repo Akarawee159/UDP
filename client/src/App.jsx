@@ -325,20 +325,9 @@ export default function App() {
 
           {/* รายงาน main=70 */}
           <Route
-            path="/reports/nonmove-report"
-            element={
-              <ProtectedRoute mainId="70" subId="701">
-                <AdminLayout>
-                  <NonMoveReport />
-                </AdminLayout>
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path="/reports/boxstatus-report"
             element={
-              <ProtectedRoute mainId="70" subId="702">
+              <ProtectedRoute mainId="70" subId="701">
                 <AdminLayout>
                   <BoxStatusReport />
                 </AdminLayout>

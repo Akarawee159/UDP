@@ -124,6 +124,9 @@ export default function Login() {
             });
             const { accessToken, refreshToken, user } = data;
 
+            // ล้างสถานะ logout ออก เพื่อให้ api.js ยอมแนบ Token กลับไปเหมือนเดิม
+            window.__LOGGING_OUT__ = false;
+
             login(accessToken, user, { remember: formData.rememberMe, refreshToken });
             message.success('เข้าสู่ระบบสำเร็จ');
 

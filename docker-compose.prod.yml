@@ -45,6 +45,8 @@ services:
       - REFRESH_SECRET=${REFRESH_SECRET}
     networks:
       - shared-network
+    volumes:
+      - ./server/src/img:/app/src/img
 
 networks:
   shared-network:

@@ -25,12 +25,12 @@ import {
 
 /* Menu Config (โครงสร้างเดิม) */
 export const menuItems = [
-  // {
-  //   id: "10", label: "แดชบอร์ด",
-  //   icon: <DashboardOutlined />,
-  //   path: "/dashboard",
-  //   type: "single"
-  // },
+  {
+    id: "10", label: "แดชบอร์ด",
+    icon: <DashboardOutlined />,
+    path: "/dashboard",
+    type: "single"
+  },
   {
     id: "30",
     label: "ข้อมูลตั้งค่า",
@@ -98,8 +98,7 @@ export const menuItems = [
     icon: <FileTextOutlined />,
     type: "dropdown",
     children: [
-      // { id: "701", label: "รายงานพิเศษ (Non-Move)", path: "/reports/nonmove-report" },
-      { id: "702", label: "รายงานตามสถานะกล่อง", path: "/reports/boxstatus-report" },
+      { id: "701", label: "รายงานตามสถานะกล่อง", path: "/reports/boxstatus-report" },
     ]
   },
 ];

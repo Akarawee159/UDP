@@ -92,7 +92,11 @@ function SystemIn() {
         }
 
         if (foundDraft) {
-            message.info('ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ');
+            // ✅ ปรับรูปแบบ message.info ให้เป็นแบบ Object และใส่ key เข้าไป
+            message.info({
+                content: 'ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ',
+                key: 'draft_found_msg' // <-- กำหนด key แบบนี้
+            });
             setSelectedDraftId(foundDraft.draft_id);
         } else {
             setSelectedDraftId(null);
