@@ -7,7 +7,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3091,
-    // เพิ่มส่วนนี้เพื่อให้ Docker จับการเปลี่ยนแปลงไฟล์ได้แม่นยำขึ้น
+    // 👇 เพิ่มโดเมนใหม่ต่อท้ายใน Array ได้เลยครับ
+    allowedHosts: [
+      'spt.local', 
+      'her09ecgc3k.sn.mynetname.net'
+    ], 
     watch: {
       usePolling: true,
     },
