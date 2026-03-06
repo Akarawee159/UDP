@@ -50,7 +50,7 @@ const CustomTooltip = ({ active, payload, label }) => {
             <span>คงคลัง:</span> <span>{data.inStock}</span>
           </p>
           <p className="flex justify-between text-green-500">
-            <span>จ่ายออก:</span> <span>{data.dispatched}</span>
+            <span>ใช้งาน:</span> <span>{data.dispatched}</span>
           </p>
           <p className="flex justify-between text-orange-500">
             <span>ชำรุด:</span> <span>{data.damaged}</span>
@@ -121,7 +121,7 @@ function Dashboard() {
         // 2. ข้อมูลสำหรับ Pie Chart (ภาพรวมทั้งหมด)
         setPieData([
           { name: 'คงคลัง', value: inStockCount, color: COLORS.inStock },
-          { name: 'จ่ายออก', value: dispatchedCount, color: COLORS.dispatched },
+          { name: 'ใช้งาน', value: dispatchedCount, color: COLORS.dispatched },
           { name: 'ชำรุด', value: damagedCount, color: COLORS.damaged },
           { name: 'ไม่เคลื่อนไหว 1 เดือน', value: inactive1mTotal, color: COLORS.inactive1m },
           { name: 'ไม่เคลื่อนไหว 2 เดือน', value: inactive2mTotal, color: COLORS.inactive2m },
@@ -177,7 +177,7 @@ function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard icon={Box} title="กล่องทั้งหมด" value={kpi.total} color="bg-gray-500" bgColor="bg-gray-50" />
-        <StatCard icon={Truck} title="จ่ายออก" value={kpi.dispatched} color="bg-green-500" bgColor="bg-green-50" />
+        <StatCard icon={Truck} title="ใช้งาน" value={kpi.dispatched} color="bg-green-500" bgColor="bg-green-50" />
         <StatCard icon={AlertCircle} title="ชำรุด" value={kpi.damaged} color="bg-orange-500" bgColor="bg-orange-50" />
         <StatCard icon={PackageCheck} title="คงคลัง" value={kpi.inStock} color="bg-blue-500" bgColor="bg-blue-50" />
       </div>
@@ -230,7 +230,7 @@ function Dashboard() {
                 
                 {/* สังเกตว่าใช้ stackId="a" เหมือนกันหมด เพื่อให้ต่อเป็นแท่งเดียวกัน */}
                 <Bar maxBarSize={60} dataKey="inStock" name="คงคลัง" stackId="a" fill={COLORS.inStock} />
-                <Bar maxBarSize={60} dataKey="dispatched" name="จ่ายออก" stackId="a" fill={COLORS.dispatched} />
+                <Bar maxBarSize={60} dataKey="dispatched" name="ใช้งาน" stackId="a" fill={COLORS.dispatched} />
                 <Bar maxBarSize={60} dataKey="damaged" name="ชำรุด" stackId="a" fill={COLORS.damaged} />
                 <Bar maxBarSize={60} dataKey="inactive1m" name="ไม่เคลื่อนไหว 1 เดือน" stackId="a" fill={COLORS.inactive1m} />
                 <Bar maxBarSize={60} dataKey="inactive2m" name="ไม่เคลื่อนไหว 2 เดือน" stackId="a" fill={COLORS.inactive2m} />

@@ -114,7 +114,7 @@ async function updateBookingHeader(draft_id, body, user_id) {
 
   return { success: true, refID: currentRefID };
 }
-// 2. เพิ่มฟังก์ชันสำหรับสถานะ 116 (แก้ไขข้อมูลจ่ายออก)
+// 2. เพิ่มฟังก์ชันสำหรับสถานะ 116 (แก้ไขข้อมูลใช้งาน)
 async function editHeaderBooking(draft_id, user_id) {
   const now = getThaiNow();
   await db.query(`
@@ -123,7 +123,7 @@ async function editHeaderBooking(draft_id, user_id) {
   return true;
 }
 
-// 3. ปรับฟังก์ชัน Finalize (จ่ายออกสมบูรณ์ - รวบ 111->115 และ 114->115 ไว้ด้วยกัน)
+// 3. ปรับฟังก์ชัน Finalize (ใช้งานสมบูรณ์ - รวบ 111->115 และ 114->115 ไว้ด้วยกัน)
 async function finalizeBooking(draft_id, user_id, headerData = {}) {
   const now = getThaiNow();
   if (headerData.origin && headerData.destination) {
@@ -184,7 +184,7 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
             t.asset_dmg_001, t.asset_dmg_002, t.asset_dmg_003, t.asset_dmg_004, t.asset_dmg_005, t.asset_dmg_006,
             t.asset_remark, t.asset_usedfor, t.asset_brand, t.asset_feature,
             t.asset_supplier_name, t.label_register, t.partCode, t.print_status,
-            t.asset_status, 'จ่ายออกแล้ว', '115', 
+            t.asset_status, 'ใช้งานแล้ว', '115', 
             t.create_date, t.created_by, t.created_at, ?, ?, t.scan_by, t.scan_at,
             b.origin, b.destination, b.destination, 
             t.asset_model, t.asset_responsible_department, t.asset_source
@@ -273,7 +273,7 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
     if (item.refID === refID) {
       return { success: false, code: 'ALREADY_SCANNED', message: `สแกนกล่องซ้ำ`, data: item };
     } else {
-      return { success: false, code: 'INVALID_STATUS', message: `กล่องนี้ถูกจ่ายออกไปแล้ว`, data: item };
+      return { success: false, code: 'INVALID_STATUS', message: `กล่องนี้ถูกใช้งานไปแล้ว`, data: item };
     }
   }
 
@@ -317,12 +317,12 @@ async function returnSingleAsset(assetCode) {
     // ✅ 1. อัปเดต Detail เดิมให้เป็น 106 (ป้องกันค้างดึงมาแสดงตอน 115)
     await db.query(`UPDATE tb_asset_lists_detail SET asset_status = 101, is_status = '106', updated_at = ? WHERE refID = ? AND asset_code = ?`, [now, item.refID, assetCode]);
 
-    // ✅ 2. Insert Detail ประวัติใหม่ระบุ Action เป็น 'ยกเลิกจ่ายออก'
+    // ✅ 2. Insert Detail ประวัติใหม่ระบุ Action เป็น 'ยกเลิกใช้งาน'
     const itemSnapshot = {
       ...item,
       is_status: '106',
       asset_status: 100,
-      asset_action: 'ยกเลิกจ่ายออก',
+      asset_action: 'ยกเลิกใช้งาน',
       updated_at: now,
       scan_at: now
     };
@@ -479,7 +479,7 @@ async function returnToStock(ids) {
         ...item,
         is_status: '106',
         asset_status: 100,
-        asset_action: 'ยกเลิกจ่ายออก', // กำหนด Action ตรงนี้
+        asset_action: 'ยกเลิกใช้งาน', // กำหนด Action ตรงนี้
         updated_at: now,
         scan_at: now
       };
@@ -594,7 +594,7 @@ async function confirmOutput(draft_id, user_id) {
             t.asset_dmg_004, t.asset_dmg_005, t.asset_dmg_006,
             t.asset_remark, t.asset_usedfor, t.asset_brand, t.asset_feature,
             t.asset_supplier_name, t.label_register, t.partCode, t.print_status,
-            t.asset_status, 'ยืนยันจ่ายออก', '115', 
+            t.asset_status, 'ยืนยันใช้งาน', '115', 
             t.create_date, t.created_by, t.created_at,
             ?, ?, t.scan_by, t.scan_at, 
             b.origin, b.destination, b.destination,

@@ -33,7 +33,7 @@ const getOverdueStatusText = (record) => {
     if (record.asset_status == 147) return `แจ้งซ่อมแล้ว (${diffDays} วัน)`;
     if (diffDays > 7 && record.asset_status != 100) return `เลยกำหนดส่งคืน (${diffDays} วัน)`;
     if (record.asset_status == 100) return 'คงคลัง';
-    return `จ่ายออกแล้ว (${diffDays} วัน)`;
+    return `ใช้งานแล้ว (${diffDays} วัน)`;
 };
 
 const getNonMovingStatusText = (record) => {
@@ -118,7 +118,7 @@ function BoxStatus() {
         'รหัสทรัพย์สิน': record.asset_code || '-',
         'สถานะทรัพย์สิน': record.asset_status_name || '-',
         'ปัจจุบันอยู่ที่': getCurrentAddressText(record),
-        'ต้นทางที่จ่ายออก': record.asset_origin || '-',
+        'ต้นทางที่ใช้งาน': record.asset_origin || '-',
         'ปลายทางที่ใช้งาน': record.asset_destination || '-',
         'วันที่ใช้งานล่าสุด': getFormattedScanAt(record.scan_at),
         'สถานะการส่งคืน': getOverdueStatusText(record),
@@ -176,7 +176,7 @@ function BoxStatus() {
             render: (_, record) => <span className="text-gray-700">{getCurrentAddressText(record)}</span>
         },
         {
-            title: 'ต้นทางที่จ่ายออก',
+            title: 'ต้นทางที่ใช้งาน',
             dataIndex: 'asset_origin',
             key: 'asset_origin',
             width: 160,

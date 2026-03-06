@@ -6,14 +6,14 @@ const dayjs = require('dayjs');
 async function initBooking(req, res, next) {
   try {
     // รับค่า objective จาก Frontend หรือกำหนด Default
-    const { draft_id, objective = 'ทำรายการจ่ายออก' } = req.body;
+    const { draft_id, objective = 'ทำรายการใช้งาน' } = req.body;
     const user_id = req.user?.employee_id;
 
     if (!draft_id) throw new Error("Draft ID required");
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการจ่ายออก') {
+    if (objective === 'ทำรายการใช้งาน') {
       booking_type = 'RF';
     }
 
@@ -70,7 +70,7 @@ async function confirmBooking(req, res, next) {
   } catch (err) { next(err); }
 }
 
-// ✅ ใหม่: จ่ายออก (Finalize)
+// ✅ ใหม่: ใช้งาน (Finalize)
 async function finalizeBooking(req, res, next) {
   try {
     // รับค่า booking_remark, origin, destination เพิ่มเข้ามา

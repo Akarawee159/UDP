@@ -226,7 +226,7 @@ function RegisterAsset() {
                 //     cellClass: "text-center cell-blue-bold cursor-pointer"
                 // },
                 {
-                    headerName: 'จ่ายออก', // Status 101
+                    headerName: 'ใช้งาน', // Status 101
                     width: 100,
                     field: 'count_use',
                     cellRenderer: p => valUnit(p.value),

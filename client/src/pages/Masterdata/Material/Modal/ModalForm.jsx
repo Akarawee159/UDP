@@ -106,7 +106,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
             }
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลวัสดุไม่สำเร็จ');
+            message.error('ดึงข้อมูลไม่สำเร็จ');
         } finally {
             setFetching(false);
         }
@@ -368,10 +368,10 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                         </div>
                         <div>
                             <Title level={4} style={{ margin: 0, fontWeight: 700 }} className="text-slate-800 text-lg md:text-xl">
-                                {isEditMode ? 'แก้ไขข้อมูลวัสดุ' : 'เพิ่มวัสดุใหม่'}
+                                {isEditMode ? 'แก้ไขข้อมูล' : 'เพิ่มใหม่'}
                             </Title>
                             <Text className="text-slate-500 text-xs md:text-sm">
-                                {isEditMode ? 'อัปเดตรายละเอียดและสถานะของวัสดุ' : 'กรอกข้อมูลเพื่อสร้างรายการวัสดุใหม่ในระบบ'}
+                                {isEditMode ? 'อัปเดตรายละเอียดและสถานะของ' : 'กรอกข้อมูลเพื่อสร้างรายการใหม่ในระบบ'}
                             </Text>
                         </div>
                     </div>
@@ -465,7 +465,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </div>
                                         <div className={`text-xs ${isStatusActive ? 'text-green-600' : 'text-red-600'} opacity-80`}>
-                                            {isStatusActive ? 'วัสดุนี้จะแสดงในระบบ' : 'ซ่อนวัสดุนี้จากระบบชั่วคราว'}
+                                            {isStatusActive ? 'นี้จะแสดงในระบบ' : 'ซ่อนนี้จากระบบชั่วคราว'}
                                         </div>
                                     </div>
 
@@ -481,7 +481,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                     <Row gutter={[16, 16]}>
                                         <Col xs={24} sm={12}>
                                             <Form.Item
-                                                label={<span className="font-semibold text-slate-700">รหัสวัสดุ</span>}
+                                                label={<span className="font-semibold text-slate-700">รหัส</span>}
                                                 name="material_code"
                                                 rules={[{ required: true, message: 'ระบุรหัส' }, { validator: validateCode }]}
                                                 hasFeedback
@@ -492,7 +492,7 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                             </Form.Item>
                                         </Col>
                                         <Col xs={24} sm={12}>
-                                            <Form.Item label={<span className="font-semibold text-slate-700">ชื่อวัสดุ</span>} name="material_name" rules={[{ required: true, message: 'ระบุชื่อวัสดุ' }]} className="mb-1">
+                                            <Form.Item label={<span className="font-semibold text-slate-700">ชื่อ</span>} name="material_name" rules={[{ required: true, message: 'ระบุชื่อ' }]} className="mb-1">
                                                 <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="เช่น กล่องกระดาษ A4" />
                                             </Form.Item>
                                         </Col>

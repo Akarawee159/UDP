@@ -107,7 +107,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     form.setFieldsValue({
                         draft_id: booking.draft_id,
                         refID: booking.refID,
-                        objective: 'ทำรายการจ่ายออก',
+                        objective: 'ทำรายการใช้งาน',
                         attendees: booking.attendees || (assets || []).length,
                         booking_remark: booking.booking_remark,
                         origin: booking.origin,
@@ -118,7 +118,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 const newId = generateDraftId();
                 await api.post('/smartpackage/systemout/init-booking', {
                     draft_id: newId,
-                    objective: 'ทำรายการจ่ายออก'
+                    objective: 'ทำรายการใช้งาน'
                 });
 
                 setDraftId(newId);
@@ -129,7 +129,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
-                    objective: 'ทำรายการจ่ายออก',
+                    objective: 'ทำรายการใช้งาน',
                     attendees: 0
                 });
             }
@@ -171,9 +171,9 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     return;
                 }
 
-                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันจ่ายออก" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
+                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันใช้งาน" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
                 if (action === 'finalized' || action === 'output_confirmed') {
-                    message.success('รายการนี้ถูกยืนยันการจ่ายออกเรียบร้อยแล้ว');
+                    message.success('รายการนี้ถูกยืนยันการใช้งานเรียบร้อยแล้ว');
                     onCancel(); // สั่งปิด Modal ทันที
                     return;     // จบการทำงาน ไม่ต้องไป Refresh Data ต่อ
                 }
@@ -236,10 +236,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 const newRef = res.data.data.refID;
                 setRefID(newRef);
                 form.setFieldsValue({ refID: newRef });
-                message.success('สร้างเลขที่จ่ายออกเรียบร้อย');
+                message.success('สร้างเลขที่ใช้งานเรียบร้อย');
             }
         } catch (err) {
-            message.error('สร้างเลขที่จ่ายออกไม่สำเร็จ');
+            message.error('สร้างเลขที่ใช้งานไม่สำเร็จ');
         }
     };
 
@@ -263,12 +263,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         }
     };
 
-    // ปุ่มแก้ไขข้อมูลจ่ายออก (เปลี่ยนสถานะเป็น 116)
+    // ปุ่มแก้ไขข้อมูลใช้งาน (เปลี่ยนสถานะเป็น 116)
     const handleEditHeader = async () => {
         try {
             await api.post('/smartpackage/systemout/edit-header', { draft_id: draftId });
             setBookingStatus('116');
-            message.success('ปลดล็อคข้อมูลจ่ายออกเพื่อแก้ไข');
+            message.success('ปลดล็อคข้อมูลใช้งานเพื่อแก้ไข');
         } catch (err) {
             message.error('เกิดข้อผิดพลาด');
         }
@@ -279,14 +279,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         try {
             values = await form.validateFields(['origin', 'destination', 'booking_remark']);
         } catch (error) {
-            message.error('กรุณาระบุสถานที่จ่ายออกและปลายทางให้ครบถ้วน');
+            message.error('กรุณาระบุสถานที่ใช้งานและปลายทางให้ครบถ้วน');
             return;
         }
 
         modal.confirm({
-            title: 'ยืนยันการจ่ายออก',
-            content: 'เมื่อยืนยันแล้วระบบจะบันทึกสถานะการจ่ายออก',
-            cancelText: 'ยืนยันจ่ายออก',
+            title: 'ยืนยันการใช้งาน',
+            content: 'เมื่อยืนยันแล้วระบบจะบันทึกสถานะการใช้งาน',
+            cancelText: 'ยืนยันใช้งาน',
             cancelButtonProps: { type: 'primary', className: '!bg-green-600 hover:!bg-green-500 border-green-600' },
             okText: 'ยกเลิก',
             onCancel: async () => {
@@ -298,7 +298,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                         booking_remark: values.booking_remark
                     });
                     setBookingStatus('115');
-                    message.success('จ่ายออกเรียบร้อย');
+                    message.success('ใช้งานเรียบร้อย');
                 } catch (e) {
                     message.error('Failed: ' + (e.response?.data?.message || e.message));
                     return Promise.reject();
@@ -339,15 +339,15 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const handleCancelBooking = async () => {
         if (scannedList.length > 0) {
             modal.warning({
-                title: 'ไม่สามารถยกเลิกจ่ายออกได้',
-                content: 'กรุณา "ยกเลิกจ่ายออก" รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกจ่ายออก',
+                title: 'ไม่สามารถยกเลิกใช้งานได้',
+                content: 'กรุณา "ยกเลิกใช้งาน" รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใช้งาน',
                 okText: 'รับทราบ'
             });
             return;
         }
         modal.confirm({
-            title: 'ยืนยันการยกเลิกจ่ายออก',
-            content: 'ต้องการยกเลิกจ่ายออกนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
+            title: 'ยืนยันการยกเลิกใช้งาน',
+            content: 'ต้องการยกเลิกใช้งานนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
             cancelText: 'ยืนยัน',
             cancelButtonProps: { type: 'primary', danger: true },
             okText: 'ปิด',
@@ -355,7 +355,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemout/cancel', { draft_id: draftId });
-                    message.success('ยกเลิกจ่ายออกเรียบร้อย');
+                    message.success('ยกเลิกใช้งานเรียบร้อย');
                     onCancel();
                 } catch (err) {
                     message.error(err.response?.data?.message || 'ยกเลิกไม่สำเร็จ');
@@ -372,20 +372,20 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 ids: selectedIds,
                 draft_id: draftId
             });
-            message.success('ยกเลิกจ่ายออกเรียบร้อย');
+            message.success('ยกเลิกใช้งานเรียบร้อย');
             setSelectedIds([]);
         } catch (err) { message.error('Error'); }
     };
 
     const handleModalClose = async () => {
-        // ✅ กรณี Status 114 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันจ่ายออกทันทีเมื่อกดปิด
+        // ✅ กรณี Status 114 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันใช้งานทันทีเมื่อกดปิด
         if (bookingStatus === '114') {
             // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน
             let values;
             try {
                 values = await form.validateFields(['origin', 'destination', 'booking_remark']);
             } catch (error) {
-                message.error('กรุณาระบุสถานที่จ่ายออกและปลายทางให้ครบถ้วน ก่อนทำการปิดหน้าต่าง');
+                message.error('กรุณาระบุสถานที่ใช้งานและปลายทางให้ครบถ้วน ก่อนทำการปิดหน้าต่าง');
                 return; // หยุดการทำงาน ไม่ให้ปิดหน้าต่างถ้าข้อมูลไม่ครบ
             }
 
@@ -399,7 +399,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 });
 
                 setBookingStatus('112');
-                message.success('บันทึกและจ่ายออกเรียบร้อย');
+                message.success('บันทึกและใช้งานเรียบร้อย');
 
                 // ✅ เมื่อสำเร็จ ให้สั่งปิด Modal หลัก
                 onCancel();
@@ -421,7 +421,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (bookingStatus === '115') {
             modal.warning({
                 title: 'ไม่สามารถทำรายการได้',
-                content: 'นี้จ่ายออกเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
+                content: 'นี้ใช้งานเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
                 okText: 'รับทราบ',
                 onOk: () => processingRef.current = false
             });
@@ -439,7 +439,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (bookingStatus === '110') {
             modal.warning({
                 title: 'แจ้งเตือน',
-                content: 'กรุณาระบุ สถานที่จ่ายออก-ไปยังปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
+                content: 'กรุณาระบุ สถานที่ต้นทาง-ไปยังปลายทาง และกดปุ่ม "บันทึกข้อมูล" ก่อนทำการสแกน',
                 okText: 'รับทราบ',
                 onOk: () => processingRef.current = false
             });
@@ -519,7 +519,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [open, draftId, refID, bookingStatus]);
 
-    // ปิด Form (Header) ถ้าสถานะเป็น 111 (บันทึกแล้วพร้อมสแกน) หรือ 115 (จ่ายออกแล้ว)
+    // ปิด Form (Header) ถ้าสถานะเป็น 111 (บันทึกแล้วพร้อมสแกน) หรือ 115 (ใช้งานแล้ว)
     const isEditingDisabled = bookingStatus === '111' || bookingStatus === '115';
     // ปิดตาราง (Cart) ห้ามติ๊กคืนของ ถ้าเป็น 110, 116 หรือ 115
     const isCartDisabled = bookingStatus === '110' || bookingStatus === '116' || bookingStatus === '115';
@@ -697,7 +697,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
     return (
         <Modal
-            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการจ่ายออก' : 'สร้างรายการจ่ายออก (System Out)'}</Title>}
+            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการใช้งาน' : 'สร้างรายการใช้งาน (System Out)'}</Title>}
             open={open}
             onCancel={handleModalClose}
             width={{ xs: '100%', sm: '95%' }} // ให้เต็มจอในมือถือ ย่อลงในจอใหญ่
@@ -942,11 +942,11 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
                 <Row gutter={[16, 16]} className="flex-1">
                     <Col xs={24} lg={8} xl={7}>
-                        <Card title={<span className="text-sm sm:text-base">ข้อมูลจ่ายออก</span>} className="h-full shadow-sm rounded-md" size="small">
+                        <Card title={<span className="text-sm sm:text-base">ข้อมูลใช้งาน</span>} className="h-full shadow-sm rounded-md" size="small">
                             <Form layout="vertical" form={form}>
 
-                                {/* สถานที่จ่ายออก */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">สถานที่จ่ายออก</span>} name="origin" rules={[{ required: true }]}>
+                                {/* สถานที่ต้นทาง */}
+                                <Form.Item label={<span className="text-xs sm:text-sm">สถานที่ต้นทาง</span>} name="origin" rules={[{ required: true }]}>
                                     <Select
                                         showSearch // เปิดให้พิมพ์ค้นหาได้
                                         optionFilterProp="label" // ให้ค้นหาจาก label (เราจะรวม code + name ไว้ในนี้)
@@ -993,7 +993,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             </Col>
                                             <Col xs={24} sm={10} lg={24} xl={10}>
                                                 <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base">
-                                                    ยกเลิกจ่ายออก
+                                                    ยกเลิกใช้งาน
                                                 </Button>
                                             </Col>
                                         </>
@@ -1004,7 +1004,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         <>
                                             <Col xs={24} sm={12} lg={24} xl={12}>
                                                 <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="!bg-green-600 hover:!bg-green-500 rounded-md px-0 text-xs sm:text-sm" disabled={scannedList.length === 0}>
-                                                    ยืนยันการจ่ายออก
+                                                    ยืนยันการใช้งาน
                                                 </Button>
                                             </Col>
                                             <Col xs={24} sm={12} lg={24} xl={12}>
@@ -1014,7 +1014,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             </Col>
                                             <Col span={24}>
                                                 <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base mt-1">
-                                                    ยกเลิกจ่ายออก
+                                                    ยกเลิกใช้งาน
                                                 </Button>
                                             </Col>
                                         </>
@@ -1033,7 +1033,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     {bookingStatus === '114' && (
                                         <Col span={24}>
                                             <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500 rounded-md text-sm sm:text-base">
-                                                แก้ไขแล้ว/ยืนยันจ่ายออก
+                                                แก้ไขแล้ว/ยืนยันใช้งาน
                                             </Button>
                                         </Col>
                                     )}
@@ -1056,7 +1056,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                             {/* ส่วนหัวตาราง */}
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-2 gap-2 sm:gap-0">
                                 <Title level={5} className="m-0 text-base sm:text-lg">รายการในตะกร้า ({scannedList.length})</Title>
-                                {/* ล็อคปุ่มยกเลิกจ่ายออกถ้าเป็น 115 หรือ 112 */}
+                                {/* ล็อคปุ่มยกเลิกใช้งานถ้าเป็น 115 หรือ 112 */}
                                 {!isFinalized && (
                                     <Button
                                         danger
@@ -1065,7 +1065,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                         disabled={selectedIds.length === 0}
                                         className="w-full sm:w-auto text-xs sm:text-sm"
                                     >
-                                        ยกเลิกจ่ายออก ({selectedIds.length})
+                                        ยกเลิกใช้งาน ({selectedIds.length})
                                     </Button>
                                 )}
                             </div>
@@ -1088,7 +1088,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                             <Tag color="orange" className="text-xs sm:text-sm">Status: Unlocked (114)</Tag>
                                         </div>
                                         <div className="mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400">
-                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "จ่ายออก" โดยอัตโนมัติ
+                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "ใช้งาน" โดยอัตโนมัติ
                                         </div>
                                     </div>
                                 ) : !hasScannedItems ? (
@@ -1102,11 +1102,11 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                 </div>
                                                 <div>
                                                     <Text strong className={`text-sm sm:text-base ${bookingStatus !== '110' ? 'text-green-700' : 'text-gray-600'}`}>
-                                                        {bookingStatus !== '110' ? 'บันทึกข้อมูลและสร้างเลขที่จ่ายออกแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
+                                                        {bookingStatus !== '110' ? 'บันทึกข้อมูลและสร้างเลขที่ใช้งานแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
                                                     </Text>
                                                     <br className="hidden sm:block" />
                                                     <Text type="secondary" className="text-xs sm:text-sm">
-                                                        {bookingStatus !== '110' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่จ่ายออกอัตโนมัติ'}
+                                                        {bookingStatus !== '110' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่ใช้งานอัตโนมัติ'}
                                                     </Text>
                                                 </div>
                                             </div>

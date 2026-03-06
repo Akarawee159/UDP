@@ -49,7 +49,7 @@ function SystemOut() {
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลรายการจ่ายออกไม่สำเร็จ');
+            message.error('ดึงข้อมูลรายการใช้งานไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -129,7 +129,7 @@ function SystemOut() {
         try {
             setLoading(true);
             await api.post('/smartpackage/systemout/confirm-output', { draft_id });
-            message.success('ยืนยันการจ่ายออกสำเร็จ');
+            message.success('ยืนยันการใช้งานสำเร็จ');
             fetchData();
         } catch (err) {
             console.error(err);
@@ -157,7 +157,7 @@ function SystemOut() {
             dragDisabled: true,
             render: (_, record) => {
                 // ✅ แสดงไอคอนเมื่อสถานะเป็น 115 ตามเงื่อนไขข้อ 9
-                if (String(record.is_status) === '115' || record.is_status_name === 'จ่ายออกเรียบร้อย') {
+                if (String(record.is_status) === '115' || record.is_status_name === 'ใช้งานเรียบร้อย') {
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
                             <CheckCircleOutlined className="text-green-600 text-2xl" />
@@ -194,7 +194,7 @@ function SystemOut() {
             )
         },
         {
-            title: 'สถานที่จ่ายออก',
+            title: 'สถานที่ใช้งาน',
             dataIndex: 'origin',
             key: 'origin',
             width: 160,
@@ -320,7 +320,7 @@ function SystemOut() {
                                         onClick={handleCreate}
                                         className="bg-green-600 hover:bg-green-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
                                     >
-                                        สร้างรายการจ่ายออก
+                                        สร้างรายการใช้งาน
                                     </Button>
 
                                     <div className="flex items-center gap-2 px-2 h-9 border border-gray-200 rounded-md bg-white">
