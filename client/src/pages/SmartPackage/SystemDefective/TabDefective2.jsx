@@ -1,20 +1,19 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { App, Button, Input, Tag, Modal } from 'antd'; // ✅ นำเข้า Modal
-import { DownloadOutlined, SearchOutlined, ExportOutlined } from '@ant-design/icons';
+import { DownloadOutlined, SearchOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import DraggableTable from '../../../components/antdtable/DraggableTable';
 import { getSocket } from '../../../socketClient';
 
-function TabDefective() {
+function TabDefective2() {
     const { message } = App.useApp();
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState([]);
     const [selectedRowKeys, setSelectedRowKeys] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // ✅ State สำหรับควบคุม Modal ยืนยันของทั้ง 2 ปุ่ม
-    const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
-    const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+    // ✅ State สำหรับควบคุม Modal ยืนยันการทำคืน
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     // State สำหรับ Pagination และความสูงของตาราง
     const [page, setPage] = useState({ current: 1, pageSize: 50 });
@@ -31,7 +30,7 @@ function TabDefective() {
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await api.get('/smartpackage/systemdefective/defective-items');
+            const res = await api.get('/smartpackage/systemdefective/defective-checkout-items');
             setData(res.data?.data || []);
         } catch (err) {
             message.error('ดึงข้อมูลรายการชำรุดล้มเหลว');
@@ -53,15 +52,12 @@ function TabDefective() {
             const action = payload?.action;
 
             const acts = [
-                'finalized',
-                'receive_stock',
                 'checkout_defective',
-                'return_defective',
-                'return'
+                'return_defective'
             ];
 
             if (acts.includes(action)) {
-                console.log("Socket Refreshing TabDefective:", action);
+                console.log("Socket Refreshing TabDefective2:", action);
                 fetchData();
             }
         };
@@ -70,49 +66,28 @@ function TabDefective() {
         return () => window.removeEventListener('hrms:systemdefective-update', onUpdate);
     }, [fetchData]);
 
+    // ✅ ปรับฟังก์ชันให้รับเฉพาะการทำงาน API และปิด Modal เมื่อเสร็จ
     const handleReceiveStock = async () => {
         if (selectedRowKeys.length === 0) {
-            setIsReceiveModalOpen(false);
-            return message.warning('กรุณาเลือกรายการที่ต้องการรับเข้าคลัง');
+            setIsConfirmModalOpen(false);
+            return message.warning('กรุณาเลือกรายการที่ต้องการทำคืนชำรุด');
         }
         try {
             setLoading(true);
-            await api.post('/smartpackage/systemdefective/receive-stock', {
+            await api.post('/smartpackage/systemdefective/return-defective', {
                 asset_codes: selectedRowKeys
             });
-            message.success('อัปเดตรับเข้าคลังสำเร็จ');
-            setSelectedRowKeys([]); // เคลียร์ Checkbox
-            setIsReceiveModalOpen(false); // ✅ ปิด Modal
-            fetchData(); // รีเฟรชตาราง
-        } catch (err) {
-            message.error('รับเข้าคลังล้มเหลว');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCheckoutDefective = async () => {
-        if (selectedRowKeys.length === 0) {
-            setIsCheckoutModalOpen(false);
-            return message.warning('กรุณาเลือกรายการที่ต้องการแจ้งจ่ายออก');
-        }
-        try {
-            setLoading(true);
-            await api.post('/smartpackage/systemdefective/checkout-defective', {
-                asset_codes: selectedRowKeys
-            });
-            message.success('แจ้งจ่ายออกสำเร็จ');
+            message.success('อัปเดตทำคืนชำรุดสำเร็จ');
             setSelectedRowKeys([]);
-            setIsCheckoutModalOpen(false); // ✅ ปิด Modal
+            setIsConfirmModalOpen(false); // ✅ ปิด Modal
             fetchData();
         } catch (err) {
-            message.error('แจ้งจ่ายออกล้มเหลว');
+            message.error('ทำคืนชำรุดล้มเหลว');
         } finally {
             setLoading(false);
         }
     };
 
-    // กรองข้อมูลตามช่องค้นหา
     const filteredData = useMemo(() => {
         if (!searchTerm) return data;
         const term = searchTerm.toLowerCase();
@@ -123,7 +98,6 @@ function TabDefective() {
         );
     }, [data, searchTerm]);
 
-    // Columns รูปแบบเดียวกับที่ใช้ใน DraggableTable
     const baseColumns = useMemo(() => [
         {
             title: 'ลำดับ',
@@ -134,7 +108,7 @@ function TabDefective() {
             render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
         },
         {
-            title: 'รหัสทรัพย์สิน',
+            title: 'รหัสบรรจุภัณฑ์',
             dataIndex: 'asset_code',
             key: 'asset_code',
             width: 200,
@@ -150,14 +124,12 @@ function TabDefective() {
                 if (!val) return '-';
                 const date = new Date(val);
 
-                // จัดรูปแบบวันที่ เป็น DD/MM/YYYY (พ.ศ.)
                 const dateStr = date.toLocaleDateString('th-TH', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric'
                 });
 
-                // จัดรูปแบบเวลา เป็น HH:mm แบบ 24 ชม.
                 const timeStr = date.toLocaleTimeString('th-TH', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -179,7 +151,7 @@ function TabDefective() {
             key: 'status',
             width: 150,
             align: 'center',
-            render: (val) => <Tag color="error" className="w-full text-center m-0 border-0">{val || 'ชำรุด'}</Tag>
+            render: (val) => <Tag color="warning" className="w-full text-center m-0 border-0">{val || 'รอทำคืนชำรุด'}</Tag>
         }
     ], [page]);
 
@@ -194,7 +166,6 @@ function TabDefective() {
                 // ✅ เอา - 60 ออก ใช้ tableY ล้วนๆ เหมือนหน้าหลัก
                 scroll={{ x: 'max-content', y: tableY }}
 
-                // ตั้งค่า Pagination ให้เหมือนหน้าหลัก
                 pagination={{
                     current: page.current,
                     pageSize: page.pageSize,
@@ -205,20 +176,18 @@ function TabDefective() {
                 }}
                 onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
 
-                // เปิดใช้งาน Checkbox ด้านหน้า
                 rowSelection={{
                     selectedRowKeys,
                     onChange: (keys) => setSelectedRowKeys(keys)
                 }}
 
-                // Render Toolbar ให้มี UI ตรงกับหน้า SystemDefective
                 renderToolbar={(ColumnVisibility) => (
                     <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
 
                             <Input
                                 prefix={<SearchOutlined className="text-gray-400" />}
-                                placeholder="ค้นหา รหัสทรัพย์สิน, RefID..."
+                                placeholder="ค้นหา รหัสบรรจุภัณฑ์, RefID..."
                                 allowClear
                                 variant="borderless"
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -231,25 +200,14 @@ function TabDefective() {
                                 <Button
                                     type="primary"
                                     icon={<DownloadOutlined />}
-                                    className="bg-green-600 hover:!bg-green-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
-                                    onClick={() => setIsReceiveModalOpen(true)} // ✅ เปลี่ยนไปเปิด Modal 1
+                                    className="bg-orange-600 hover:!bg-orange-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
+                                    onClick={() => setIsConfirmModalOpen(true)} // ✅ เปลี่ยนให้ไปเปิด Modal แทน
                                     disabled={selectedRowKeys.length === 0}
                                     loading={loading}
                                 >
-                                    ซ่อมแล้ว/รับเข้าคลัง ({selectedRowKeys.length})
-                                </Button>
-                                <Button
-                                    type="primary"
-                                    icon={<ExportOutlined />}
-                                    className="bg-blue-600 hover:!bg-blue-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
-                                    onClick={() => setIsCheckoutModalOpen(true)} // ✅ เปลี่ยนไปเปิด Modal 2
-                                    disabled={selectedRowKeys.length === 0}
-                                    loading={loading}
-                                >
-                                    แจ้งจ่ายออก ({selectedRowKeys.length})
+                                    ทำคืนชำรุด ({selectedRowKeys.length})
                                 </Button>
 
-                                {/* ปุ่มซ่อน/แสดงคอลัมน์ */}
                                 {ColumnVisibility}
                             </div>
                         </div>
@@ -257,16 +215,17 @@ function TabDefective() {
                 )}
             />
 
-            {/* ✅ Modal 1: ยืนยันซ่อมแล้ว/รับเข้าคลัง */}
+            {/* ✅ คอมโพเนนต์ Modal สำหรัยืนยันการทำรายการ */}
             <Modal
-                title="ยืนยันการรับเข้าคลัง"
-                open={isReceiveModalOpen}
-                onCancel={() => setIsReceiveModalOpen(false)}
+                title="ยืนยันการทำคืนชำรุด"
+                open={isConfirmModalOpen}
+                onCancel={() => setIsConfirmModalOpen(false)}
+                // ✅ ใช้ array ใน footer เพื่อจัดเรียงปุ่ม [ ยืนยัน, ปิด ] ตามลำดับจากซ้ายไปขวา
                 footer={[
                     <Button
                         key="submit"
                         type="primary"
-                        className="bg-green-600 hover:!bg-green-500 border-none"
+                        className="bg-orange-600 hover:!bg-orange-500 border-none"
                         loading={loading}
                         onClick={handleReceiveStock}
                     >
@@ -274,44 +233,17 @@ function TabDefective() {
                     </Button>,
                     <Button
                         key="back"
-                        onClick={() => setIsReceiveModalOpen(false)}
+                        onClick={() => setIsConfirmModalOpen(false)}
                         disabled={loading}
                     >
                         ปิด
                     </Button>
                 ]}
             >
-                <p>คุณต้องการอัปเดตสถานะ <strong>"ซ่อมแล้ว/รับเข้าคลัง"</strong> จำนวน <strong>{selectedRowKeys.length}</strong> รายการ ใช่หรือไม่?</p>
-            </Modal>
-
-            {/* ✅ Modal 2: ยืนยันแจ้งจ่ายออก */}
-            <Modal
-                title="ยืนยันการแจ้งจ่ายออก"
-                open={isCheckoutModalOpen}
-                onCancel={() => setIsCheckoutModalOpen(false)}
-                footer={[
-                    <Button
-                        key="submit"
-                        type="primary"
-                        className="bg-blue-600 hover:!bg-blue-500 border-none"
-                        loading={loading}
-                        onClick={handleCheckoutDefective}
-                    >
-                        ยืนยัน
-                    </Button>,
-                    <Button
-                        key="back"
-                        onClick={() => setIsCheckoutModalOpen(false)}
-                        disabled={loading}
-                    >
-                        ปิด
-                    </Button>
-                ]}
-            >
-                <p>คุณต้องการ <strong>"แจ้งจ่ายออก"</strong> จำนวน <strong>{selectedRowKeys.length}</strong> รายการ ใช่หรือไม่?</p>
+                <p>คุณต้องการทำคืนชำรุดจำนวน <strong>{selectedRowKeys.length}</strong> รายการ ใช่หรือไม่?</p>
             </Modal>
         </div>
     );
 }
 
-export default TabDefective;
+export default TabDefective2;

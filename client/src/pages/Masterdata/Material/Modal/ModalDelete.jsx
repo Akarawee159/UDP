@@ -62,7 +62,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
               <DeleteOutlined />
             </div>
             <div>
-              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบวัสดุ</h3>
+              <h3 className="text-lg font-bold m-0 leading-tight">ยืนยันการลบ</h3>
               <span className="text-xs text-red-600/70">การดำเนินการนี้ไม่สามารถกู้คืนได้</span>
             </div>
           </div>
@@ -82,7 +82,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
             <div>
               <div className="font-bold text-orange-800 text-sm mb-1">คำเตือน: การลบข้อมูลถาวร</div>
               <p className="text-xs text-orange-700/80 leading-relaxed">
-                คุณกำลังจะลบข้อมูลวัสดุนี้ออกจากระบบ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ
+                คุณกำลังจะลบข้อมูลนี้ออกจากระบบ กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ
               </p>
             </div>
           </div>
@@ -97,7 +97,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                     <ApartmentOutlined className="text-xl" />
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">ชื่อวัสดุ</div>
+                    <div className="text-xs text-gray-400 mb-1">ชื่อ</div>
                     <div className="font-bold text-gray-800 text-base leading-tight">{record.material_name || '-'}</div>
                   </div>
                 </div>
@@ -105,7 +105,7 @@ function ModalDelete({ open, record, onClose, onSuccess }) {
                 {/* Code Grid */}
                 <div className="bg-gray-50/50 p-2 rounded-lg border border-gray-100">
                   <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
-                    <BarcodeOutlined /> รหัสวัสดุ
+                    <BarcodeOutlined /> รหัส
                   </div>
                   <div className="font-mono text-sm font-semibold text-emerald-700">
                     {record.material_code || '-'}

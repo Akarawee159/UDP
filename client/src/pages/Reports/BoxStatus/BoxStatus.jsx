@@ -99,6 +99,7 @@ function BoxStatus() {
             (r.asset_origin || '').toLowerCase().includes(term) ||
             (r.doc_no || '').toLowerCase().includes(term) ||
             (r.asset_status_name || '').toLowerCase().includes(term) ||
+            (r.scan_by_name || '').toLowerCase().includes(term) ||
             getCurrentAddressText(r).toLowerCase().includes(term) ||     // ค้นหาปัจจุบันอยู่ที่
             getFormattedScanAt(r.scan_at).toLowerCase().includes(term) ||  // ค้นหาวันที่ใช้งานล่าสุด
             getNonMovingStatusText(r).toLowerCase().includes(term) ||      // ค้นหาสถานะไม่เคลื่อนไหว
@@ -107,32 +108,44 @@ function BoxStatus() {
     }, [data, searchTerm]);
 
     const handleExportExcel = () => {
-    if (filteredData.length === 0) {
-        message.warning('ไม่มีข้อมูลสำหรับ Export');
-        return;
-    }
+        if (filteredData.length === 0) {
+            message.warning('ไม่มีข้อมูลสำหรับ Export');
+            return;
+        }
 
-    // 1. Map ข้อมูลให้อยู่ในรูปแบบที่ต้องการพร้อมชื่อ Column ภาษาไทย
-    const exportPayload = filteredData.map((record, index) => ({
-        'ลำดับ': index + 1,
-        'รหัสทรัพย์สิน': record.asset_code || '-',
-        'สถานะทรัพย์สิน': record.asset_status_name || '-',
-        'ปัจจุบันอยู่ที่': getCurrentAddressText(record),
-        'ต้นทางที่ใช้งาน': record.asset_origin || '-',
-        'ปลายทางที่ใช้งาน': record.asset_destination || '-',
-        'วันที่ใช้งานล่าสุด': getFormattedScanAt(record.scan_at),
-        'สถานะการส่งคืน': getOverdueStatusText(record),
-        'สถานะไม่เคลื่อนไหว': getNonMovingStatusText(record)
-    }));
+        // 1. Map ข้อมูลให้อยู่ในรูปแบบที่ต้องการพร้อมชื่อ Column ภาษาไทย
+        const exportPayload = filteredData.map((record, index) => ({
+            'ลำดับ': index + 1,
+            'รหัสทรัพย์สิน': record.asset_code || '-',
+            'สถานะทรัพย์สิน': record.asset_status_name || '-',
+            'ปัจจุบันอยู่ที่': getCurrentAddressText(record),
+            'ต้นทางที่ใช้งาน': record.asset_origin || '-',
+            'ปลายทางที่ใช้งาน': record.asset_destination || '-',
+            'วันที่ดำเนินการ': getFormattedScanAt(record.scan_at),
+            'สถานะการส่งคืน': getOverdueStatusText(record),
+            'สถานะไม่เคลื่อนไหว': getNonMovingStatusText(record),
+            'ความกว้าง': record.asset_width ? `${parseFloat(record.asset_width).toFixed(2)} ${record.asset_width_unit || ''}`.trim() : '-',
+            'ความยาว': record.asset_length ? `${parseFloat(record.asset_length).toFixed(2)} ${record.asset_length_unit || ''}`.trim() : '-',
+            'ความสูง': record.asset_height ? `${parseFloat(record.asset_height).toFixed(2)} ${record.asset_height_unit || ''}`.trim() : '-',
+            // 'สถานะ': record.is_status_name || record.is_status || '-',
+            'รหัส': record.partCode || '-',
+            'หมายเลขล็อต': record.asset_lot || '-',
+            'ชื่อ': record.asset_detail || '-',
+            'ประเภท': record.asset_type || '-',
+            'เลขที่เอกสาร': record.doc_no || '-',
+            'ใช้สำหรับ': record.asset_usedfor || '-',
+            'แบรนด์': record.asset_brand || '-',
+            'คุณสมบัติ': record.asset_feature || '-'
+        }));
 
-    // 2. สร้าง Worksheet และ Workbook
-    const worksheet = XLSX.utils.json_to_sheet(exportPayload);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Box Status");
+        // 2. สร้าง Worksheet และ Workbook
+        const worksheet = XLSX.utils.json_to_sheet(exportPayload);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Box Status");
 
-    // 3. สั่งโหลดไฟล์
-    XLSX.writeFile(workbook, `BoxStatus_Report_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`);
-};
+        // 3. สั่งโหลดไฟล์
+        XLSX.writeFile(workbook, `BoxStatus_Report_${dayjs().format('YYYYMMDD_HHmm')}.xlsx`);
+    };
 
     // ✅ รูปแบบ Columns ของ DraggableTable พร้อม Filters ในทุกคอลัมน์
     const baseColumns = useMemo(() => [
@@ -141,7 +154,7 @@ function BoxStatus() {
             key: 'index',
             width: 70,
             align: 'center',
-            dragDisabled: true, 
+            dragDisabled: true,
             render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
         },
         {
@@ -157,7 +170,7 @@ function BoxStatus() {
             title: 'สถานะทรัพย์สิน',
             dataIndex: 'asset_status_name',
             key: 'asset_status_name',
-            width: 150,
+            width: 180,
             align: 'center',
             filters: [...new Set(data.map(r => r.asset_status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
             onFilter: (value, record) => record.asset_status_name === value,
@@ -168,18 +181,10 @@ function BoxStatus() {
             )
         },
         {
-            title: 'ปัจจุบันอยู่ที่',
-            key: 'current_address',
-            width: 160,
-            filters: [...new Set(data.map(r => getCurrentAddressText(r)))].map(v => ({ text: v, value: v })),
-            onFilter: (value, record) => getCurrentAddressText(record) === value,
-            render: (_, record) => <span className="text-gray-700">{getCurrentAddressText(record)}</span>
-        },
-        {
             title: 'ต้นทางที่ใช้งาน',
             dataIndex: 'asset_origin',
             key: 'asset_origin',
-            width: 160,
+            width: 170,
             filters: [...new Set(data.map(r => r.asset_origin || '-'))].map(v => ({ text: v, value: v })),
             onFilter: (value, record) => (record.asset_origin || '-') === value,
             render: (val) => <span className="text-gray-600">{val || '-'}</span>
@@ -188,19 +193,36 @@ function BoxStatus() {
             title: 'ปลายทางที่ใช้งาน',
             dataIndex: 'asset_destination',
             key: 'asset_destination',
-            width: 160,
+            width: 170,
             filters: [...new Set(data.map(r => r.asset_destination || '-'))].map(v => ({ text: v, value: v })),
             onFilter: (value, record) => (record.asset_destination || '-') === value,
             render: (val) => <span className="text-gray-600">{val || '-'}</span>
         },
         {
-            title: 'วันที่ใช้งานล่าสุด',
+            title: 'ปัจจุบันอยู่ที่',
+            key: 'current_address',
+            width: 160,
+            filters: [...new Set(data.map(r => getCurrentAddressText(r)))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => getCurrentAddressText(record) === value,
+            render: (_, record) => <span className="text-gray-700">{getCurrentAddressText(record)}</span>
+        },
+        {
+            title: 'วันที่ดำเนินการ',
             key: 'scan_at',
             width: 180,
             align: 'center',
             filters: [...new Set(data.map(r => getFormattedScanAt(r.scan_at)))].map(v => ({ text: v, value: v })),
             onFilter: (value, record) => getFormattedScanAt(record.scan_at) === value,
             render: (_, record) => getFormattedScanAt(record.scan_at)
+        },
+        {
+            title: 'ผู้ดำเนินการ',
+            dataIndex: 'scan_by_name',
+            key: 'scan_by_name',
+            width: 180,
+            filters: [...new Set(data.map(r => r.scan_by_name || '-'))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => (record.scan_by_name || '-') === value,
+            render: (val) => <span className="text-gray-700">{val || '-'}</span>
         },
         {
             title: 'สถานะการส่งคืน',
@@ -231,15 +253,166 @@ function BoxStatus() {
                 const updatedDate = dayjs(record.updated_at);
                 const diffMonth = dayjs().diff(updatedDate, 'month');
 
-                let textClass = "text-gray-500"; 
-                if (diffMonth === 1) textClass = "font-bold text-blue-600"; 
-                else if (diffMonth === 2) textClass = "font-bold text-purple-600"; 
-                else if (diffMonth >= 3) textClass = "font-bold text-orange-500"; 
+                let textClass = "text-gray-500";
+                if (diffMonth === 1) textClass = "font-bold text-blue-600";
+                else if (diffMonth === 2) textClass = "font-bold text-purple-600";
+                else if (diffMonth >= 3) textClass = "font-bold text-orange-500";
 
                 return <span className={textClass}>{text}</span>;
             }
+        },
+        {
+            title: 'ความกว้าง',
+            dataIndex: 'asset_width',
+            key: 'asset_width',
+            width: 160,
+            filters: Array.from(
+                new Set(
+                    data.filter(r => r.asset_width !== null && r.asset_width !== undefined)
+                        .map(r => `${Number(r.asset_width).toFixed(2)} ${r.asset_width_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            onFilter: (value, record) => {
+                if (record.asset_width === null || record.asset_width === undefined) return false;
+                const recordValue = `${Number(record.asset_width).toFixed(2)} ${record.asset_width_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_width) || 0;
+                const unit = record?.asset_width_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        {
+            title: 'ความยาว',
+            dataIndex: 'asset_length',
+            key: 'asset_length',
+            width: 160,
+            filters: Array.from(
+                new Set(
+                    data.filter(r => r.asset_length !== null && r.asset_length !== undefined)
+                        .map(r => `${Number(r.asset_length).toFixed(2)} ${r.asset_length_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            onFilter: (value, record) => {
+                if (record.asset_length === null || record.asset_length === undefined) return false;
+                const recordValue = `${Number(record.asset_length).toFixed(2)} ${record.asset_length_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_length) || 0;
+                const unit = record?.asset_length_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        {
+            title: 'ความสูง',
+            dataIndex: 'asset_height',
+            key: 'asset_height',
+            width: 160,
+            filters: Array.from(
+                new Set(
+                    data.filter(r => r.asset_height !== null && r.asset_height !== undefined)
+                        .map(r => `${Number(r.asset_height).toFixed(2)} ${r.asset_height_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            onFilter: (value, record) => {
+                if (record.asset_height === null || record.asset_height === undefined) return false;
+                const recordValue = `${Number(record.asset_height).toFixed(2)} ${record.asset_height_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_height) || 0;
+                const unit = record?.asset_height_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        // {
+        //     title: 'สถานะ',
+        //     dataIndex: 'is_status',
+        //     key: 'is_status',
+        //     width: 160,
+        //     filters: [...new Set(data.map(r => r.is_status_name || r.is_status).filter(Boolean))].map(v => ({ text: v, value: v })),
+        //     onFilter: (value, record) => (record.is_status_name || record.is_status) === value,
+        //     render: (value, record) => {
+        //         const name = record.is_status_name || value;
+        //         const colorClass = record.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+        //         return <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>{name || '-'}</div>;
+        //     }
+        // },
+        {
+            title: 'รหัส',
+            dataIndex: 'partCode',
+            key: 'partCode',
+            width: 120,
+            filters: [...new Set(data.map(r => r.partCode).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.partCode === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'หมายเลขล็อต',
+            dataIndex: 'asset_lot',
+            key: 'asset_lot',
+            width: 180,
+            filters: [...new Set(data.map(r => r.asset_lot).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_lot === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'ชื่อ',
+            dataIndex: 'asset_detail',
+            key: 'asset_detail',
+            width: 200,
+            filters: [...new Set(data.map(r => r.asset_detail).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_detail === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'ประเภท',
+            dataIndex: 'asset_type',
+            key: 'asset_type',
+            width: 180,
+            filters: [...new Set(data.map(r => r.asset_type).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_type === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'เลขที่เอกสาร',
+            dataIndex: 'doc_no',
+            key: 'doc_no',
+            width: 180,
+            filters: [...new Set(data.map(r => r.doc_no).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.doc_no === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'ใช้สำหรับ',
+            dataIndex: 'asset_usedfor',
+            key: 'asset_usedfor',
+            width: 150,
+            filters: [...new Set(data.map(r => r.asset_usedfor).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_usedfor === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'แบรนด์',
+            dataIndex: 'asset_brand',
+            key: 'asset_brand',
+            width: 150,
+            filters: [...new Set(data.map(r => r.asset_brand).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_brand === value,
+            render: (val) => val || '-'
+        },
+        {
+            title: 'คุณสมบัติ',
+            dataIndex: 'asset_feature',
+            key: 'asset_feature',
+            width: 150,
+            filters: [...new Set(data.map(r => r.asset_feature).filter(Boolean))].map(v => ({ text: v, value: v })),
+            onFilter: (value, record) => record.asset_feature === value,
+            render: (val) => val || '-'
         }
-    ], [page, data]);
+    ], [page, data]); // ปิด Array ตรงนี้
 
     return (
         <ConfigProvider

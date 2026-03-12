@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     Form, Input, Button, Select, Row, Col, Card, Image, Typography,
-    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip
+    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip, Grid
 } from 'antd';
 import {
     ReloadOutlined, SaveOutlined, ExclamationCircleOutlined,
     InfoCircleOutlined, PictureOutlined, FileAddOutlined,
     EditOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined, QrcodeOutlined, CheckCircleFilled,
     ColumnWidthOutlined, ExpandAltOutlined, VerticalAlignTopOutlined, GoldOutlined, DatabaseOutlined, ApartmentOutlined,
-    CopyOutlined
+    CopyOutlined, UpOutlined, DownOutlined, LeftOutlined, RightOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 import { usePermission } from '../../../../hooks/usePermission';
@@ -23,7 +23,7 @@ const generateDraftId = () => {
 function SystemOutList({ open, onCancel, targetDraftId }) {
     const { message, modal } = App.useApp();
     const [form] = Form.useForm();
-
+    const screens = Grid.useBreakpoint();
     // --- State ---
     const [draftId, setDraftId] = useState(null);
     const [refID, setRefID] = useState(null);
@@ -31,11 +31,17 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const [lastScanned, setLastScanned] = useState({});
     const [zones, setZones] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [hasActiveItems, setHasActiveItems] = useState(false);
 
     // Selection for Return (Using Asset Codes)
     const [selectedIds, setSelectedIds] = useState([]);
 
     const [expandedKeys, setExpandedKeys] = useState([]);
+
+    // --- UX States (สำหรับการยุบ/ขยาย UI) ---
+    // ให้ค่าเริ่มต้นเป็น true (ยุบหน้าต่าง)
+    const [isAssetCollapsed, setIsAssetCollapsed] = useState(true);
+    const [isUsageCollapsed, setIsUsageCollapsed] = useState(false);
 
     // Status Logic
     const [bookingStatus, setBookingStatus] = useState('110');
@@ -98,6 +104,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
                 setDraftId(currentDraftId);
                 setScannedList(assets || []);
+                setHasActiveItems(res.data.hasActiveItems || false);
 
                 setLastScanned({});
 
@@ -107,7 +114,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     form.setFieldsValue({
                         draft_id: booking.draft_id,
                         refID: booking.refID,
-                        objective: 'ทำรายการใช้งาน',
+                        objective: 'ทำรายการเบิกใช้งาน',
                         attendees: booking.attendees || (assets || []).length,
                         booking_remark: booking.booking_remark,
                         origin: booking.origin,
@@ -118,7 +125,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 const newId = generateDraftId();
                 await api.post('/smartpackage/systemout/init-booking', {
                     draft_id: newId,
-                    objective: 'ทำรายการใช้งาน'
+                    objective: 'ทำรายการเบิกใช้งาน'
                 });
 
                 setDraftId(newId);
@@ -129,7 +136,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 form.resetFields();
                 form.setFieldsValue({
                     draft_id: newId,
-                    objective: 'ทำรายการใช้งาน',
+                    objective: 'ทำรายการเบิกใช้งาน',
                     attendees: 0
                 });
             }
@@ -151,6 +158,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             setScannedList([]);
             setLastScanned({});
             setSelectedIds([]); // Clear selection
+
+            // รีเซ็ตสถานะหน้าต่างเมื่อปิดออกไป ให้ asset เป็น true เสมอ
+            setIsAssetCollapsed(true);
+            setIsUsageCollapsed(false);
         }
     }, [open, targetDraftId]);
 
@@ -171,9 +182,9 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                     return;
                 }
 
-                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันใช้งาน" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
+                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันเบิกใช้งาน" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
                 if (action === 'finalized' || action === 'output_confirmed') {
-                    message.success('รายการนี้ถูกยืนยันการใช้งานเรียบร้อยแล้ว');
+                    message.success('รายการนี้ถูกยืนยันการเบิกใช้งานเรียบร้อยแล้ว');
                     onCancel(); // สั่งปิด Modal ทันที
                     return;     // จบการทำงาน ไม่ต้องไป Refresh Data ต่อ
                 }
@@ -206,6 +217,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
                         // อัปเดตรายการสินค้าใหม่ทันที (กรณี Unlock รายการจะกลายเป็นว่าง หรือตามที่มีใน Master)
                         setScannedList(assets || []);
+                        setHasActiveItems(res.data.hasActiveItems || false);
                     });
                 }
 
@@ -236,10 +248,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 const newRef = res.data.data.refID;
                 setRefID(newRef);
                 form.setFieldsValue({ refID: newRef });
-                message.success('สร้างเลขที่ใช้งานเรียบร้อย');
+                message.success('สร้างเลขที่เบิกใช้งานเรียบร้อย');
             }
         } catch (err) {
-            message.error('สร้างเลขที่ใช้งานไม่สำเร็จ');
+            message.error('สร้างเลขที่เบิกใช้งานไม่สำเร็จ');
         }
     };
 
@@ -263,12 +275,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         }
     };
 
-    // ปุ่มแก้ไขข้อมูลใช้งาน (เปลี่ยนสถานะเป็น 116)
+    // ปุ่มแก้ไขข้อมูลเบิกใช้งาน (เปลี่ยนสถานะเป็น 116)
     const handleEditHeader = async () => {
         try {
             await api.post('/smartpackage/systemout/edit-header', { draft_id: draftId });
             setBookingStatus('116');
-            message.success('ปลดล็อคข้อมูลใช้งานเพื่อแก้ไข');
+            message.success('ปลดล็อคข้อมูลเบิกใช้งานเพื่อแก้ไข');
         } catch (err) {
             message.error('เกิดข้อผิดพลาด');
         }
@@ -279,14 +291,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         try {
             values = await form.validateFields(['origin', 'destination', 'booking_remark']);
         } catch (error) {
-            message.error('กรุณาระบุสถานที่ใช้งานและปลายทางให้ครบถ้วน');
+            message.error('กรุณาระบุสถานที่เบิกใช้งานและปลายทางให้ครบถ้วน');
             return;
         }
 
         modal.confirm({
-            title: 'ยืนยันการใช้งาน',
-            content: 'เมื่อยืนยันแล้วระบบจะบันทึกสถานะการใช้งาน',
-            cancelText: 'ยืนยันใช้งาน',
+            title: 'ยืนยันการเบิกใช้งาน',
+            content: 'เมื่อยืนยันแล้วระบบจะบันทึกสถานะการเบิกใช้งาน',
+            cancelText: 'ยืนยันเบิกใช้งาน',
             cancelButtonProps: { type: 'primary', className: '!bg-green-600 hover:!bg-green-500 border-green-600' },
             okText: 'ยกเลิก',
             onCancel: async () => {
@@ -298,7 +310,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                         booking_remark: values.booking_remark
                     });
                     setBookingStatus('115');
-                    message.success('ใช้งานเรียบร้อย');
+                    message.success('เบิกใช้งานเรียบร้อย');
                 } catch (e) {
                     message.error('Failed: ' + (e.response?.data?.message || e.message));
                     return Promise.reject();
@@ -308,6 +320,12 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     };
 
     const handleUnlock = async () => {
+        // ✅ เพิ่มการตรวจสอบก่อนเปิด Modal ยืนยัน
+        if (!scannedList || scannedList.length === 0) {
+            message.warning('ไม่อนุญาติให้แก้ไข เนื่องไม่พบรายการ');
+            return;
+        }
+
         modal.confirm({
             title: 'ยืนยันปลดล็อค',
             content: 'ต้องการปลดล็อคเพื่อแก้ไขข้อมูลใช่หรือไม่?',
@@ -322,13 +340,13 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 try {
                     await api.post('/smartpackage/systemout/unlock', { draft_id: draftId });
 
-                    // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
-                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 114 -> Master RefID)
+                    // เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
                     fetchData();
 
                     message.success('ปลดล็อคเรียบร้อย');
                 } catch (e) {
-                    message.error('Failed');
+                    // ✅ แสดงข้อความ Error ที่ถูกส่งมาจาก Backend
+                    message.error(e.response?.data?.message || 'ไม่สามารถปลดล็อคได้');
                     return Promise.reject();
                 }
             },
@@ -339,15 +357,15 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const handleCancelBooking = async () => {
         if (scannedList.length > 0) {
             modal.warning({
-                title: 'ไม่สามารถยกเลิกใช้งานได้',
-                content: 'กรุณา "ยกเลิกใช้งาน" รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกใช้งาน',
+                title: 'ไม่สามารถยกเลิกเบิกใช้งานได้',
+                content: 'กรุณา "ยกเลิกเบิกใช้งาน" รายการสินค้าทั้งหมดในตะกร้าก่อนทำการยกเลิกเบิกใช้งาน',
                 okText: 'รับทราบ'
             });
             return;
         }
         modal.confirm({
-            title: 'ยืนยันการยกเลิกใช้งาน',
-            content: 'ต้องการยกเลิกใช้งานนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
+            title: 'ยืนยันการยกเลิกเบิกใช้งาน',
+            content: 'ต้องการยกเลิกเบิกใช้งานนี้ใช่หรือไม่? (สถานะจะถูกเปลี่ยนเป็นยกเลิก)',
             cancelText: 'ยืนยัน',
             cancelButtonProps: { type: 'primary', danger: true },
             okText: 'ปิด',
@@ -355,7 +373,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             onCancel: async () => {
                 try {
                     await api.post('/smartpackage/systemout/cancel', { draft_id: draftId });
-                    message.success('ยกเลิกใช้งานเรียบร้อย');
+                    message.success('ยกเลิกเบิกใช้งานเรียบร้อย');
                     onCancel();
                 } catch (err) {
                     message.error(err.response?.data?.message || 'ยกเลิกไม่สำเร็จ');
@@ -367,25 +385,68 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
     const handleReturnToStock = async () => {
         if (selectedIds.length === 0) return message.warning('กรุณาเลือกรายการ');
+
+        modal.confirm({
+            title: 'ยืนยันการยกเลิกเบิกใช้งาน',
+            content: `คุณต้องการยกเลิกเบิกใช้งานรายการที่เลือกจำนวน ${selectedIds.length} รายการใช่หรือไม่?`,
+            // สลับให้ ยืนยัน มาอยู่ซ้าย (Cancel Button Position)
+            cancelText: 'ยืนยัน',
+            cancelButtonProps: { type: 'primary', danger: true },
+            // สลับให้ ปิด ไปอยู่ขวา (OK Button Position)
+            okText: 'ปิด',
+            okButtonProps: { type: 'default' },
+            onCancel: async () => {
+                // ย้าย Logic การยิง API มาไว้ที่ onCancel แทน
+                try {
+                    await api.post('/smartpackage/systemout/return', {
+                        ids: selectedIds,
+                        draft_id: draftId
+                    });
+                    message.success('ยกเลิกเบิกใช้งานเรียบร้อย');
+                    setSelectedIds([]);
+                } catch (err) {
+                    message.error('เกิดข้อผิดพลาดในการยกเลิกเบิกใช้งาน');
+                }
+            },
+            onOk: () => {
+                // ถ้ากดปิด ไม่ต้องทำอะไร ให้ Modal หายไปเฉยๆ
+            }
+        });
+    };
+
+    const handlePrintPDF = async () => {
+        if (selectedIds.length === 0) return message.warning('กรุณาเลือกรายการที่ต้องการพิมพ์');
+
         try {
-            await api.post('/smartpackage/systemout/return', {
+            message.loading({ content: 'กำลังสร้างเอกสาร PDF...', key: 'print_pdf' });
+
+            const response = await api.post('/smartpackage/systemout/print-pdf', {
                 ids: selectedIds,
                 draft_id: draftId
+            }, {
+                responseType: 'blob' // 📌 จำเป็นมากสำหรับการรับไฟล์ PDF
             });
-            message.success('ยกเลิกใช้งานเรียบร้อย');
-            setSelectedIds([]);
-        } catch (err) { message.error('Error'); }
+
+            // สร้าง URL และเปิด PDF ในแท็บใหม่
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(url, '_blank');
+
+            message.success({ content: 'สร้างเอกสารสำเร็จ', key: 'print_pdf' });
+        } catch (err) {
+            console.error(err);
+            message.error({ content: 'เกิดข้อผิดพลาดในการสร้างเอกสาร', key: 'print_pdf' });
+        }
     };
 
     const handleModalClose = async () => {
-        // ✅ กรณี Status 114 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันใช้งานทันทีเมื่อกดปิด
+        // ✅ กรณี Status 114 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันเบิกใช้งานทันทีเมื่อกดปิด
         if (bookingStatus === '114') {
             // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน
             let values;
             try {
                 values = await form.validateFields(['origin', 'destination', 'booking_remark']);
             } catch (error) {
-                message.error('กรุณาระบุสถานที่ใช้งานและปลายทางให้ครบถ้วน ก่อนทำการปิดหน้าต่าง');
+                message.error('กรุณาระบุสถานที่เบิกใช้งานและปลายทางให้ครบถ้วน ก่อนทำการปิดหน้าต่าง');
                 return; // หยุดการทำงาน ไม่ให้ปิดหน้าต่างถ้าข้อมูลไม่ครบ
             }
 
@@ -399,7 +460,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                 });
 
                 setBookingStatus('112');
-                message.success('บันทึกและใช้งานเรียบร้อย');
+                message.success('บันทึกและเบิกใช้งานเรียบร้อย');
 
                 // ✅ เมื่อสำเร็จ ให้สั่งปิด Modal หลัก
                 onCancel();
@@ -421,7 +482,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         if (bookingStatus === '115') {
             modal.warning({
                 title: 'ไม่สามารถทำรายการได้',
-                content: 'นี้ใช้งานเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
+                content: 'นี้เบิกใช้งานเรียบร้อยแล้ว ไม่สามารถสแกนเพิ่มหรือแก้ไขได้',
                 okText: 'รับทราบ',
                 onOk: () => processingRef.current = false
             });
@@ -457,6 +518,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
             if (res.data.success) {
                 setLastScanned(res.data.data);
                 processingRef.current = false;
+
+                // ถ้ายุบหน้าต่างบรรจุภัณฑ์อยู่ ให้กางออกอัตโนมัติเพื่อให้เห็นว่าสแกนอะไรได้
+                // if (isAssetCollapsed) setIsAssetCollapsed(false);
+
             } else {
                 const { code, data, message: msg } = res.data;
                 {
@@ -471,13 +536,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     };
 
     const fixThaiInput = (str) => {
-        // ตรวจสอบว่ามีตัวอักษรภาษาไทยอยู่ในข้อความหรือไม่
-        // ถ้าไม่มี (แปลว่าเป็นภาษาอังกฤษอยู่แล้ว) ให้คืนค่ากลับไปเลยโดยไม่ต้องแปลง
         if (!/[ก-๛]/.test(str)) {
             return str;
         }
 
-        // แผนผังแปลงแป้นพิมพ์ภาษาไทย (Kedmanee) กลับเป็นภาษาอังกฤษ (QWERTY)
         const map = {
             'ๅ': '1', '/': '2', '-': '3', 'ภ': '4', 'ถ': '5', 'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0', 'ข': '-', 'ช': '=',
             'ๆ': 'q', 'ไ': 'w', 'ำ': 'e', 'พ': 'r', 'ะ': 't', 'ั': 'y', 'ี': 'u', 'ร': 'i', 'น': 'o', 'ย': 'p', 'บ': '[', 'ล': ']', 'ฃ': '\\',
@@ -517,9 +579,9 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [open, draftId, refID, bookingStatus]);
+    }, [open, draftId, refID, bookingStatus, isAssetCollapsed]);
 
-    // ปิด Form (Header) ถ้าสถานะเป็น 111 (บันทึกแล้วพร้อมสแกน) หรือ 115 (ใช้งานแล้ว)
+    // ปิด Form (Header) ถ้าสถานะเป็น 111 (บันทึกแล้วพร้อมสแกน) หรือ 115 (เบิกใช้งานแล้ว)
     const isEditingDisabled = bookingStatus === '111' || bookingStatus === '115';
     // ปิดตาราง (Cart) ห้ามติ๊กคืนของ ถ้าเป็น 110, 116 หรือ 115
     const isCartDisabled = bookingStatus === '110' || bookingStatus === '116' || bookingStatus === '115';
@@ -590,15 +652,24 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                             e.stopPropagation();
                             // Update the detail card with the representative item of this group
                             setLastScanned(record.firstItem);
+                            // กางหน้าต่างข้อมูลบรรจุภัณฑ์ออกเพื่อให้เห็นรายละเอียด
+                            if (isAssetCollapsed) setIsAssetCollapsed(false);
                         }}
                     />
                 </Tooltip>
             )
         },
         // { title: 'ลำดับ', key: 'index', width: 60, align: 'center', render: (_, __, index) => index + 1 },
-        { title: 'รหัสทรัพย์สิน', dataIndex: 'partCode', key: 'partCode', width: 150, ...getColumnSearchProps('partCode') },
         {
-            title: 'ชื่อทรัพย์สิน',
+            title: 'รหัส',
+            dataIndex: 'partCode',
+            key: 'partCode',
+            // 👇 ถ้าจอใหญ่ (lg ขึ้นไป) ให้กว้าง 300 ถ้าเล็กกว่านั้นให้กว้าง 150
+            width: screens.lg ? 300 : 150,
+            ...getColumnSearchProps('partCode')
+        },
+        {
+            title: 'ชื่อ',
             dataIndex: 'asset_detail',
             key: 'asset_detail',
             width: 120,
@@ -619,10 +690,10 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
     const childColumns = [
         // { title: 'ลำดับ', key: 'index', width: 60, align: 'center', render: (_, __, index) => index + 1 },
         {
-            title: 'รหัสทรัพย์สิน',
+            title: 'ทะเบียนบรรจุภัณฑ์',
             dataIndex: 'asset_code',
             key: 'asset_code',
-            width: 100,
+            width: screens.lg ? 300 : 100,
             ...getColumnSearchProps('asset_code'),
             render: (text) => (
                 <div className="whitespace-normal break-all min-w-[150px] sm:min-w-[auto] sm:break-words">
@@ -697,21 +768,42 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
 
     return (
         <Modal
-            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการใช้งาน' : 'สร้างรายการใช้งาน (System Out)'}</Title>}
+            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการเบิกใช้งาน' : 'สร้างรายการเบิกใช้งาน '}</Title>}
             open={open}
             onCancel={handleModalClose}
-            width={{ xs: '100%', sm: '95%' }} // ให้เต็มจอในมือถือ ย่อลงในจอใหญ่
-            style={{ top: 20, maxWidth: '1400px' }}
+            width="100%"
+            style={{ top: 0, padding: 0, margin: 0, maxWidth: '100vw' }}
+            styles={{
+                content: { borderRadius: 0, height: '100vh', display: 'flex', flexDirection: 'column' },
+                // เปลี่ยน overflow: 'hidden' เป็น overflowY: 'auto' เพื่อให้เลื่อนแกน Y ทั้งหน้าได้
+                body: { flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '12px 16px', backgroundColor: '#f8fafc', gap: '16px' }
+            }}
             footer={null}
             destroyOnHidden
             maskClosable={false}
             keyboard={false}
         >
-            <div className="flex flex-col gap-4 bg-slate-50 p-2 sm:p-4 rounded-lg" style={{ minHeight: '80vh' }}>
-                <Card
-                    className="shadow-md border-0 bg-white overflow-hidden rounded-md"
-                    styles={{ body: { padding: 0 } }}
+            {/* --- TOP SECTION: ข้อมูลบรรจุภัณฑ์ (ยุบขึ้นบน) --- */}
+            <div className="flex-shrink-0 transition-all duration-300 w-full bg-white shadow-sm border border-gray-100 rounded-md overflow-hidden">
+                {/* Header Strip สำหรับเป็นตัว Toggle */}
+                <div
+                    className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-100 cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => setIsAssetCollapsed(!isAssetCollapsed)}
                 >
+                    <div className="flex items-center gap-2 text-slate-700">
+                        <InfoCircleOutlined className="text-blue-500" />
+                        <span className="font-semibold text-sm sm:text-base">ข้อมูลบรรจุภัณฑ์ล่าสุด</span>
+                    </div>
+                    <Button
+                        type="text"
+                        size="small"
+                        className="text-gray-500 pointer-events-none" // ให้คลิกที่แถบได้เลยโดยไม่ต้องเล็งปุ่ม
+                        icon={isAssetCollapsed ? <DownOutlined /> : <UpOutlined />}
+                    />
+                </div>
+
+                {/* เนื้อหาของ Card ข้อมูลบรรจุภัณฑ์ (ซ่อน/แสดง ตาม State) */}
+                <div className={`${isAssetCollapsed ? 'hidden' : 'block'}`}>
                     {!lastScanned?.asset_code ? (
                         // --- UX: Empty State เมื่อยังไม่ได้สแกน ---
                         <div className="flex flex-col items-center justify-center py-8 sm:py-12 bg-slate-50/50">
@@ -722,36 +814,34 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                             <Text type="secondary" className="text-xs sm:text-sm text-center">กรุณาสแกน QR Code หรือเลือกรายการจากตาราง</Text>
                         </div>
                     ) : (
-                        // --- UX: ข้อมูลทรัพย์สิน ---
+                        // --- UX: ข้อมูลบรรจุภัณฑ์ ---
                         <div className="flex flex-col">
                             {/* Header Strip: Modern Gradient & Glass Effect */}
-                            <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 px-4 sm:px-6 py-3 sm:py-4 shadow-sm rounded-md">
-                                {/* Decorative Background Elements (ช่วยเพิ่มมิติ) */}
+                            <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
                                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl pointer-events-none"></div>
                                 <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-blue-400 opacity-20 rounded-full blur-lg pointer-events-none"></div>
 
                                 <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center z-10 gap-3 sm:gap-0">
-                                    {/* Left Side: Title & Icon */}
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
-                                            <InfoCircleOutlined className="text-white text-lg sm:text-xl" />
+                                            <PictureOutlined className="text-white text-lg sm:text-xl" />
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-white font-bold text-base sm:text-lg leading-tight tracking-wide shadow-black drop-shadow-sm">
-                                                รายละเอียดทรัพย์สิน
+                                                {lastScanned.asset_detail || 'รายละเอียดบรรจุภัณฑ์'}
                                             </span>
                                             <span className="text-blue-100 text-[10px] sm:text-xs font-light tracking-wider opacity-90">
-                                                Asset Information Details
+                                                {lastScanned.asset_type || 'Asset Information Details'}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Right Side: Asset Code Badge with Copy Action */}
                                     <div className="flex items-center gap-2 self-end sm:self-auto">
                                         <Tooltip title="คลิกเพื่อคัดลอกรหัส">
                                             <div
                                                 className="group flex items-center gap-2 bg-white text-blue-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-blue-200 shadow-md cursor-pointer hover:bg-blue-50 transition-all active:scale-95"
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // กันการไป trigger collapse
                                                     navigator.clipboard.writeText(lastScanned.partCode);
                                                     message.success('คัดลอกรหัสเรียบร้อย');
                                                 }}
@@ -767,20 +857,18 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                 </div>
                             </div>
 
-                            <div className="p-4 sm:p-6">
+                            <div className="p-4 sm:p-6 bg-white">
                                 <Row gutter={[16, 24]}>
                                     {/* 1. รูปภาพหลัก */}
                                     <Col xs={24} sm={10} md={8} lg={6} xl={5}>
                                         <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-100 shadow-inner flex items-center justify-center relative group">
                                             {lastScanned.asset_img ? (
-                                                <>
-                                                    <Image
-                                                        src={getFullImgUrl('material', lastScanned.asset_img)}
-                                                        className="object-cover w-full h-full"
-                                                        style={{ height: '100%', width: '100%' }}
-                                                        preview={{ mask: <div className="text-white text-xs sm:text-sm"><EyeOutlined /> ดูภาพขยาย</div> }}
-                                                    />
-                                                </>
+                                                <Image
+                                                    src={getFullImgUrl('material', lastScanned.asset_img)}
+                                                    className="object-cover w-full h-full"
+                                                    style={{ height: '100%', width: '100%' }}
+                                                    preview={{ mask: <div className="text-white text-xs sm:text-sm"><EyeOutlined /> ดูภาพขยาย</div> }}
+                                                />
                                             ) : (
                                                 <div className="flex flex-col items-center text-gray-300">
                                                     <PictureOutlined style={{ fontSize: 40 }} className="sm:text-5xl" />
@@ -794,7 +882,7 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     <Col xs={24} sm={14} md={16} lg={10} xl={11}>
                                         <div className="flex flex-col h-full justify-start gap-3 sm:gap-4">
                                             <div>
-                                                <Text type="secondary" className="text-[10px] sm:text-xs uppercase tracking-wider">ชื่อทรัพย์สิน</Text>
+                                                <Text type="secondary" className="text-[10px] sm:text-xs uppercase tracking-wider">ชื่อบรรจุภัณฑ์</Text>
                                                 <Title level={4} className="m-0 text-gray-800 text-lg sm:text-xl">
                                                     {lastScanned.asset_detail || '-'}
                                                 </Title>
@@ -839,7 +927,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                             </div>
                                                         );
                                                     })}
-                                                    {/* Empty Placeholder for Drawing if none exists */}
                                                     {![1, 2, 3, 4, 5, 6].some(n => lastScanned?.[`asset_dmg_00${n}`]) && (
                                                         <div className="w-full text-center py-3 sm:py-4 bg-gray-50 rounded border border-dashed border-gray-300 text-gray-500 text-[10px] sm:text-xs">
                                                             ไม่พบข้อมูล Drawing
@@ -853,21 +940,18 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                     {/* 3. สเปค (Dimension Grid) */}
                                     <Col xs={24} md={24} lg={8} xl={8}>
                                         <div className="bg-white rounded-xl border border-gray-200 h-full shadow-sm overflow-hidden flex flex-col">
-                                            {/* Header */}
                                             <div className="bg-slate-50 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-100 flex items-center gap-2">
                                                 <ApartmentOutlined className="text-blue-500" />
                                                 <span className="font-semibold text-gray-700 text-xs sm:text-sm">ข้อมูลจำเพาะ (Spec)</span>
                                             </div>
 
                                             <div className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 h-full justify-center">
-
-                                                {/* Group 1: Dimensions (กว้าง x ยาว x สูง) */}
+                                                {/* Group 1: Dimensions */}
                                                 <div>
                                                     <Text type="secondary" className="text-xs sm:text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
                                                         ขนาด (Dimensions)
                                                     </Text>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {/* Width */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <ColumnWidthOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">กว้าง</span>
@@ -875,7 +959,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                                 {lastScanned.asset_width || '-'} <span className="text-[10px] sm:text-[14px] font-normal text-gray-700">{lastScanned.asset_width_unit}</span>
                                                             </div>
                                                         </div>
-                                                        {/* Length */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <ExpandAltOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">ยาว</span>
@@ -883,7 +966,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                                 {lastScanned.asset_length || '-'} <span className="text-[10px] sm:text-[14px] font-normal text-gray-700">{lastScanned.asset_length_unit}</span>
                                                             </div>
                                                         </div>
-                                                        {/* Height */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <VerticalAlignTopOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">สูง</span>
@@ -894,16 +976,14 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                     </div>
                                                 </div>
 
-                                                {/* Divider */}
                                                 <div className="h-px bg-gray-100 w-full"></div>
 
-                                                {/* Group 2: Properties (น้ำหนัก & ความจุ) */}
+                                                {/* Group 2: Properties */}
                                                 <div>
                                                     <Text type="secondary" className="text-xs sm:text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
                                                         คุณสมบัติ (Properties)
                                                     </Text>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 sm:gap-3">
-                                                        {/* Weight */}
                                                         <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
                                                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 flex-shrink-0">
                                                                 <GoldOutlined className="text-xs sm:text-base" />
@@ -915,8 +995,6 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                                                                 </span>
                                                             </div>
                                                         </div>
-
-                                                        {/* Capacity */}
                                                         <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
                                                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-500 flex-shrink-0">
                                                                 <DatabaseOutlined className="text-xs sm:text-base" />
@@ -938,240 +1016,284 @@ function SystemOutList({ open, onCancel, targetDraftId }) {
                             </div>
                         </div>
                     )}
-                </Card>
+                </div>
+            </div>
 
-                <Row gutter={[16, 16]} className="flex-1">
-                    <Col xs={24} lg={8} xl={7}>
-                        <Card title={<span className="text-sm sm:text-base">ข้อมูลใช้งาน</span>} className="h-full shadow-sm rounded-md" size="small">
-                            <Form layout="vertical" form={form}>
+            {/* --- BOTTOM SECTION: ข้อมูลเบิกใช้งาน (ซ้าย) & ตะกร้า (ขวา) --- */}
+            <div className="flex flex-col lg:flex-row gap-4 w-full">
 
-                                {/* สถานที่ต้นทาง */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">สถานที่ต้นทาง</span>} name="origin" rules={[{ required: true }]}>
-                                    <Select
-                                        showSearch // เปิดให้พิมพ์ค้นหาได้
-                                        optionFilterProp="label" // ให้ค้นหาจาก label (เราจะรวม code + name ไว้ในนี้)
-                                        filterOption={(input, option) =>
-                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                                        }
-                                        options={zones.map(s => ({
-                                            label: `${s.code} - ${s.name}`, // แสดงทั้งรหัสและชื่อ
-                                            value: s.code // เก็บค่าเป็นรหัส supplier
-                                        }))}
-                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
-                                        disabled={isEditingDisabled}
-                                    />
-                                </Form.Item>
+                {/* 1. LEFT PANEL: ข้อมูลเบิกใช้งาน (ย่อ/ขยายได้) */}
+                <div className={`transition-all duration-300 ease-in-out flex flex-col bg-white shadow-sm border border-gray-100 rounded-md flex-shrink-0
+                    ${isUsageCollapsed
+                        ? 'h-[40px] lg:w-[48px] overflow-hidden'
+                        : 'h-auto w-full lg:w-[320px] xl:w-[380px]'
+                    }`}
+                >
+                    {/* Header Strip เป็นปุ่ม Toggle */}
+                    <div
+                        className="flex justify-between items-center px-3 py-2 bg-white border-b border-gray-100 cursor-pointer hover:bg-slate-50 transition-colors flex-shrink-0 h-[40px]"
+                        onClick={() => setIsUsageCollapsed(!isUsageCollapsed)}
+                    >
+                        <div className={`flex items-center gap-2 text-slate-700 ${isUsageCollapsed ? 'lg:hidden' : ''}`}>
+                            <EditOutlined className="text-blue-500" />
+                            <span className="font-semibold text-sm sm:text-base whitespace-nowrap">ข้อมูลเบิกใช้งาน</span>
+                        </div>
+                        <Button
+                            type="text"
+                            size="small"
+                            className={`text-gray-500 pointer-events-none p-0 flex items-center justify-center ${isUsageCollapsed ? 'mx-auto' : ''}`}
+                            icon={isUsageCollapsed
+                                ? <RightOutlined className="rotate-90 lg:rotate-0" /> // บนจอมือถือจะเป็นลูกศรชี้ลง, Desktop เป็นชี้ขวา
+                                : <LeftOutlined className="rotate-90 lg:rotate-0" />  // บนจอมือถือจะเป็นลูกศรชี้ขึ้น, Desktop เป็นชี้ซ้าย
+                            }
+                        />
+                    </div>
 
-                                {/* ไปยังปลายทาง */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">ไปยังปลายทาง</span>} name="destination" rules={[{ required: true }]}>
-                                    <Select
-                                        showSearch
-                                        optionFilterProp="label"
-                                        filterOption={(input, option) =>
-                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                                        }
-                                        options={zones.map(s => ({
-                                            label: `${s.code} - ${s.name}`,
-                                            value: s.code
-                                        }))}
-                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
-                                        disabled={isEditingDisabled}
-                                    />
-                                </Form.Item>
-                                <Form.Item label={<span className="text-xs sm:text-sm">หมายเหตุ</span>} name="booking_remark">
-                                    <Input.TextArea rows={2} disabled={isEditingDisabled} />
-                                </Form.Item>
+                    {/* เนื้อหา Form ข้อมูลเบิกใช้งาน (ซ่อน/แสดง ตาม State) */}
+                    <div className={`${isUsageCollapsed ? 'hidden' : 'block'} p-3 sm:p-4`}>
+                        <Form layout="vertical" form={form}>
+                            {/* สถานที่ต้นทาง */}
+                            <Form.Item label={<span className="text-xs sm:text-sm">สถานที่ต้นทาง</span>} name="origin" rules={[{ required: true }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    filterOption={(input, option) =>
+                                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                    options={zones.map(s => ({
+                                        label: `${s.code} - ${s.name}`,
+                                        value: s.code
+                                    }))}
+                                    placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
+                                    disabled={isEditingDisabled}
+                                />
+                            </Form.Item>
 
-                                <Row gutter={[8, 8]} style={{ marginTop: 16 }}>
-                                    {/* กรณีสถานะ 110 หรือ 116 (พร้อมบันทึก/แก้ไขเสร็จแล้ว) */}
-                                    {(bookingStatus === '110' || bookingStatus === '116') && (
-                                        <>
-                                            <Col xs={24} sm={14} lg={24} xl={14}>
-                                                <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large" className="rounded-md text-sm sm:text-base">
-                                                    บันทึกข้อมูล
-                                                </Button>
-                                            </Col>
-                                            <Col xs={24} sm={10} lg={24} xl={10}>
-                                                <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base">
-                                                    ยกเลิกใช้งาน
-                                                </Button>
-                                            </Col>
-                                        </>
-                                    )}
+                            {/* ไปยังปลายทาง */}
+                            <Form.Item label={<span className="text-xs sm:text-sm">ไปยังปลายทาง</span>} name="destination" rules={[{ required: true }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    filterOption={(input, option) =>
+                                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                    options={zones.map(s => ({
+                                        label: `${s.code} - ${s.name}`,
+                                        value: s.code
+                                    }))}
+                                    placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
+                                    disabled={isEditingDisabled}
+                                />
+                            </Form.Item>
 
-                                    {/* กรณีสถานะ 111 (บันทึกข้อมูลแล้ว) */}
-                                    {bookingStatus === '111' && (
-                                        <>
-                                            <Col xs={24} sm={12} lg={24} xl={12}>
-                                                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="!bg-green-600 hover:!bg-green-500 rounded-md px-0 text-xs sm:text-sm" disabled={scannedList.length === 0}>
-                                                    ยืนยันการใช้งาน
-                                                </Button>
-                                            </Col>
-                                            <Col xs={24} sm={12} lg={24} xl={12}>
-                                                <Button type="default" block icon={<EditOutlined />} onClick={handleEditHeader} size="large" className="border-blue-500 text-blue-500 rounded-md px-0 text-xs sm:text-sm">
-                                                    แก้ไขข้อมูล
-                                                </Button>
-                                            </Col>
-                                            <Col span={24}>
-                                                <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base mt-1">
-                                                    ยกเลิกใช้งาน
-                                                </Button>
-                                            </Col>
-                                        </>
-                                    )}
+                            <Form.Item label={<span className="text-xs sm:text-sm">หมายเหตุ</span>} name="booking_remark">
+                                <Input.TextArea rows={2} disabled={isEditingDisabled} />
+                            </Form.Item>
 
-                                    {/* กรณีสถานะ 115 (ยืนยันสมบูรณ์) */}
-                                    {bookingStatus === '115' && canUse('system-out:unlock') && (
+                            <Row gutter={[8, 8]} style={{ marginTop: 16 }}>
+                                {/* กรณีสถานะ 110 หรือ 116 (พร้อมบันทึก/แก้ไขเสร็จแล้ว) */}
+                                {(bookingStatus === '110' || bookingStatus === '116') && (
+                                    <>
+                                        <Col xs={24} sm={14} lg={24} xl={14}>
+                                            <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large" className="rounded-md text-sm sm:text-base">
+                                                บันทึกข้อมูล
+                                            </Button>
+                                        </Col>
+                                        <Col xs={24} sm={10} lg={24} xl={10}>
+                                            <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base">
+                                                ยกเลิกเบิกใช้งาน
+                                            </Button>
+                                        </Col>
+                                    </>
+                                )}
+
+                                {/* กรณีสถานะ 111 (บันทึกข้อมูลแล้ว) */}
+                                {bookingStatus === '111' && (
+                                    <>
+                                        <Col xs={24} sm={12} lg={24} xl={12}>
+                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="!bg-green-600 hover:!bg-green-500 rounded-md px-0 text-xs sm:text-sm" disabled={scannedList.length === 0}>
+                                                ยืนยันการเบิกใช้งาน
+                                            </Button>
+                                        </Col>
+                                        <Col xs={24} sm={12} lg={24} xl={12}>
+                                            <Button type="default" block icon={<EditOutlined />} onClick={handleEditHeader} size="large" className="border-blue-500 text-blue-500 rounded-md px-0 text-xs sm:text-sm">
+                                                แก้ไขข้อมูล
+                                            </Button>
+                                        </Col>
                                         <Col span={24}>
+                                            <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base mt-1">
+                                                ยกเลิกเบิกใช้งาน
+                                            </Button>
+                                        </Col>
+                                    </>
+                                )}
+
+                                {/* กรณีสถานะ 115 (ยืนยันสมบูรณ์) */}
+                                {bookingStatus === '115' && canUse('system-out:unlock') && (
+                                    <Col span={24}>
+                                        {!hasActiveItems ? (    // ✅ เปลี่ยนจาก !hasScannedItems เป็น !hasActiveItems
+                                            <div className="text-red-500 text-center font-medium mt-2 text-sm sm:text-base">
+                                                ไม่สามารถแก้ไขได้ เนื่องไม่พบรายการ
+                                            </div>
+                                        ) : (
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:!text-orange-600 hover:!border-orange-600 rounded-md text-sm sm:text-base">
                                                 ปลดล็อคเพื่อแก้ไข
                                             </Button>
-                                        </Col>
-                                    )}
-
-                                    {/* กรณีสถานะ 114 (ปลดล็อคแก้ไขทั้งหมด) */}
-                                    {bookingStatus === '114' && (
-                                        <Col span={24}>
-                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500 rounded-md text-sm sm:text-base">
-                                                แก้ไขแล้ว/ยืนยันใช้งาน
-                                            </Button>
-                                        </Col>
-                                    )}
-                                </Row>
-
-                                <Divider className="my-3 sm:my-4" />
-
-                                {/* ซ่อนฟิลด์เหล่านี้ไว้ แต่ยังคงให้ Form เก็บค่าและทำงานอยู่เบื้องหลัง */}
-                                <Form.Item name="draft_id" hidden><Input /></Form.Item>
-                                <Form.Item name="refID" hidden><Input /></Form.Item>
-                                <Form.Item name="objective" hidden><Input /></Form.Item>
-                                <Form.Item name="attendees" hidden><Input /></Form.Item>
-                            </Form>
-                        </Card>
-                    </Col>
-
-                    {/* ✅ New Table Implementation */}
-                    <Col xs={24} lg={16} xl={17}>
-                        <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm h-full flex flex-col">
-                            {/* ส่วนหัวตาราง */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-2 gap-2 sm:gap-0">
-                                <Title level={5} className="m-0 text-base sm:text-lg">รายการในตะกร้า ({scannedList.length})</Title>
-                                {/* ล็อคปุ่มยกเลิกใช้งานถ้าเป็น 115 หรือ 112 */}
-                                {!isFinalized && (
-                                    <Button
-                                        danger
-                                        icon={<ReloadOutlined />}
-                                        onClick={handleReturnToStock}
-                                        disabled={selectedIds.length === 0}
-                                        className="w-full sm:w-auto text-xs sm:text-sm"
-                                    >
-                                        ยกเลิกใช้งาน ({selectedIds.length})
-                                    </Button>
+                                        )}
+                                    </Col>
                                 )}
+
+                                {/* กรณีสถานะ 114 (ปลดล็อคแก้ไขทั้งหมด) */}
+                                {bookingStatus === '114' && (
+                                    <Col span={24}>
+                                        <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500 rounded-md text-sm sm:text-base">
+                                            แก้ไขแล้ว/ยืนยันเบิกใช้งาน
+                                        </Button>
+                                    </Col>
+                                )}
+                            </Row>
+
+                            <Divider className="my-3 sm:my-4" />
+
+                            {/* Hidden fields */}
+                            <Form.Item name="draft_id" hidden><Input /></Form.Item>
+                            <Form.Item name="refID" hidden><Input /></Form.Item>
+                            <Form.Item name="objective" hidden><Input /></Form.Item>
+                            <Form.Item name="attendees" hidden><Input /></Form.Item>
+                        </Form>
+                    </div>
+                </div>
+
+                {/* 2. RIGHT PANEL: รายการในตะกร้า (Table) */}
+                {/* flex-1 จะทำให้ส่วนนี้ขยายเต็มพื้นที่ที่เหลืออัตโนมัติ เมื่อ Card อื่นถูกยุบ */}
+                <div className="flex-1 bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col min-w-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-2 gap-2 sm:gap-0 flex-shrink-0">
+                        <Title level={5} className="m-0 text-base sm:text-lg">รายการในตะกร้า ({scannedList.length})</Title>
+                        <Space>
+                            {/* แสดงเฉพาะจอ lg ขึ้นไป (screens.lg = true) */}
+                            {screens.lg && (
+                                <Button
+                                    type="primary"
+                                    className="bg-blue-600 hover:bg-blue-500"
+                                    icon={<PrinterOutlined />}
+                                    onClick={handlePrintPDF}
+                                    disabled={selectedIds.length === 0}
+                                >
+                                    พิมพ์ใบเบิกใช้งาน ({selectedIds.length})
+                                </Button>
+                            )}
+
+                            {!isFinalized && bookingStatus !== '114' && (
+                                <Button
+                                    danger
+                                    icon={<ReloadOutlined />}
+                                    onClick={handleReturnToStock}
+                                    disabled={selectedIds.length === 0}
+                                    className="w-full sm:w-auto text-xs sm:text-sm"
+                                >
+                                    ยกเลิกเบิกใช้งาน ({selectedIds.length})
+                                </Button>
+                            )}
+                        </Space>
+                    </div>
+
+                    <div className="flex-1 flex flex-col w-full">
+                        {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
+                        {bookingStatus === '114' && !hasScannedItems ? (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 text-center h-full">
+                                <div className="text-orange-500 mb-3 sm:mb-4">
+                                    <ExclamationCircleOutlined className="text-4xl sm:text-5xl" />
+                                </div>
+                                <Title level={5} className="text-gray-700 text-sm sm:text-base">
+                                    รายการเบิกปัจจุบัน
+                                </Title>
+                                <Text type="secondary" className="text-xs sm:text-sm">
+                                    ไม่พบรายการสินค้าในสถานะกำลังแก้ไข
+                                    <br />
+                                    (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
+                                </Text>
+                                <div className="mt-3 sm:mt-4">
+                                    <Tag color="orange" className="text-xs sm:text-sm">Status: Unlocked (114)</Tag>
+                                </div>
+                                <div className="mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400">
+                                    * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "เบิกเบิกใช้งาน" โดยอัตโนมัติ
+                                </div>
                             </div>
-                            <div className="flex-1 overflow-auto flex flex-col min-h-[400px]">
-                                {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
-                                {bookingStatus === '114' && !hasScannedItems ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 text-center h-full">
-                                        <div className="text-orange-500 mb-3 sm:mb-4">
-                                            <ExclamationCircleOutlined className="text-4xl sm:text-5xl" />
+                        ) : !hasScannedItems ? (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 h-full">
+                                <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-sm">
+                                    {/* เงื่อนไข: การระบุสถานที่และบันทึกข้อมูล */}
+                                    <div className={`flex flex-col sm:flex-row items-center p-3 sm:p-4 rounded-xl border-2 transition-all ${bookingStatus !== '110' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'} text-center sm:text-left`}>
+                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center sm:mr-4 mb-2 sm:mb-0 ${bookingStatus !== '110' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            {bookingStatus !== '110' ? <CheckCircleOutlined className="text-lg sm:text-2xl" /> : <InfoCircleOutlined className="text-lg sm:text-2xl" />}
                                         </div>
-                                        <Title level={5} className="text-gray-700 text-sm sm:text-base">
-                                            รายการเบิกปัจจุบัน
-                                        </Title>
-                                        <Text type="secondary" className="text-xs sm:text-sm">
-                                            ไม่พบรายการสินค้าในสถานะกำลังแก้ไข
-                                            <br />
-                                            (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
-                                        </Text>
-                                        <div className="mt-3 sm:mt-4">
-                                            <Tag color="orange" className="text-xs sm:text-sm">Status: Unlocked (114)</Tag>
-                                        </div>
-                                        <div className="mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400">
-                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "ใช้งาน" โดยอัตโนมัติ
+                                        <div>
+                                            <Text strong className={`text-sm sm:text-base ${bookingStatus !== '110' ? 'text-green-700' : 'text-gray-600'}`}>
+                                                {bookingStatus !== '110' ? 'บันทึกข้อมูลและสร้างเลขที่เบิกใช้งานแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
+                                            </Text>
+                                            <br className="hidden sm:block" />
+                                            <Text type="secondary" className="text-xs sm:text-sm">
+                                                {bookingStatus !== '110' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่เบิกใช้งานอัตโนมัติ'}
+                                            </Text>
                                         </div>
                                     </div>
-                                ) : !hasScannedItems ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 h-full">
-                                        <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-sm">
 
-                                            {/* เงื่อนไข: การระบุสถานที่และบันทึกข้อมูล */}
-                                            <div className={`flex flex-col sm:flex-row items-center p-3 sm:p-4 rounded-xl border-2 transition-all ${bookingStatus !== '110' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'} text-center sm:text-left`}>
-                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center sm:mr-4 mb-2 sm:mb-0 ${bookingStatus !== '110' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {bookingStatus !== '110' ? <CheckCircleOutlined className="text-lg sm:text-2xl" /> : <InfoCircleOutlined className="text-lg sm:text-2xl" />}
-                                                </div>
-                                                <div>
-                                                    <Text strong className={`text-sm sm:text-base ${bookingStatus !== '110' ? 'text-green-700' : 'text-gray-600'}`}>
-                                                        {bookingStatus !== '110' ? 'บันทึกข้อมูลและสร้างเลขที่ใช้งานแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
-                                                    </Text>
-                                                    <br className="hidden sm:block" />
-                                                    <Text type="secondary" className="text-xs sm:text-sm">
-                                                        {bookingStatus !== '110' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่ใช้งานอัตโนมัติ'}
-                                                    </Text>
-                                                </div>
+                                    {/* ข้อความแนะนำด้านล่าง */}
+                                    {bookingStatus !== '110' && refID && (
+                                        <div className="mt-2 sm:mt-6 bg-white border border-green-100 shadow-sm rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 relative overflow-hidden text-center sm:text-left">
+                                            <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 rounded-full blur-xl hidden sm:block"></div>
+                                            <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
+                                                <QrcodeOutlined className="text-xl sm:text-2xl" />
                                             </div>
-
-                                            {/* ข้อความแนะนำด้านล่าง (จะแสดงเมื่อบันทึกข้อมูลแล้ว) */}
-                                            {bookingStatus !== '110' && refID && (
-                                                <div className="mt-2 sm:mt-6 bg-white border border-green-100 shadow-sm rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 relative overflow-hidden text-center sm:text-left">
-                                                    {/* Decorative Circle */}
-                                                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 rounded-full blur-xl hidden sm:block"></div>
-
-                                                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
-                                                        <QrcodeOutlined className="text-xl sm:text-2xl" />
-                                                    </div>
-
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-center sm:justify-start gap-2">
-                                                            <h4 className="text-sm sm:text-base font-bold text-gray-700 m-0">ระบบพร้อมสแกน</h4>
-                                                            <span className="flex h-2 w-2 relative">
-                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-gray-400 text-xs sm:text-sm m-0">สามารถยิงบาร์โค้ดได้เลย</p>
-                                                    </div>
-
-                                                    <div className="hidden sm:block">
-                                                        <CheckCircleFilled className="text-green-500/20 text-3xl sm:text-4xl" />
-                                                    </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-center sm:justify-start gap-2">
+                                                    <h4 className="text-sm sm:text-base font-bold text-gray-700 m-0">ระบบพร้อมสแกน</h4>
+                                                    <span className="flex h-2 w-2 relative">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                    </span>
                                                 </div>
-                                            )}
+                                                <p className="text-gray-400 text-xs sm:text-sm m-0">สามารถยิงบาร์โค้ดได้เลย</p>
+                                            </div>
+                                            <div className="hidden sm:block">
+                                                <CheckCircleFilled className="text-green-500/20 text-3xl sm:text-4xl" />
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    /* ✅ เมื่อเริ่มสแกนแล้ว (มีข้อมูล) ให้แสดงตารางตามเดิม */
-                                    <Table
-                                        columns={parentColumns}
-                                        dataSource={groupedData}
-                                        expandable={{
-                                            expandedRowRender,
-                                            expandIcon: customExpandIcon,
-                                            // ✅ ปรับแก้ข้อ 2: ควบคุมการ Expand ด้วย State
-                                            expandedRowKeys: expandedKeys,
-                                            onExpand: (expanded, record) => {
-                                                // อนุญาตให้ User หุบเข้า-กางออกเองได้ด้วย
-                                                if (expanded) {
-                                                    setExpandedKeys(prev => [...prev, record.key]);
-                                                } else {
-                                                    setExpandedKeys(prev => prev.filter(k => k !== record.key));
-                                                }
-                                            }
-                                        }}
-                                        rowKey="key"
-                                        loading={loading}
-                                        pagination={false}
-                                        bordered
-                                        size="middle"
-                                        scroll={{ x: 'max-content', y: 600 }} // เพิ่ม max-content รองรับจอเล็ก
-                                    />
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </Col>
-                </Row>
+                        ) : (
+                            /* ✅ เมื่อเริ่มสแกนแล้ว (มีข้อมูล) ให้แสดงตารางตามเดิม */
+                            <Table
+                                columns={parentColumns}
+                                dataSource={groupedData}
+                                expandable={{
+                                    expandedRowRender,
+                                    expandIcon: customExpandIcon,
+                                    expandedRowKeys: expandedKeys,
+                                    onExpand: (expanded, record) => {
+                                        if (expanded) {
+                                            setExpandedKeys(prev => [...prev, record.key]);
+                                        } else {
+                                            setExpandedKeys(prev => prev.filter(k => k !== record.key));
+                                        }
+                                    }
+                                }}
+                                rowKey="key"
+                                loading={loading}
+                                pagination={false}
+                                bordered
+                                size="middle"
+                                // ก่อนแก้: scroll={{ x: 'max-content', y: 600 }}
+                                scroll={{ x: 'max-content' }} // เอา y: 600 ออกเพื่อให้ตารางขยายความสูงได้เต็มที่
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
+
         </Modal >
     );
 }
+
 export default SystemOutList;

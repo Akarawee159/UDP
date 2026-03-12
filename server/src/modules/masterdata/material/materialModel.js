@@ -22,7 +22,7 @@ async function getAll() {
         m.minimum_order, m.minstock, m.maxstock, m.is_status,
         m.material_width, m.material_width_unit, m.material_length, m.material_length_unit,
         m.material_height, m.material_height_unit, m.material_capacity, m.material_capacity_unit,
-        m.material_weight, m.material_weight_unit,
+        m.material_weight, m.material_weight_unit, m.material_unitname,
         
         -- ✅ [เพิ่ม] ดึงข้อมูล Drawing 1-6
         m.drawing_001, m.drawing_002, m.drawing_003, m.drawing_004, m.drawing_005, m.drawing_006,
@@ -96,11 +96,11 @@ async function create(data) {
         created_by, created_at,
         material_width, material_width_unit, material_length, material_length_unit,
         material_height, material_height_unit, material_capacity, material_capacity_unit,
-        material_weight, material_weight_unit,
+        material_weight, material_weight_unit,material_unitname,
         drawing_001, drawing_002, drawing_003, drawing_004, drawing_005, drawing_006
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await conn.query(sql, [
@@ -112,7 +112,7 @@ async function create(data) {
       data.created_by, now,
       data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
       data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
-      data.material_weight, data.material_weight_unit,
+      data.material_weight, data.material_weight_unit, data.material_unitname,
       // Drawing Values
       data.drawing_001 || '', data.drawing_002 || '', data.drawing_003 || '',
       data.drawing_004 || '', data.drawing_005 || '', data.drawing_006 || ''
@@ -142,7 +142,7 @@ async function update(material_id, data) {
       updated_by = ?, updated_at = ?,
       material_width = ?, material_width_unit = ?, material_length = ?, material_length_unit = ?,
       material_height = ?, material_height_unit = ?, material_capacity = ?, material_capacity_unit = ?,
-      material_weight = ?, material_weight_unit = ?,
+      material_weight = ?, material_weight_unit = ?, material_unitname = ?,
       drawing_001 = ?, drawing_002 = ?, drawing_003 = ?, 
       drawing_004 = ?, drawing_005 = ?, drawing_006 = ?
     WHERE material_id = ?
@@ -157,7 +157,7 @@ async function update(material_id, data) {
     data.updated_by, now,
     data.material_width, data.material_width_unit, data.material_length, data.material_length_unit,
     data.material_height, data.material_height_unit, data.material_capacity, data.material_capacity_unit,
-    data.material_weight, data.material_weight_unit,
+    data.material_weight, data.material_weight_unit, data.material_unitname,
     data.drawing_001 || '', data.drawing_002 || '', data.drawing_003 || '',
     data.drawing_004 || '', data.drawing_005 || '', data.drawing_006 || '',
     material_id

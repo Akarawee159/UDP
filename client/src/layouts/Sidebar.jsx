@@ -65,18 +65,18 @@ export const menuItems = [
     children: [
       // { id: "401", label: "สร้างข้อมูลพนักงาน", path: "/employees" },
       { id: "406", label: "หน่วยนับ", path: "/settings/counting-unit" },
-      { id: "402", label: "สร้างข้อมูลกล่อง", path: "/material" },
-      { id: "407", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
+      { id: "402", label: "สร้างข้อมูลบรรจุภัณฑ์", path: "/material" },
+      { id: "407", label: "ขึ้นทะเบียนบรรจุภัณฑ์", path: "/registration/register-asset" },
 
     ]
   },
   // {
   //   id: "50",
-  //   label: "การจัดการทรัพย์สิน",
+  //   label: "การจัดการบรรจุภัณฑ์",
   //   icon: <DropboxOutlined />,
   //   type: "dropdown",
   //   children: [
-  //     // { id: "501", label: "ขึ้นทะเบียนทรัพย์สิน", path: "/registration/register-asset" },
+  //     // { id: "501", label: "ขึ้นทะเบียนบรรจุภัณฑ์", path: "/registration/register-asset" },
   //   ]
   // },
   {
@@ -86,7 +86,7 @@ export const menuItems = [
     type: "dropdown",
     children: [
       { id: "600", label: "ข้อมูลผู้ส่ง-ผู้รับ", path: "/suppliers" },
-      { id: "601", label: "ระบบใช้งาน", path: "/smart-package/system-out" },
+      { id: "601", label: "ระบบเบิกใช้งาน", path: "/smart-package/system-out" },
       { id: "602", label: "ระบบรับเข้า", path: "/smart-package/system-in" },
       { id: "603", label: "ระบบแจ้งชำรุด", path: "/smart-package/system-defective" },
       // { id: "604", label: "ระบบแจ้งซ่อม", path: "/smart-package/system-repair" },
@@ -98,7 +98,7 @@ export const menuItems = [
     icon: <FileTextOutlined />,
     type: "dropdown",
     children: [
-      { id: "701", label: "รายงานตามสถานะกล่อง", path: "/reports/boxstatus-report" },
+      { id: "701", label: "รายงานตามสถานะบรรจุภัณฑ์", path: "/reports/boxstatus-report" },
     ]
   },
 ];

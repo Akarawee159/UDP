@@ -50,7 +50,7 @@ function Material() {
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลวัสดุไม่สำเร็จ');
+            message.error('ดึงข้อมูลบรรจุภัณฑ์ไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -116,26 +116,26 @@ function Material() {
             dragDisabled: true, // ล็อคไม่ให้ลาก
             render: (_val, _record, index) => <span className="text-gray-400 font-medium">{(page.current - 1) * page.pageSize + index + 1}</span>
         },
-        {
-            title: 'สถานะ',
-            dataIndex: 'status_name',
-            key: 'status_name',
-            width: 140,
-            align: 'center',
-            sorter: (a, b) => String(a.status_name || '').localeCompare(String(b.status_name || '')),
-            filters: [...new Set(rows.map(r => r.status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.status_name === value,
-            render: (val, record) => {
-                const statusName = val || 'ไม่ระบุ';
-                const statusClass = record.status_class || 'bg-gray-100 text-gray-500 border-gray-200';
-                return (
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}`}>
-                        {statusName}
-                    </span>
-                );
-            }
-        },
+        // {
+        //     title: 'สถานะ',
+        //     dataIndex: 'status_name',
+        //     key: 'status_name',
+        //     width: 140,
+        //     align: 'center',
+        //     sorter: (a, b) => String(a.status_name || '').localeCompare(String(b.status_name || '')),
+        //     filters: [...new Set(rows.map(r => r.status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+        //     filterSearch: true,
+        //     onFilter: (value, record) => record.status_name === value,
+        //     render: (val, record) => {
+        //         const statusName = val || 'ไม่ระบุ';
+        //         const statusClass = record.status_class || 'bg-gray-100 text-gray-500 border-gray-200';
+        //         return (
+        //             <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${statusClass}`}>
+        //                 {statusName}
+        //             </span>
+        //         );
+        //     }
+        // },
         // {
         //     title: 'รูปภาพ',
         //     dataIndex: 'material_image',
@@ -158,7 +158,7 @@ function Material() {
         //     }
         // },
         {
-            title: 'รหัสกล่อง',
+            title: 'รหัส',
             dataIndex: 'material_code',
             key: 'material_code',
             width: 150,
@@ -169,7 +169,117 @@ function Material() {
             render: (val) => <span className="font-mono font-bold text-blue-700">{val}</span>
         },
         {
-            title: 'ชื่อวัสดุ',
+            title: 'โมเดล',
+            dataIndex: 'material_model',
+            key: 'material_model',
+            width: 150,
+            sorter: (a, b) => String(a.material_model || '').localeCompare(String(b.material_model || '')),
+            filters: [...new Set(rows.map(r => r.material_model).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_model === value,
+        },
+        {
+            title: 'หน่วยนับ',
+            dataIndex: 'material_unitname',
+            key: 'material_unitname',
+            width: 150,
+            sorter: (a, b) => String(a.material_type || '').localeCompare(String(b.material_type || '')),
+            filters: [...new Set(rows.map(r => r.material_type).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.material_type === value,
+        },
+        {
+            title: 'ความกว้าง',
+            dataIndex: 'material_width',
+            key: 'material_width',
+            width: 150,
+            sorter: (a, b) => (Number(a.material_width) || 0) - (Number(b.material_width) || 0),
+
+            // ✅ แปลงค่าเป็นทศนิยม 2 ตำแหน่งก่อนนำมาต่อกับหน่วยใน Filter
+            filters: Array.from(
+                new Set(
+                    rows.filter(r => r.material_width !== null && r.material_width !== undefined)
+                        .map(r => `${Number(r.material_width).toFixed(2)} ${r.material_width_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+
+            // ✅ เวลา Filter ก็แปลงค่าใน record ให้เป็น 2 ตำแหน่งก่อนเทียบด้วย
+            onFilter: (value, record) => {
+                if (record.material_width === null || record.material_width === undefined) return false;
+                const recordValue = `${Number(record.material_width).toFixed(2)} ${record.material_width_unit || ''}`.trim();
+                return recordValue === value;
+            },
+
+            // ✅ แสดงผลในหน้าตารางเป็นทศนิยม 2 ตำแหน่ง
+            render: (val, record) => (
+                <span className="font-mono font-bold text-blue-700">
+                    {val !== null && val !== undefined ? Number(val).toFixed(2) : '-'} {record.material_width_unit || ''}
+                </span>
+            )
+        },
+        {
+            title: 'ความยาว',
+            dataIndex: 'material_length',
+            key: 'material_length',
+            width: 150,
+            sorter: (a, b) => (Number(a.material_length) || 0) - (Number(b.material_length) || 0),
+
+            // ✅ แปลงค่าเป็นทศนิยม 2 ตำแหน่งก่อนนำมาต่อกับหน่วยใน Filter
+            filters: Array.from(
+                new Set(
+                    rows.filter(r => r.material_length !== null && r.material_length !== undefined)
+                        .map(r => `${Number(r.material_length).toFixed(2)} ${r.material_length_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+
+            // ✅ เวลา Filter ก็แปลงค่าใน record ให้เป็น 2 ตำแหน่งก่อนเทียบด้วย
+            onFilter: (value, record) => {
+                if (record.material_length === null || record.material_length === undefined) return false;
+                const recordValue = `${Number(record.material_length).toFixed(2)} ${record.material_length_unit || ''}`.trim();
+                return recordValue === value;
+            },
+
+            // ✅ แสดงผลในหน้าตารางเป็นทศนิยม 2 ตำแหน่ง
+            render: (val, record) => (
+                <span className="font-mono font-bold text-blue-700">
+                    {val !== null && val !== undefined ? Number(val).toFixed(2) : '-'} {record.material_length_unit || ''}
+                </span>
+            )
+        },
+        {
+            title: 'ความสูง',
+            dataIndex: 'material_height',
+            key: 'material_height',
+            width: 150,
+            sorter: (a, b) => (Number(a.material_height) || 0) - (Number(b.material_height) || 0),
+
+            // ✅ แปลงค่าเป็นทศนิยม 2 ตำแหน่งก่อนนำมาต่อกับหน่วยใน Filter
+            filters: Array.from(
+                new Set(
+                    rows.filter(r => r.material_height !== null && r.material_height !== undefined)
+                        .map(r => `${Number(r.material_height).toFixed(2)} ${r.material_height_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+
+            // ✅ เวลา Filter ก็แปลงค่าใน record ให้เป็น 2 ตำแหน่งก่อนเทียบด้วย
+            onFilter: (value, record) => {
+                if (record.material_height === null || record.material_height === undefined) return false;
+                const recordValue = `${Number(record.material_height).toFixed(2)} ${record.material_height_unit || ''}`.trim();
+                return recordValue === value;
+            },
+
+            // ✅ แสดงผลในหน้าตารางเป็นทศนิยม 2 ตำแหน่ง
+            render: (val, record) => (
+                <span className="font-mono font-bold text-blue-700">
+                    {val !== null && val !== undefined ? Number(val).toFixed(2) : '-'} {record.material_height_unit || ''}
+                </span>
+            )
+        },
+        {
+            title: 'ชื่อ',
             dataIndex: 'material_name',
             key: 'material_name',
             width: 250,
@@ -199,16 +309,6 @@ function Material() {
             onFilter: (value, record) => record.material_color === value,
         },
         {
-            title: 'รุ่น',
-            dataIndex: 'material_model',
-            key: 'material_model',
-            width: 150,
-            sorter: (a, b) => String(a.material_model || '').localeCompare(String(b.material_model || '')),
-            filters: [...new Set(rows.map(r => r.material_model).filter(Boolean))].map(v => ({ text: v, value: v })),
-            filterSearch: true,
-            onFilter: (value, record) => record.material_model === value,
-        },
-        {
             title: 'คุณสมบัติ',
             dataIndex: 'material_feature',
             key: 'material_feature',
@@ -231,7 +331,7 @@ function Material() {
         },
     ], [page, rows]);
 
-    // Logic กรองข้อมูลช่องค้นหา (เพิ่มค้นหาจากชื่อวัสดุด้วย)
+    // Logic กรองข้อมูลช่องค้นหา (เพิ่มค้นหาจากชื่อบรรจุภัณฑ์ด้วย)
     const filteredRows = useMemo(() => {
         if (!searchTerm) return rows;
         const term = searchTerm.toLowerCase();
@@ -282,7 +382,7 @@ function Material() {
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
                                 <Input
                                     prefix={<SearchOutlined className="text-gray-400" />}
-                                    placeholder="ค้นหารหัส, ชื่อวัสดุ..."
+                                    placeholder="ค้นหารหัส, ชื่อบรรจุภัณฑ์..."
                                     allowClear
                                     variant="borderless"
                                     onChange={(e) => setSearchTerm(e.target.value)}

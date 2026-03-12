@@ -108,7 +108,7 @@ async function updateBookingHeader(draft_id, body, user_id) {
     await db.query(`
         UPDATE tb_asset_lists_detail 
         SET asset_origin = ?, asset_destination = ?, updated_at = ? 
-        WHERE refID = ? AND asset_status = '100' AND is_status = '135' -- ⬅️ ปรับเป็น 100
+        WHERE refID = ? AND asset_status = '100' AND is_status = '135' 
     `, [origin, destination, now, currentRefID]);
   }
 
@@ -122,7 +122,7 @@ async function getAssetsDetailByRefID(refID) {
         FROM tb_asset_lists_detail d
         LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
         LEFT JOIN employees e ON d.scan_by = e.employee_id
-        WHERE d.refID = ? AND d.is_status = '135' AND d.asset_status = '100' -- ⬅️ ปรับเป็น 100
+        WHERE d.refID = ? AND d.is_status = '135' AND d.asset_status = '100' 
         ORDER BY d.asset_code ASC
     `;
   const [rows] = await db.query(sql, [refID]);
@@ -178,7 +178,7 @@ async function getAssetsByMasterRefID(refID) {
 }
 
 // ใน getAllBookings (เพื่อให้นับจำนวนหน้าลิสต์ได้ถูก)
-async function getAllBookings(searchDate) {
+async function getAllBookings(startDate, endDate) {
   const sql = `
     SELECT 
         b.*, 
@@ -190,7 +190,7 @@ async function getAllBookings(searchDate) {
                 FROM tb_asset_lists_detail d1
                 WHERE d1.refID = b.refID 
                 AND d1.is_status IN ('100', '135') 
-                AND d1.asset_status = '100' -- ⬅️ ปรับเป็น 100
+                AND d1.asset_status = '100'
                 AND d1.scan_at = (         
                     SELECT MAX(d2.scan_at)
                     FROM tb_asset_lists_detail d2
@@ -203,10 +203,10 @@ async function getAllBookings(searchDate) {
                 SELECT COUNT(*) 
                 FROM tb_asset_lists a 
                 WHERE a.refID = b.refID 
-                AND a.is_status IN ('100', '132') -- ⬅️ ปรับเป็น 100
+                AND a.is_status IN ('100', '132')
               )
             ELSE 
-              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '100') -- ⬅️ ปรับเป็น 100
+              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '100')
           END
         ) as attendees,
         s.G_NAME as is_status_name, 
@@ -217,11 +217,11 @@ async function getAllBookings(searchDate) {
     LEFT JOIN employees e ON b.created_by = e.employee_id
     WHERE b.is_status NOT IN ('133') 
       AND b.booking_type = 'RC'
-      AND b.create_date = ? 
+      AND b.create_date BETWEEN ? AND ?
     ORDER BY b.created_at DESC
   `;
 
-  const [rows] = await db.query(sql, [searchDate]);
+  const [rows] = await db.query(sql, [startDate, endDate]);
   return rows;
 }
 
@@ -448,7 +448,7 @@ async function returnSingleAsset(assetCode) {
 
   if (item.booking_status === '134') {
     // อัปเดตตารางหลัก 
-    await db.query(`UPDATE tb_asset_lists SET asset_status = 100, is_status = '107', draft_id = NULL, refID = NULL, updated_at = ? WHERE asset_code = ?`, [now, assetCode]);
+    await db.query(`UPDATE tb_asset_lists SET asset_status = 100, is_status = '107', draft_id = NULL, refID = NULL, current_address = asset_destination, updated_at = ? WHERE asset_code = ?`, [now, assetCode]);
 
     // ✅ 1. อัปเดต Detail เดิมให้เป็น 107 (ป้องกันค้างดึงมาแสดงตอน 135)
     await db.query(`UPDATE tb_asset_lists_detail SET asset_status = 102, is_status = '107', updated_at = ? WHERE refID = ? AND asset_code = ?`, [now, item.refID, assetCode]);
@@ -465,7 +465,7 @@ async function returnSingleAsset(assetCode) {
     await insertSingleDetail(itemSnapshot, item.origin, item.destination);
 
   } else {
-    await db.query(`UPDATE tb_asset_lists SET asset_status = 100, draft_id = NULL, refID = NULL, updated_at = ? WHERE asset_code = ?`, [now, assetCode]);
+    await db.query(`UPDATE tb_asset_lists SET asset_status = 100, draft_id = NULL, refID = NULL, current_address = asset_destination, updated_at = ? WHERE asset_code = ?`, [now, assetCode]);
   }
   await returnToStock([assetCode]);
   return await getAssetWithStatus(assetCode);
@@ -556,13 +556,12 @@ async function returnToStock(ids) {
                   refID = ?, 
                   asset_status = 101, 
                   is_status = '115',
-                  current_address = ?, 
+                  current_address = asset_destination, /* เปลี่ยนมาใช้ค่า destination เดิม */
                   updated_at = ?
               WHERE asset_code = ?
-          `, [prevData.draft_id, prevData.refID, prevData.current_address, now, assetCode]);
+          `, [prevData.draft_id, prevData.refID, now, assetCode]);
 
-      // 4. ถ้าเป็นการยกเลิกตอนสถานะ 134 (ปลดล็อค) 
-      // 💡 เปลี่ยนจากการ DELETE เป็น UPDATE ประวัติ 102/135 เป็น 133/133
+      // 4. ถ้าเป็นการยกเลิกตอนสถานะ 134 (ปลดล็อค)
       if (bookingStatus === '134') {
         await db.query(`
                   UPDATE tb_asset_lists_detail 
@@ -579,7 +578,7 @@ async function returnToStock(ids) {
               `, [now, assetCode, currentRefID]);
       }
 
-      // 5. ลบประวัติ 108/132 ใน Detail ทิ้ง (อันนี้ควรลบตามเดิม เพราะถือว่าแค่ถูกดึงลงตะกร้าแล้วดึงกลับ ยังไม่ได้มีผลทางบัญชี)
+      // 5. ลบประวัติ 108/132 ใน Detail ทิ้ง
       await db.query(`
               DELETE FROM tb_asset_lists_detail 
               WHERE asset_code = ? 
@@ -596,6 +595,7 @@ async function returnToStock(ids) {
                   is_status = '115',
                   draft_id = NULL, 
                   refID = NULL, 
+                  current_address = asset_destination,
                   updated_at = ? 
               WHERE asset_code = ?
           `, [now, assetCode]);
@@ -694,6 +694,49 @@ async function confirmOutput(draft_id, user_id) {
   return true;
 }
 
+async function getAssetsForPrint(assetCodes) {
+  if (!assetCodes || assetCodes.length === 0) return [];
+  const sql = `
+      SELECT a.asset_code, a.scan_at, a.label_register,
+             CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+      FROM tb_asset_lists a
+      LEFT JOIN employees e ON a.scan_by = e.employee_id
+      WHERE a.asset_code IN (?)
+      ORDER BY a.scan_at ASC
+  `;
+  const [rows] = await db.query(sql, [assetCodes]);
+  return rows;
+}
+
+async function getUserFullName(employee_id) {
+  if (!employee_id) return '-';
+  const sql = `
+      SELECT CONCAT(COALESCE(titlename_th,''), '', COALESCE(firstname_th,''), ' ', COALESCE(lastname_th,'')) as fullname 
+      FROM employees 
+      WHERE employee_id = ?
+  `;
+  const [rows] = await db.query(sql, [employee_id]);
+  return rows[0]?.fullname || employee_id;
+}
+
+async function getUnlockedAssetsByRefID(refID) {
+  const sql = `
+    SELECT 
+      a.*,
+      s.G_NAME as status_name,
+      s.G_DESCRIPT as status_class,
+      CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+    FROM tb_asset_lists a
+    LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
+    LEFT JOIN employees e ON a.scan_by = e.employee_id
+    WHERE a.refID = ? 
+      AND a.asset_status = 108 -- ดึงเฉพาะรายการที่สถานะกำลังสแกนรับเข้า
+    ORDER BY a.updated_at DESC
+  `;
+  const [rows] = await db.query(sql, [refID]);
+  return rows;
+}
+
 module.exports = {
   createBooking,
   generateRefID,
@@ -712,5 +755,8 @@ module.exports = {
   cancelBooking,
   getAssetsDetailByRefID,
   getAssetsByMasterRefID,
-  confirmOutput
+  confirmOutput,
+  getAssetsForPrint,
+  getUserFullName,
+  getUnlockedAssetsByRefID
 };

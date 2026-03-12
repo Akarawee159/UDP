@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { App, Button, Input, ConfigProvider, Grid, Tag, Popconfirm, DatePicker } from 'antd';
+import { App, Button, Input, ConfigProvider, Grid, Tag, Popconfirm, DatePicker, Space } from 'antd';
 import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined, CalendarOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
@@ -17,6 +17,10 @@ function SystemOut() {
     const screens = Grid.useBreakpoint();
     const isMd = !!screens.md;
     const { message } = App.useApp();
+
+    const { RangePicker } = DatePicker;
+    // เปลี่ยนค่าเริ่มต้นเป็น วันแรกของเดือน จนถึง วันสุดท้ายของเดือน
+    const [dateRange, setDateRange] = useState([dayjs().startOf('month'), dayjs().endOf('month')]);
 
     const [loading, setLoading] = useState(false);
     const [rows, setRows] = useState([]);
@@ -39,12 +43,14 @@ function SystemOut() {
         return () => window.removeEventListener('resize', onResize);
     }, []);
 
+
     const fetchData = useCallback(async () => {
         try {
             setLoading(true);
-            const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : '';
+            const startDateStr = dateRange && dateRange[0] ? dateRange[0].format('YYYY-MM-DD') : '';
+            const endDateStr = dateRange && dateRange[1] ? dateRange[1].format('YYYY-MM-DD') : '';
             const res = await api.get('/smartpackage/systemout', {
-                params: { date: dateStr }
+                params: { startDate: startDateStr, endDate: endDateStr }
             });
             setRows(res?.data?.data || []);
         } catch (err) {
@@ -53,8 +59,7 @@ function SystemOut() {
         } finally {
             setLoading(false);
         }
-    }, [message, selectedDate]);
-
+    }, [message, dateRange]);
     useEffect(() => {
         fetchData();
     }, [fetchData]);
@@ -156,7 +161,6 @@ function SystemOut() {
             align: 'center',
             dragDisabled: true,
             render: (_, record) => {
-                // ✅ แสดงไอคอนเมื่อสถานะเป็น 115 ตามเงื่อนไขข้อ 9
                 if (String(record.is_status) === '115' || record.is_status_name === 'ใช้งานเรียบร้อย') {
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
@@ -167,17 +171,6 @@ function SystemOut() {
                 return <span className="text-gray-300">-</span>;
             }
         },
-        // {
-        //     title: 'เลขที่เอกสาร',
-        //     dataIndex: 'refID',
-        //     key: 'refID',
-        //     width: 180,
-        //     sorter: (a, b) => String(a.refID || '').localeCompare(String(b.refID || '')),
-        //     filters: [...new Set(rows.map(r => r.refID).filter(Boolean))].map(v => ({ text: v, value: v })),
-        //     filterSearch: true,
-        //     onFilter: (value, record) => record.refID === value,
-        //     render: (val) => <span className="font-bold text-blue-600">{val}</span>
-        // },
         {
             title: 'สถานะ',
             dataIndex: 'is_status_name',
@@ -186,6 +179,7 @@ function SystemOut() {
             align: 'center',
             sorter: (a, b) => String(a.is_status_name || '').localeCompare(String(b.is_status_name || '')),
             filters: [...new Set(rows.map(r => r.is_status_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
             onFilter: (value, record) => record.is_status_name === value,
             render: (val, record) => (
                 <div className={`w-full text-center py-1 rounded-md text-xs border ${record.is_status_color || 'bg-gray-100'}`}>
@@ -197,27 +191,36 @@ function SystemOut() {
             title: 'สถานที่ใช้งาน',
             dataIndex: 'origin',
             key: 'origin',
-            width: 160,
+            width: 170,
             align: 'center',
             sorter: (a, b) => String(a.origin || '').localeCompare(String(b.origin || '')),
+            filters: [...new Set(rows.map(r => r.origin).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.origin === value,
             render: (val) => <span className="text-gray-600">{val || '-'}</span>
         },
         {
             title: 'ไปยังปลายทาง',
             dataIndex: 'destination',
             key: 'destination',
-            width: 160,
+            width: 170,
             align: 'center',
             sorter: (a, b) => String(a.destination || '').localeCompare(String(b.destination || '')),
+            filters: [...new Set(rows.map(r => r.destination).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.destination === value,
             render: (val) => <span className="text-gray-600">{val || '-'}</span>
         },
         {
             title: 'จำนวน',
-            dataIndex: 'detail_count', // ✅ เปลี่ยนจาก attendees เป็น detail_count เพื่อใช้ข้อมูลจากตารางประวัติ
-            key: 'detail_count',       // ✅ เปลี่ยน key ให้ตรงกัน
-            width: 100,
+            dataIndex: 'detail_count',
+            key: 'detail_count',
+            width: 120,
             align: 'center',
-            sorter: (a, b) => Number(a.detail_count || 0) - Number(b.detail_count || 0), // ✅ เปลี่ยนค่าตอน Sort ด้วย
+            sorter: (a, b) => Number(a.detail_count || 0) - Number(b.detail_count || 0),
+            filters: [...new Set(rows.map(r => r.detail_count).filter(v => v !== null && v !== undefined && v !== ''))].sort((a, b) => a - b).map(v => ({ text: String(v), value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.detail_count === value,
             render: (val) => (
                 <Tag color="blue" className="w-full text-center text-sm m-0 border-0 rounded-md">
                     {val || 0}
@@ -241,15 +244,21 @@ function SystemOut() {
             width: 140,
             align: 'center',
             sorter: (a, b) => new Date(a.create_date || 0) - new Date(b.create_date || 0),
+            filters: [...new Set(rows.map(r => r.create_date).filter(Boolean))].map(v => ({ text: dayjs(v).format('DD/MM/YYYY'), value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.create_date === value,
             render: (val) => val ? new Date(val).toLocaleDateString('th-TH') : '-'
         },
         {
             title: 'เวลา',
             dataIndex: 'create_time',
             key: 'create_time',
-            width: 100,
+            width: 120,
             align: 'center',
             sorter: (a, b) => String(a.create_time || '').localeCompare(String(b.create_time || '')),
+            filters: [...new Set(rows.map(r => r.create_time).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.create_time === value,
             render: (val) => val || '-'
         },
         {
@@ -259,6 +268,9 @@ function SystemOut() {
             width: 250,
             ellipsis: true,
             sorter: (a, b) => String(a.booking_remark || '').localeCompare(String(b.booking_remark || '')),
+            filters: [...new Set(rows.map(r => r.booking_remark).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.booking_remark === value,
         },
     ], [page, rows]);
 
@@ -320,19 +332,18 @@ function SystemOut() {
                                         onClick={handleCreate}
                                         className="bg-green-600 hover:bg-green-500 border-none h-9 rounded-md px-4 font-medium shadow-md w-full sm:w-auto"
                                     >
-                                        สร้างรายการใช้งาน
+                                        สร้างรายการเบิกใช้งาน
                                     </Button>
 
                                     <div className="flex items-center gap-2 px-2 h-9 border border-gray-200 rounded-md bg-white">
                                         <span className="text-gray-500 text-sm hidden lg:inline">วันที่:</span>
-                                        <DatePicker
-                                            value={selectedDate}
-                                            onChange={(date) => setSelectedDate(date)}
+                                        <RangePicker
+                                            value={dateRange}
+                                            onChange={(dates) => setDateRange(dates)}
                                             format="DD/MM/YYYY"
                                             allowClear={false}
                                             variant="borderless"
-                                            className="w-32 cursor-pointer"
-                                            suffixIcon={<CalendarOutlined className="text-green-600" />}
+                                            className="w-56 cursor-pointer"
                                         />
                                     </div>
 

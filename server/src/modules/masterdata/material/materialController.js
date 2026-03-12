@@ -74,6 +74,7 @@ function parsePayload(body, files) {
     material_capacity_unit: parseStr(body.material_capacity_unit),
     material_weight: parseNum(body.material_weight),
     material_weight_unit: parseStr(body.material_weight_unit),
+    material_unitname: parseStr(body.material_unitname),
   };
 
   // --- จัดการ Main Image (key: 'image') ---

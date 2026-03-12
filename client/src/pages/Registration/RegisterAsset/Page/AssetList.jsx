@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import api from "../../../../api";
 import { ThaiDateInput } from '../../../../components/form/ThaiDateInput';
-import DataTable from '../../../../components/aggrid/DataTable';
+import DraggableTable from '../../../../components/antdtable/DraggableTable';
 import ModalAssetList from './ModalAssetList';
 import ModalDepartment from './ModalDepartment';
 
@@ -175,7 +175,9 @@ function AssetList() {
         form.setFieldsValue({
             asset_code: material.material_code,
             asset_detail: material.material_name,
+            asset_color: material.material_color,
             asset_type: material.material_type,
+            asset_unitname: material.material_unitname,
             asset_model: material.material_model,
             asset_remark: material.material_remark,
             asset_usedfor: material.material_usedfor,
@@ -213,7 +215,7 @@ function AssetList() {
         message.success(`เลือกรายการ: ${material.material_code} เรียบร้อย`);
     };
 
-const handleDepartmentSelect = (dept) => {
+    const handleDepartmentSelect = (dept) => {
         form.setFieldsValue({
             asset_responsible_department: dept.G_CODE,
             current_address: dept.branch_code
@@ -298,12 +300,23 @@ const handleDepartmentSelect = (dept) => {
         message.info('ยกเลิกการขึ้นทะเบียนเรียบร้อยแล้ว');
     };
 
-    const columnDefs = useMemo(() => [
-        { headerName: 'ลำดับ', valueGetter: "node.rowIndex + 1", width: 60, pinned: 'left', cellClass: "flex justify-center items-center", headerClass: "text-center justify-center" },
-        { checkboxSelection: true, headerCheckboxSelection: true, width: 50, pinned: 'left', lockVisible: true, headerClass: 'header-center-checkbox', cellClass: "flex justify-center items-center" },
+    const columns = useMemo(() => [
         {
-            headerName: 'Label', field: 'label_register', width: 120, pinned: 'left',
-            cellRenderer: (params) => (
+            title: 'ลำดับ',
+            key: 'seq',
+            width: 60,
+            fixed: 'left',
+            align: 'center',
+            dragDisabled: true, // ป้องกันการลาก
+            render: (_, __, index) => index + 1
+        },
+        {
+            title: 'Label',
+            dataIndex: 'label_register',
+            key: 'label_register',
+            width: 120,
+            fixed: 'left',
+            render: (text, record) => (
                 <Button
                     type="dashed"
                     size="small"
@@ -311,55 +324,309 @@ const handleDepartmentSelect = (dept) => {
                     disabled={isPrinting}
                     icon={!isPrinting && <div className="flex items-center gap-1"><QrcodeOutlined /><PrinterOutlined /></div>}
                     className="flex items-center justify-center w-full text-blue-600 border-blue-200 hover:border-blue-500 hover:text-blue-500 bg-blue-50"
-                    onClick={() => handleIndividualPrint(params.data)}
+                    onClick={() => handleIndividualPrint(record)}
                 >
                     {isPrinting ? 'รอ...' : 'Print'}
                 </Button>
             )
         },
         {
-            headerName: 'สถานะปริ้น', field: 'print_status', width: 150,
-            cellRenderer: (params) => {
-                const val = parseInt(params.value) || 0;
+            title: 'สถานะปริ้น',
+            dataIndex: 'print_status',
+            key: 'print_status',
+            width: 150,
+            sorter: (a, b) => (Number(a.print_status) || 0) - (Number(b.print_status) || 0),
+            filters: [...new Set(tableData.map(r => r.print_status).filter(v => v !== undefined && v !== null))].map(v => {
+                const val = parseInt(v) || 0;
+                let text = `ปริ้นครั้งที่ ${val}`;
+                if (val === 0) text = 'ยังไม่ปริ้น';
+                else if (val === 1) text = 'ปริ้นแล้ว';
+                return { text, value: v };
+            }),
+            filterSearch: true,
+            onFilter: (value, record) => record.print_status === value,
+            render: (value) => {
+                const val = parseInt(value) || 0;
                 if (val === 0) return <span className="text-orange-500 font-medium">ยังไม่ปริ้น</span>;
                 if (val === 1) return <span className="text-green-600 font-bold">ปริ้นแล้ว</span>;
                 return <span className="text-blue-600 font-bold">ปริ้นครั้งที่ {val}</span>;
             }
         },
         {
-            headerName: 'สถานะใช้งาน', field: 'asset_status', width: 150,
-            cellRenderer: (params) => {
-                const name = params.data.asset_status_name || params.value;
-                const colorClass = params.data.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+            title: 'สถานะใช้งาน',
+            dataIndex: 'asset_status',
+            key: 'asset_status',
+            width: 160,
+            sorter: (a, b) => String(a.asset_status_name || a.asset_status || '').localeCompare(String(b.asset_status_name || b.asset_status || '')),
+            filters: [...new Set(tableData.map(r => r.asset_status_name || r.asset_status).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => (record.asset_status_name || record.asset_status) === value,
+            render: (value, record) => {
+                const name = record.asset_status_name || value;
+                const colorClass = record.asset_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>{name}</div>;
             }
         },
         {
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
-            cellRenderer: (params) => {
-                const name = params.data.is_status_name || params.value;
-                const colorClass = params.data.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
+            title: 'สถานะ',
+            dataIndex: 'is_status',
+            key: 'is_status',
+            width: 160,
+            sorter: (a, b) => String(a.is_status_name || a.is_status || '').localeCompare(String(b.is_status_name || b.is_status || '')),
+            filters: [...new Set(tableData.map(r => r.is_status_name || r.is_status).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => (record.is_status_name || record.is_status) === value,
+            render: (value, record) => {
+                const name = record.is_status_name || value;
+                const colorClass = record.is_status_color || 'bg-gray-100 text-gray-600 border-gray-200';
                 return <div className={`px-2 py-0.5 rounded border text-xs text-center font-medium ${colorClass}`}>{name}</div>;
             }
         },
-        { headerName: 'รหัสทรัพย์สิน', field: 'asset_code', width: 180 },
-        { headerName: 'Lot No', field: 'asset_lot', width: 150 },
-        { headerName: 'รายละเอียดทรัพย์สิน', field: 'asset_detail', width: 200 },
-        { headerName: 'ประเภททรัพย์สิน', field: 'asset_type', width: 180 },
-        { headerName: 'โมเดล', field: 'asset_model', width: 180 },
-        { headerName: 'ที่อยู่ทรัพย์สิน', field: 'asset_location', width: 150 },
-        { headerName: 'Part Code', field: 'partCode', width: 150 },
-        { headerName: 'Part Name', field: 'partName', width: 150 },
-        { headerName: 'Label Code', field: 'label_register', width: 150 },
-        { headerName: 'เลขที่เอกสาร', field: 'doc_no', width: 150 },
-        { headerName: 'วันที่ขึ้นทะเบียน', field: 'create_date', width: 180, valueFormatter: (params) => params.value ? dayjs(params.value).format('DD/MM/YYYY') : '-' },
-        { headerName: 'ผู้ครอบครอง', field: 'asset_holder', width: 150 },
-        { headerName: 'ใช้สำหรับงาน', field: 'asset_usedfor', width: 150 },
-        { headerName: 'ผู้จำหน่าย', field: 'asset_supplier_name', width: 150 },
-        { headerName: 'ยี่ห้อ', field: 'asset_brand', width: 150 },
-        { headerName: 'แหล่งที่มา', field: 'asset_source', width: 150 },
-        { headerName: 'คุณสมบัติ', field: 'asset_feature', width: 150 },
-    ], [isPrinting]);
+        {
+            title: 'รหัส',
+            dataIndex: 'partCode',
+            key: 'partCode',
+            width: 120,
+            sorter: (a, b) => String(a.partCode || '').localeCompare(String(b.partCode || '')),
+            filters: [...new Set(tableData.map(r => r.partCode).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.partCode === value,
+        },
+        {
+            title: 'โมเดล',
+            dataIndex: 'asset_model',
+            key: 'asset_model',
+            width: 120,
+            sorter: (a, b) => String(a.asset_model || '').localeCompare(String(b.asset_model || '')),
+            filters: [...new Set(tableData.map(r => r.asset_model).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_model === value,
+        },
+        {
+            title: 'ทะเบียนบรรจุภัณฑ์',
+            dataIndex: 'asset_code',
+            key: 'asset_code',
+            width: 200,
+            sorter: (a, b) => String(a.asset_code || '').localeCompare(String(b.asset_code || '')),
+            filters: [...new Set(tableData.map(r => r.asset_code).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_code === value,
+        },
+        {
+            title: 'หน่วยนับ',
+            dataIndex: 'asset_unitname',
+            key: 'asset_unitname',
+            width: 150,
+            sorter: (a, b) => String(a.asset_unitname || '').localeCompare(String(b.asset_unitname || '')),
+            filters: [...new Set(tableData.map(r => r.asset_unitname).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_unitname === value,
+        },
+        {
+            title: 'หมายเลขล็อต',
+            dataIndex: 'asset_lot',
+            key: 'asset_lot',
+            width: 180,
+            sorter: (a, b) => String(a.asset_lot || '').localeCompare(String(b.asset_lot || '')),
+            filters: [...new Set(tableData.map(r => r.asset_lot).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_lot === value,
+        },
+        {
+            title: 'ปัจจุบันอยู่ที่',
+            dataIndex: 'current_address',
+            key: 'current_address',
+            width: 150,
+            sorter: (a, b) => String(a.current_address || '').localeCompare(String(b.current_address || '')),
+            filters: [...new Set(tableData.map(r => r.current_address).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.current_address === value,
+        },
+        {
+            title: 'วันที่ซื้อ',
+            dataIndex: 'asset_date',
+            key: 'asset_date',
+            width: 180,
+            sorter: (a, b) => dayjs(a.asset_date || 0).valueOf() - dayjs(b.asset_date || 0).valueOf(),
+            filters: [...new Set(tableData.map(r => r.asset_date ? dayjs(r.asset_date).format('DD/MM/YYYY') : null).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => (record.asset_date ? dayjs(record.asset_date).format('DD/MM/YYYY') : null) === value,
+            render: (value) => value ? dayjs(value).format('DD/MM/YYYY') : '-'
+        },
+        {
+            title: 'ความกว้าง',
+            dataIndex: 'asset_width',
+            key: 'asset_width',
+            width: 160,
+            sorter: (a, b) => (Number(a.asset_width) || 0) - (Number(b.asset_width) || 0),
+            filters: Array.from(
+                new Set(
+                    tableData.filter(r => r.asset_width !== null && r.asset_width !== undefined)
+                        .map(r => `${Number(r.asset_width).toFixed(2)} ${r.asset_width_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+            onFilter: (value, record) => {
+                if (record.asset_width === null || record.asset_width === undefined) return false;
+                const recordValue = `${Number(record.asset_width).toFixed(2)} ${record.asset_width_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_width) || 0;
+                const unit = record?.asset_width_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        {
+            title: 'ความยาว',
+            dataIndex: 'asset_length',
+            key: 'asset_length',
+            width: 160,
+            sorter: (a, b) => (Number(a.asset_length) || 0) - (Number(b.asset_length) || 0),
+            filters: Array.from(
+                new Set(
+                    tableData.filter(r => r.asset_length !== null && r.asset_length !== undefined)
+                        .map(r => `${Number(r.asset_length).toFixed(2)} ${r.asset_length_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+            onFilter: (value, record) => {
+                if (record.asset_length === null || record.asset_length === undefined) return false;
+                const recordValue = `${Number(record.asset_length).toFixed(2)} ${record.asset_length_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_length) || 0;
+                const unit = record?.asset_length_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        {
+            title: 'ความสูง',
+            dataIndex: 'asset_height',
+            key: 'asset_height',
+            width: 160,
+            sorter: (a, b) => (Number(a.asset_height) || 0) - (Number(b.asset_height) || 0),
+            filters: Array.from(
+                new Set(
+                    tableData.filter(r => r.asset_height !== null && r.asset_height !== undefined)
+                        .map(r => `${Number(r.asset_height).toFixed(2)} ${r.asset_height_unit || ''}`.trim())
+                )
+            ).map(text => ({ text: text, value: text })),
+            filterSearch: true,
+            onFilter: (value, record) => {
+                if (record.asset_height === null || record.asset_height === undefined) return false;
+                const recordValue = `${Number(record.asset_height).toFixed(2)} ${record.asset_height_unit || ''}`.trim();
+                return recordValue === value;
+            },
+            render: (_, record) => {
+                const val = parseFloat(record?.asset_height) || 0;
+                const unit = record?.asset_height_unit || '';
+                return `${val.toFixed(2)} ${unit}`.trim();
+            }
+        },
+        {
+            title: 'ชื่อ',
+            dataIndex: 'asset_detail',
+            key: 'asset_detail',
+            width: 200,
+            sorter: (a, b) => String(a.asset_detail || '').localeCompare(String(b.asset_detail || '')),
+            filters: [...new Set(tableData.map(r => r.asset_detail).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_detail === value,
+        },
+        {
+            title: 'ประเภท',
+            dataIndex: 'asset_type',
+            key: 'asset_type',
+            width: 180,
+            sorter: (a, b) => String(a.asset_type || '').localeCompare(String(b.asset_type || '')),
+            filters: [...new Set(tableData.map(r => r.asset_type).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_type === value,
+        },
+        {
+            title: 'เลขที่เอกสาร',
+            dataIndex: 'doc_no',
+            key: 'doc_no',
+            width: 180,
+            sorter: (a, b) => String(a.doc_no || '').localeCompare(String(b.doc_no || '')),
+            filters: [...new Set(tableData.map(r => r.doc_no).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.doc_no === value,
+        },
+        {
+            title: 'ฝ่ายที่รับผิดชอบ',
+            dataIndex: 'asset_responsible_department',
+            key: 'asset_responsible_department',
+            width: 180,
+            sorter: (a, b) => String(a.asset_responsible_department || '').localeCompare(String(b.asset_responsible_department || '')),
+            filters: [...new Set(tableData.map(r => r.asset_responsible_department).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_responsible_department === value,
+        },
+        {
+            title: 'ใช้สำหรับ',
+            dataIndex: 'asset_usedfor',
+            key: 'asset_usedfor',
+            width: 150,
+            sorter: (a, b) => String(a.asset_usedfor || '').localeCompare(String(b.asset_usedfor || '')),
+            filters: [...new Set(tableData.map(r => r.asset_usedfor).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_usedfor === value,
+        },
+        {
+            title: 'สี',
+            dataIndex: 'asset_color',
+            key: 'asset_color',
+            width: 150,
+            sorter: (a, b) => String(a.asset_color || '').localeCompare(String(b.asset_color || '')),
+            filters: [...new Set(tableData.map(r => r.asset_color).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_color === value,
+        },
+        {
+            title: 'ผู้จำหน่าย',
+            dataIndex: 'asset_supplier_name',
+            key: 'asset_supplier_name',
+            width: 150,
+            sorter: (a, b) => String(a.asset_supplier_name || '').localeCompare(String(b.asset_supplier_name || '')),
+            filters: [...new Set(tableData.map(r => r.asset_supplier_name).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_supplier_name === value,
+        },
+        {
+            title: 'แบรนด์',
+            dataIndex: 'asset_brand',
+            key: 'asset_brand',
+            width: 150,
+            sorter: (a, b) => String(a.asset_brand || '').localeCompare(String(b.asset_brand || '')),
+            filters: [...new Set(tableData.map(r => r.asset_brand).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_brand === value,
+        },
+        {
+            title: 'แหล่งที่มา',
+            dataIndex: 'asset_source',
+            key: 'asset_source',
+            width: 150,
+            sorter: (a, b) => String(a.asset_source || '').localeCompare(String(b.asset_source || '')),
+            filters: [...new Set(tableData.map(r => r.asset_source).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_source === value,
+        },
+        {
+            title: 'คุณสมบัติ',
+            dataIndex: 'asset_feature',
+            key: 'asset_feature',
+            width: 150,
+            sorter: (a, b) => String(a.asset_feature || '').localeCompare(String(b.asset_feature || '')),
+            filters: [...new Set(tableData.map(r => r.asset_feature).filter(Boolean))].map(v => ({ text: v, value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.asset_feature === value,
+        },
+    ], [isPrinting, tableData]);
+
 
     const filteredRows = useMemo(() => {
         if (!searchTerm) return tableData;
@@ -371,6 +638,16 @@ const handleDepartmentSelect = (dept) => {
         );
     }, [tableData, searchTerm]);
 
+    // การจัดการ Checkbox สำหรับ Ant Design Table
+    const rowSelection = {
+        selectedRowKeys: selectedRows.map(row => row.asset_code), // ใช้ asset_code เป็น Key หลัก
+        onChange: (selectedRowKeys, selectedRowsData) => {
+            setSelectedRows(selectedRowsData);
+        },
+        columnWidth: 50,
+        fixed: 'left'
+    };
+
     return (
         <div style={containerStyle} className="bg-slate-50 relative">
             {/* --- Header (Responsive) --- */}
@@ -380,9 +657,9 @@ const handleDepartmentSelect = (dept) => {
                     <div className="truncate">
                         <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2 text-base sm:text-lg">
                             <span className="bg-blue-600 w-1.5 sm:w-2 h-5 sm:h-6 rounded-r-md block"></span>
-                            <span className="truncate">ลงทะเบียนทรัพย์สิน</span>
+                            <span className="truncate">ลงทะเบียน</span>
                         </Title>
-                        <Text className="text-slate-500 text-[10px] sm:text-xs ml-3 sm:ml-4 truncate block">ระบบจัดการและสร้างรายการทรัพย์สินใหม่</Text>
+                        <Text className="text-slate-500 text-[10px] sm:text-xs ml-3 sm:ml-4 truncate block">ระบบจัดการและสร้างรายการใหม่</Text>
                     </div>
                 </div>
                 <Button type="text" danger icon={<CloseOutlined />} onClick={() => navigate(-1)} className="hover:bg-red-50 rounded-full shrink-0 hidden sm:flex">ปิด</Button>
@@ -406,11 +683,12 @@ const handleDepartmentSelect = (dept) => {
                                 <Form.Item name="asset_feature" hidden><Input /></Form.Item>
                                 <Form.Item name="asset_type" hidden><Input /></Form.Item>
                                 <Form.Item name="current_address" hidden><Input /></Form.Item>
+                                <Form.Item name="asset_unitname" hidden><Input /></Form.Item>
 
                                 {/* ใช้ xs={24} sm={12} เพื่อให้ช่อง input เรียงซ้อนบนมือถือ เรียงคู่บน Desktop/Tablet */}
                                 <Row gutter={12}>
                                     <Col xs={24} sm={12}>
-                                        <Form.Item label="รหัสทรัพย์สิน" name="asset_code" rules={[{ required: true, message: 'ระบุรหัสทรัพย์สิน' }]}>
+                                        <Form.Item label="รหัส" name="asset_code" rules={[{ required: true, message: 'ระบุรหัส' }]}>
                                             <Input
                                                 prefix={<BarcodeOutlined className="text-slate-400 mr-1" />}
                                                 placeholder="Scan / ระบุรหัส"
@@ -471,8 +749,8 @@ const handleDepartmentSelect = (dept) => {
                                 </Row>
                                 <Row gutter={12}>
                                     <Col xs={24} sm={12}>
-                                        <Form.Item label="ชื่อทรัพย์สิน" name="asset_detail">
-                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ระบุชื่อทรัพย์สิน" disabled={isFormLocked} />
+                                        <Form.Item label="ชื่อ" name="asset_detail">
+                                            <Input prefix={<TagOutlined className="text-slate-400" />} placeholder="ระบุชื่อ" disabled={isFormLocked} />
                                         </Form.Item>
                                     </Col>
                                     <Col xs={24} sm={12}>
@@ -563,7 +841,7 @@ const handleDepartmentSelect = (dept) => {
                             <Col xs={24} lg={8} className="p-4 sm:p-6 bg-white flex flex-col h-full">
                                 <div className="mb-4 flex items-center gap-2 text-slate-700">
                                     <PictureOutlined className="text-purple-500 text-lg" />
-                                    <span className="font-semibold text-base">รูปภาพทรัพย์สิน</span>
+                                    <span className="font-semibold text-base">รูปภาพ</span>
                                 </div>
                                 <div className="flex-1 flex flex-col">
                                     <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden shadow-inner group hover:border-blue-400 transition-colors">
@@ -627,20 +905,24 @@ const handleDepartmentSelect = (dept) => {
                         </div>
                     </div>
                     {/* กำหนดให้ตารางไหลลื่นแนวนอน (overflow-x-auto) และปรับระดับความสูงให้เข้ากับอุปกรณ์ */}
-                    <div className="w-full h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
-                        <DataTable
-                            rowData={filteredRows}
-                            columnDefs={columnDefs}
-                            loading={false}
-                            rowSelection="multiple"
-                            suppressRowClickSelection={true}
-                            onSelectionChanged={(params) => setSelectedRows(params.api.getSelectedRows())}
+                    <div className="w-full h-[400px] md:h-[500px] lg:h-[600px] flex flex-col p-3">
+                        <DraggableTable
+                            dataSource={filteredRows}
+                            columns={columns}
+                            rowKey="asset_code"
+                            rowSelection={rowSelection}
+                            scroll={{ x: 'max-content', y: '100%' }}
+                            pagination={{
+                                defaultPageSize: 100,
+                                showSizeChanger: true,
+                                pageSizeOptions: ['50', '100', '200']
+                            }}
                         />
                     </div>
                 </Card>
             </div >
 
-            {/* Modal เลือก Master Data ทรัพย์สิน */}
+            {/* Modal เลือก Master Data  */}
             <ModalAssetList open={isModalListOpen} onClose={() => setIsModalListOpen(false)} onSelect={handleMaterialSelect} />
 
             {/* Modal เลือกแผนกที่เพิ่มมาใหม่ */}
@@ -674,7 +956,7 @@ const handleDepartmentSelect = (dept) => {
                                 />
                             </div>
 
-                            {/* 2. รหัสทรัพย์สิน แสดงอยู่ด้านล่าง */}
+                            {/* 2. รหัส แสดงอยู่ด้านล่าง */}
                             <div style={{ textAlign: 'center', overflow: 'hidden' }}>
                                 <div style={{ fontWeight: 'bold', fontSize: '5px' }}> {/* ปรับ fontSize ให้พอดีกับการพิมพ์ (2px จะเล็กเกินไปตอนพิมพ์จริง) */}
                                     {item.asset_code}

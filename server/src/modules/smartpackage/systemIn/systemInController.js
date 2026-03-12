@@ -2,6 +2,7 @@
 'use strict';
 const model = require('./systemInModel');
 const dayjs = require('dayjs');
+const { generateUsagePDF } = require('./inPDF');
 
 async function initBooking(req, res, next) {
   try {
@@ -96,6 +97,23 @@ async function unlockBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
+    // --- 1. ตรวจสอบเงื่อนไขก่อนปลดล็อค ---
+    const booking = await model.getBookingDetail(draft_id);
+    if (booking && booking.refID) {
+      // ดึงรายการในตะกร้าที่มี refID ตรงกัน และสถานะเป็น 108
+      const assets108 = await model.getUnlockedAssetsByRefID(booking.refID);
+
+      // ถ้าไม่มีรายการ 108 อยู่เลย ให้ตีกลับการทำงานทันที
+      if (!assets108 || assets108.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'ไม่อนุญาติให้แก้ไข เนื่องไม่พบรายการ'
+        });
+      }
+    }
+    // ------------------------------------
+
+    // 2. ถ้ามีรายการผ่านเงื่อนไข ค่อยดำเนินการปลดล็อค (134)
     await model.unlockBooking(draft_id, user_id);
 
     const io = req.app.get('io');
@@ -172,11 +190,13 @@ async function getDropdowns(req, res, next) {
 
 async function getBookingList(req, res, next) {
   try {
-    // ✅ รับค่า date จาก query parameter ถ้าไม่ส่งมาให้ใช้ "วันนี้"
-    const { date } = req.query;
-    const searchDate = date || dayjs().format('YYYY-MM-DD');
+    const { startDate, endDate } = req.query;
 
-    const rows = await model.getAllBookings(searchDate);
+    // ตั้งค่าเริ่มต้น: วันแรกของเดือนปัจจุบัน ถึง วันสุดท้ายของเดือนปัจจุบัน
+    const sDate = startDate || dayjs().startOf('month').format('YYYY-MM-DD');
+    const eDate = endDate || dayjs().endOf('month').format('YYYY-MM-DD');
+
+    const rows = await model.getAllBookings(sDate, eDate);
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 }
@@ -188,18 +208,35 @@ async function getBookingDetail(req, res, next) {
 
     const booking = await model.getBookingDetail(draft_id);
     let assets = [];
+    let hasActiveItems = false; // ✅ 1. เพิ่ม Flag เช็คสถานะ 108
 
     if (booking) {
       const status = String(booking.is_status);
+
       if (status === '135') {
-        assets = await model.getAssetsDetailByRefID(booking.refID);
-      } else if (status === '134' || status === '131' || status === '136') {
+        // ✅ 2. เช็คว่ามีของที่ยังรอรับเข้า (108) ค้างในตาราง Master ไหม
+        const masterAssets = await model.getUnlockedAssetsByRefID(booking.refID);
+
+        if (masterAssets && masterAssets.length > 0) {
+          assets = masterAssets;
+          hasActiveItems = true; // มีของจริง (ปลดล็อคได้)
+        } else {
+          assets = await model.getAssetsDetailByRefID(booking.refID);
+          hasActiveItems = false; // ไม่มีของจริง โชว์แค่ประวัติ (ปลดล็อคไม่ได้)
+        }
+      } else if (status === '134') {
+        assets = await model.getUnlockedAssetsByRefID(booking.refID);
+        hasActiveItems = assets.length > 0;
+      } else if (status === '131' || status === '136') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
+        hasActiveItems = assets.length > 0;
       } else {
         assets = await model.getAssetsByDraft(draft_id);
+        hasActiveItems = assets.length > 0;
       }
     }
-    res.json({ success: true, booking, assets });
+    // ✅ 3. ส่ง hasActiveItems กลับไปให้ Frontend
+    res.json({ success: true, booking, assets, hasActiveItems });
   } catch (err) { next(err); }
 }
 
@@ -237,6 +274,35 @@ async function confirmOutput(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function printUsagePDF(req, res, next) {
+  try {
+    const { ids, draft_id } = req.body;
+    const user_id = req.user?.employee_id;
+    if (!ids || ids.length === 0) throw new Error("ไม่พบรายการที่เลือก");
+
+    const booking = await model.getBookingDetail(draft_id);
+
+    const origin = booking ? booking.origin : '-';
+    const destination = booking ? booking.destination : '-';
+
+    // 📌 ดึงวันที่และเวลาเบิกใช้งานมาจัดฟอร์แมต
+    const createDate = booking?.create_date ? dayjs(booking.create_date).format('DD/MM/YYYY') : '-';
+    const createTime = booking?.create_time ? booking.create_time : '-';
+
+    const items = await model.getAssetsForPrint(ids);
+    const printByName = await model.getUserFullName(user_id);
+
+    // 📌 ส่ง createDate และ createTime เข้าไปในฟังก์ชัน
+    const pdfBuffer = await generateUsagePDF(items, origin, destination, printByName, createDate, createTime);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   initBooking,
   getScannedList,
@@ -251,5 +317,6 @@ module.exports = {
   cancelBooking,
   finalizeBooking,
   unlockBooking,
-  confirmOutput
+  confirmOutput,
+  printUsagePDF
 };

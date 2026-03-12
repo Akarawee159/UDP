@@ -7,18 +7,17 @@ services:
   client:
     build:
       context: ./client
-      dockerfile: Dockerfile
-      # 👇 สำคัญ: React ต้องการค่านี้ตอน Build Image เพื่อให้รู้ว่า Backend อยู่ไหน
-      args:
-        - VITE_API_PATH=${VITE_API_PATH} 
-    container_name: udp-client
+      dockerfile: Dockerfile.prod  # ✅ เปลี่ยนไปใช้ไฟล์สำหรับ Production
+    container_name: udp-client-prod
     restart: always
     ports:
-      - "3091:80"  # ✅ เปิดไว้เพื่อเข้าผ่าน IP:3091 หรือให้ Nginx หลัก Proxy เข้ามา
+      # ✅ มักจะ map เข้า port 80 ของ Nginx ใน Container (ปรับได้ตาม Dockerfile ของคุณ)
+      - "3091:80"               
     environment:
       - TZ=Asia/Bangkok
     networks:
       - shared-network
+    # ❌ เอา volumes ที่ sync code และ CHOKIDAR_USEPOLLING ออก
 
   # ------------------------------------
   # Backend: Node.js (Production Mode)
@@ -26,27 +25,24 @@ services:
   server:
     build:
       context: ./server
-      dockerfile: Dockerfile      # ✅ แนะนำให้ใช้ไฟล์สำหรับ Prod (ที่ใช้ node server.js)
-    container_name: udp-server
+      dockerfile: Dockerfile.prod  # ✅ เปลี่ยนไปใช้ไฟล์สำหรับ Production
+    container_name: udp-server-prod
     restart: always
     ports:
       - "3092:3092"
     environment:
       - PORT=3092
-      - NODE_ENV=production
+      - NODE_ENV=production        # ✅ เปลี่ยนเป็น production
       - TZ=Asia/Bangkok
-      # 👇 Database Config (รับค่าจาก Portainer)
-      - DB_HOST=db-mysql          # อ้างอิงชื่อ Container DB ใน Stack หลัก
+      - DB_HOST=db-mysql
       - DB_PORT=3306
-      - DB_USER=root
-      - DB_PASSWORD=${DB_PASSWORD} # รับค่า Password จาก Env
-      - DB_NAME=${DB_NAME}        # ชื่อ Database ที่จะใช้
-      - JWT_SECRET=${JWT_SECRET}
-      - REFRESH_SECRET=${REFRESH_SECRET}
+    env_file:
+      - ./server/.env
+    volumes:
+      # ✅ เก็บไว้เฉพาะโฟลเดอร์ที่ต้องการเก็บข้อมูลถาวร เช่น รูปภาพที่อัปโหลด
+      - ./server/src/img:/app/src/img 
     networks:
       - shared-network
-    volumes:
-      - ./server/src/img:/app/src/img
 
 networks:
   shared-network:

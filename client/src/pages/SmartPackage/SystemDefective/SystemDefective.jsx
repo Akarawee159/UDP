@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { App, Button, Input, ConfigProvider, Grid, Tag, DatePicker, Tabs } from 'antd';
-import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined, CalendarOutlined } from '@ant-design/icons';
+import { SearchOutlined, CaretRightOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import api from "../../../api";
 import { getSocket } from '../../../socketClient';
 import SystemDefectiveList from './Page/SystemDefectiveList';
 import dayjs from 'dayjs';
 import 'dayjs/locale/th';
 import thTH from 'antd/locale/th_TH';
+
+// ✅ นำเข้า Tab ทั้ง 2 หน้า
 import TabDefective from './TabDefective';
+import TabDefective2 from './TabDefective2';
 
 // ✅ นำเข้า DraggableTable
 import DraggableTable from '../../../components/antdtable/DraggableTable';
@@ -23,16 +26,18 @@ function SystemDefective() {
     const [rows, setRows] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const [selectedDate, setSelectedDate] = useState(dayjs());
+    const { RangePicker } = DatePicker;
+    const [dateRange, setDateRange] = useState([dayjs().startOf('month'), dayjs().endOf('month')]);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDraftId, setSelectedDraftId] = useState(null);
 
-    // ✅ State สำหรับ Pagination และความสูงของตาราง
+    // ✅ เพิ่ม State สำหรับควบคุม Tab ปัจจุบัน
+    const [activeTab, setActiveTab] = useState('1');
+
     const [page, setPage] = useState({ current: 1, pageSize: 10 });
     const [tableY, setTableY] = useState(600);
 
-    // ✅ คำนวณความสูงตารางอัตโนมัติ
     useEffect(() => {
         const onResize = () => setTableY(Math.max(400, window.innerHeight - 300));
         onResize();
@@ -41,11 +46,15 @@ function SystemDefective() {
     }, []);
 
     const fetchData = useCallback(async () => {
+        // ให้โหลดข้อมูลเฉพาะตอนอยู่ Tab 1 (แจ้งชำรุด)
+        if (activeTab !== '1') return;
+
         try {
             setLoading(true);
-            const dateStr = selectedDate ? selectedDate.format('YYYY-MM-DD') : '';
+            const startDateStr = dateRange && dateRange[0] ? dateRange[0].format('YYYY-MM-DD') : '';
+            const endDateStr = dateRange && dateRange[1] ? dateRange[1].format('YYYY-MM-DD') : '';
             const res = await api.get('/smartpackage/systemdefective', {
-                params: { date: dateStr }
+                params: { startDate: startDateStr, endDate: endDateStr }
             });
             setRows(res?.data?.data || []);
         } catch (err) {
@@ -54,7 +63,7 @@ function SystemDefective() {
         } finally {
             setLoading(false);
         }
-    }, [message, selectedDate]);
+    }, [message, dateRange, activeTab]);
 
     useEffect(() => {
         fetchData();
@@ -93,10 +102,9 @@ function SystemDefective() {
         }
 
         if (foundDraft) {
-            // ✅ ปรับรูปแบบ message.info ให้เป็นแบบ Object และใส่ key เข้าไป
             message.info({
                 content: 'ระบบพบ! คุณสร้างรายการแบบร่างไว้ จึงเปิดรายการล่าสุดให้คุณ',
-                key: 'draft_found_msg' // <-- กำหนด key แบบนี้
+                key: 'draft_found_msg'
             });
             setSelectedDraftId(foundDraft.draft_id);
         } else {
@@ -126,21 +134,6 @@ function SystemDefective() {
         );
     }, [rows, searchTerm]);
 
-    const handleConfirmOutput = async (draft_id) => {
-        try {
-            setLoading(true);
-            await api.post('/smartpackage/systemdefective/confirm-output', { draft_id });
-            message.success('ยืนยันการแจ้งชำรุดสำเร็จ');
-            fetchData();
-        } catch (err) {
-            console.error(err);
-            message.error('ไม่สามารถยืนยันรายการได้');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // ====== Columns (Ant Design Format) ======
     const baseColumns = useMemo(() => [
         {
             title: 'ลำดับ',
@@ -157,7 +150,6 @@ function SystemDefective() {
             align: 'center',
             dragDisabled: true,
             render: (_, record) => {
-                // ✅ แสดงไอคอนเมื่อสถานะเป็น 145 ตามเงื่อนไขข้อ 9
                 if (String(record.is_status) === '145' || record.is_status_name === 'รับเข้าเรียบร้อย') {
                     return (
                         <div onClick={(e) => e.stopPropagation()}>
@@ -168,17 +160,6 @@ function SystemDefective() {
                 return <span className="text-gray-300">-</span>;
             }
         },
-        // {
-        //     title: 'เลขที่เอกสาร',
-        //     dataIndex: 'refID',
-        //     key: 'refID',
-        //     width: 180,
-        //     sorter: (a, b) => String(a.refID || '').localeCompare(String(b.refID || '')),
-        //     filters: [...new Set(rows.map(r => r.refID).filter(Boolean))].map(v => ({ text: v, value: v })),
-        //     filterSearch: true,
-        //     onFilter: (value, record) => record.refID === value,
-        //     render: (val) => <span className="font-bold text-blue-600">{val}</span>
-        // },
         {
             title: 'สถานะ',
             dataIndex: 'is_status_name',
@@ -198,7 +179,7 @@ function SystemDefective() {
             title: 'รับเข้าจาก (ปลายทาง)',
             dataIndex: 'origin',
             key: 'origin',
-            width: 160,
+            width: 190,
             align: 'center',
             sorter: (a, b) => String(a.origin || '').localeCompare(String(b.origin || '')),
             render: (val) => <span className="text-gray-600">{val || '-'}</span>
@@ -216,9 +197,12 @@ function SystemDefective() {
             title: 'จำนวน',
             dataIndex: 'attendees',
             key: 'attendees',
-            width: 100,
+            width: 120,
             align: 'center',
             sorter: (a, b) => Number(a.attendees || 0) - Number(b.attendees || 0),
+            filters: [...new Set(rows.map(r => r.attendees).filter(v => v !== null && v !== undefined && v !== ''))].sort((a, b) => a - b).map(v => ({ text: String(v), value: v })),
+            filterSearch: true,
+            onFilter: (value, record) => record.attendees === value,
             render: (val) => (
                 <Tag color="blue" className="w-full text-center text-sm m-0 border-0 rounded-md">
                     {val || 0}
@@ -268,7 +252,7 @@ function SystemDefective() {
             locale={thTH}
             theme={{
                 token: {
-                    colorPrimary: '#f54a00', // สีตรงวันที่ และ ปุ่ม "แสดง/ซ่อนคอลัมน์"
+                    colorPrimary: '#f54a00',
                     borderRadius: 2,
                     fontFamily: 'Inter, "Sarabun", sans-serif',
                 }
@@ -276,24 +260,39 @@ function SystemDefective() {
         >
             <div className={`h-screen flex flex-col bg-gray-50 ${isMd ? 'p-4' : 'p-2'}`}>
 
-                {/* ✅ ครอบด้วยส่วนของ Tabs เพื่อแยกหน้าต่าง */}
+                <style>{`
+                    .system-defective-tabs .ant-tabs-content-holder {
+                        flex: 1;
+                        overflow: hidden;
+                    }
+                    .system-defective-tabs .ant-tabs-content {
+                        height: 100%;
+                    }
+                    .system-defective-tabs .ant-tabs-tabpane {
+                        height: 100%;
+                        display: flex;
+                        flex-direction: column;
+                    }
+                `}</style>
+
                 <div className="bg-white p-2 rounded-md shadow-sm flex-1 flex flex-col overflow-hidden">
                     <Tabs
-                        defaultActiveKey="1"
-                        className="flex-1 overflow-hidden"
+                        activeKey={activeTab} // ✅ ระบุ Tab ปัจจุบัน
+                        onChange={(key) => setActiveTab(key)} // ✅ เปลี่ยน State เมื่อคลิก
+                        destroyInactiveTabPane={true} // ✅ เคลียร์คอมโพเนนต์ที่ไม่ได้เปิด เพื่อให้โหลดและจัดหน้าใหม่ตอนเปิด
+                        className="flex-1 flex flex-col overflow-hidden system-defective-tabs"
                         items={[
                             {
                                 key: '1',
                                 label: 'แจ้งชำรุด',
                                 children: (
-                                    <div className="pt-2 h-full">
-                                        {/* ✅ เรียกใช้ DraggableTable (ตารางเดิมของคุณ) */}
+                                    <div className="pt-2 h-full flex flex-col w-full">
                                         <DraggableTable
                                             columns={baseColumns}
                                             dataSource={filteredRows}
-                                            rowKey="draft_id" // ใช้ draft_id เป็น Key
+                                            rowKey="draft_id"
                                             loading={loading}
-                                            scroll={{ x: 'max-content', y: tableY - 60 }} // ลบความสูงออกเล็กน้อยเพื่อเผื่อที่ให้แถบ Tabs ด้านบน
+                                            scroll={{ x: 'max-content', y: tableY }}
 
                                             pagination={{
                                                 current: page.current,
@@ -305,13 +304,11 @@ function SystemDefective() {
                                             }}
                                             onChange={(pg) => setPage({ current: pg.current, pageSize: pg.pageSize })}
 
-                                            // ✅ คลิกแถวเพื่อเปิด Modal
                                             onRow={(record) => ({
                                                 onClick: () => handleRowClick(record),
                                                 className: "cursor-pointer"
                                             })}
 
-                                            // ✅ Toolbar
                                             renderToolbar={(ColumnVisibility) => (
                                                 <div className="w-full mb-4 flex flex-col md:flex-row md:items-center justify-start gap-4 flex-none">
                                                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 bg-white p-2 rounded-md shadow-sm border border-gray-100 w-full md:w-auto">
@@ -337,18 +334,16 @@ function SystemDefective() {
 
                                                             <div className="flex items-center gap-2 px-2 h-9 border border-gray-200 rounded-md bg-white">
                                                                 <span className="text-gray-500 text-sm hidden lg:inline">วันที่:</span>
-                                                                <DatePicker
-                                                                    value={selectedDate}
-                                                                    onChange={(date) => setSelectedDate(date)}
+                                                                <RangePicker
+                                                                    value={dateRange}
+                                                                    onChange={(dates) => setDateRange(dates)}
                                                                     format="DD/MM/YYYY"
                                                                     allowClear={false}
                                                                     variant="borderless"
-                                                                    className="w-32 cursor-pointer"
-                                                                    suffixIcon={<CalendarOutlined className="text-orange-600" />}
+                                                                    className="w-56 cursor-pointer"
                                                                 />
                                                             </div>
 
-                                                            {/* ปุ่มซ่อน/แสดงคอลัมน์ */}
                                                             {ColumnVisibility}
                                                         </div>
                                                     </div>
@@ -362,9 +357,19 @@ function SystemDefective() {
                                 key: '2',
                                 label: 'รายการชำรุด',
                                 children: (
-                                    <div className="pt-2 h-full">
-                                        {/* ✅ เรียกใช้คอมโพเนนต์ใหม่ที่คุณจะสร้าง */}
+                                    <div className="pt-2 h-full flex flex-col w-full">
+                                        {/* ✅ เรียกใช้คอมโพเนนต์ TabDefective */}
                                         <TabDefective />
+                                    </div>
+                                )
+                            },
+                            {
+                                key: '3',
+                                label: 'รายการจ่ายออก',
+                                children: (
+                                    <div className="pt-2 h-full flex flex-col w-full">
+                                        {/* ✅ เรียกใช้คอมโพเนนต์ TabDefective2 */}
+                                        <TabDefective2 />
                                     </div>
                                 )
                             }

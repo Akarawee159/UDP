@@ -35,7 +35,7 @@ function RegisterAsset() {
             setRows(res?.data?.data || []);
         } catch (err) {
             console.error(err);
-            message.error('ดึงข้อมูลทะเบียนทรัพย์สินไม่สำเร็จ');
+            message.error('ดึงข้อมูลทะเบียนบรรจุภัณฑ์ไม่สำเร็จ');
         } finally {
             setLoading(false);
         }
@@ -185,7 +185,7 @@ function RegisterAsset() {
             lockVisible: true,
         },
         {
-            headerName: 'รหัสทรัพย์สิน',
+            headerName: 'รหัสบรรจุภัณฑ์',
             field: 'partCode',
             width: 200,
             filter: true,
@@ -193,7 +193,7 @@ function RegisterAsset() {
             pinned: 'left',
         },
         {
-            headerName: 'ชื่อทรัพย์สิน',
+            headerName: 'ชื่อบรรจุภัณฑ์',
             field: 'asset_detail',
             minWidth: 200,
             flex: 1,
@@ -271,7 +271,7 @@ function RegisterAsset() {
                     <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl shadow-sm border border-gray-100">
                         <Input
                             prefix={<SearchOutlined className="text-gray-400" />}
-                            placeholder="ค้นหา รหัสทรัพย์สิน..."
+                            placeholder="ค้นหา รหัสบรรจุภัณฑ์..."
                             allowClear
                             variant="borderless"
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -284,7 +284,7 @@ function RegisterAsset() {
                             onClick={handleCreate}
                             className="bg-blue-600 hover:bg-blue-500 border-none h-9 rounded-lg px-4 font-medium shadow-md"
                         >
-                            ขึ้นทะเบียนทรัพย์สิน
+                            ขึ้นทะเบียนบรรจุภัณฑ์
                         </Button>
                     </div>
                 </div>

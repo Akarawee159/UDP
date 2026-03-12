@@ -75,13 +75,14 @@ async function generateRefID(draft_id, user_id) {
 }
 
 // 1. ปรับฟังก์ชันอัปเดต Header (บันทึกข้อมูล และสร้าง RefID อัตโนมัติถ้ายังไม่มี)
-// ใน updateBookingHeader
 async function updateBookingHeader(draft_id, body, user_id) {
   const { booking_remark, origin, destination } = body;
   const now = getThaiNow();
 
-  const [bookingRes] = await db.query(`SELECT refID FROM booking_asset_lists WHERE draft_id = ?`, [draft_id]);
+  // ดึงข้อมูลเดิมมาเช็คก่อนว่าสถานะปัจจุบันคืออะไร
+  const [bookingRes] = await db.query(`SELECT refID, is_status FROM booking_asset_lists WHERE draft_id = ?`, [draft_id]);
   let currentRefID = bookingRes[0]?.refID;
+  const currentStatus = String(bookingRes[0]?.is_status);
 
   if (!currentRefID) {
     const dateStr = dayjs().format('DDMMYY');
@@ -94,22 +95,35 @@ async function updateBookingHeader(draft_id, body, user_id) {
     currentRefID = `${prefix}${String(seq).padStart(4, '0')}`;
   }
 
+  // 💡 ป้องกันไม่ให้ is_status โดนบังคับเป็น 141 ถ้ามันถูกปลดล็อคมา (144) 
+  const newStatus = (currentStatus === '144') ? '144' : '141';
+
   await db.query(`
         UPDATE booking_asset_lists
-        SET refID = ?, booking_remark = ?, origin = ?, destination = ?, is_status = '141', updated_by = ?, updated_at = ?
+        SET refID = ?, booking_remark = ?, origin = ?, destination = ?, is_status = ?, updated_by = ?, updated_at = ?
         WHERE draft_id = ?
-    `, [currentRefID, booking_remark, origin, destination, user_id, now, draft_id]);
+    `, [currentRefID, booking_remark, origin, destination, newStatus, user_id, now, draft_id]);
 
+  // ✅ อัปเดตตาราง tb_asset_lists ทั้ง origin, destination และ current_address อ้างอิงจาก draft_id
   await db.query(`
-        UPDATE tb_asset_lists SET asset_origin = ?, asset_destination = ?, updated_at = ? WHERE draft_id = ?
-    `, [origin, destination, now, draft_id]);
+        UPDATE tb_asset_lists 
+        SET asset_origin = ?, 
+            asset_destination = ?, 
+            current_address = ?,
+            updated_at = ? 
+        WHERE draft_id = ?
+    `, [origin, destination, destination, now, draft_id]);
 
   if (currentRefID) {
+    // ✅ อัปเดต Detail สำหรับของที่มีประวัติชำรุดไปแล้วเพื่อให้ข้อมูลสอดคล้องกัน
     await db.query(`
         UPDATE tb_asset_lists_detail 
-        SET asset_origin = ?, asset_destination = ?, updated_at = ? 
-        WHERE refID = ? AND asset_status = '147' AND is_status = '145' -- ⬅️ ปรับเป็น 147
-    `, [origin, destination, now, currentRefID]);
+        SET asset_origin = ?, 
+            asset_destination = ?, 
+            current_address = ?,
+            updated_at = ? 
+        WHERE refID = ? AND asset_status = '147' AND is_status = '145' 
+    `, [origin, destination, destination, now, currentRefID]);
   }
 
   return { success: true, refID: currentRefID };
@@ -122,7 +136,7 @@ async function getAssetsDetailByRefID(refID) {
         FROM tb_asset_lists_detail d
         LEFT JOIN tb_erp_status s ON d.asset_status = s.G_CODE AND s.G_USE = 'A1'
         LEFT JOIN employees e ON d.scan_by = e.employee_id
-        WHERE d.refID = ? AND d.is_status = '145' AND d.asset_status = '147' -- ⬅️ ปรับเป็น 147
+        WHERE d.refID = ? AND d.is_status = '145' AND d.asset_status = '147'
         ORDER BY d.asset_code ASC
     `;
   const [rows] = await db.query(sql, [refID]);
@@ -146,6 +160,7 @@ async function getAssetsByMasterRefID(refID) {
             LEFT JOIN tb_erp_status s ON a.asset_status = s.G_CODE AND s.G_USE = 'A1'
             LEFT JOIN employees e ON a.scan_by = e.employee_id
             WHERE a.refID = ? 
+              AND a.asset_status = '147'
 
             UNION ALL
 
@@ -174,20 +189,20 @@ async function getAssetsByMasterRefID(refID) {
   return rows;
 }
 
-// ใน getAllBookings (เพื่อให้นับจำนวนหน้าลิสต์ได้ถูก)
-async function getAllBookings(searchDate) {
+async function getAllBookings(startDate, endDate) {
   const sql = `
     SELECT 
         b.*, 
         (
           CASE 
+            -- 1. กรณีแจ้งชำรุดเรียบร้อย (145) ให้นับจำนวนจากตารางประวัติ (Detail)
             WHEN b.is_status = '145' THEN 
               (
                 SELECT COUNT(*)
                 FROM tb_asset_lists_detail d1
                 WHERE d1.refID = b.refID 
-                AND d1.is_status IN ('147', '145') 
-                AND d1.asset_status = '147' -- ⬅️ ปรับเป็น 147
+                AND d1.is_status = '145' 
+                AND d1.asset_status = 147
                 AND d1.scan_at = (         
                     SELECT MAX(d2.scan_at)
                     FROM tb_asset_lists_detail d2
@@ -195,15 +210,17 @@ async function getAllBookings(searchDate) {
                     AND d2.asset_code = d1.asset_code
                 )
               )
-            WHEN b.is_status = '142' THEN 
+            -- 2. กรณีปลดล็อคแก้ไข (144) ให้นับจำนวนจากตารางหลัก (Master) ที่สถานะเป็น 147
+            WHEN b.is_status = '144' THEN 
               (
                 SELECT COUNT(*) 
                 FROM tb_asset_lists a 
                 WHERE a.refID = b.refID 
-                AND a.is_status IN ('147', '142') -- ⬅️ ปรับเป็น 147
+                AND a.asset_status = 147
               )
+            -- 3. กรณีใบเบิกใหม่/อยู่ในตะกร้า (140, 141, 146) ให้นับของในตะกร้าซึ่งสถานะจะเป็น 148
             ELSE 
-              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '147') -- ⬅️ ปรับเป็น 147
+              (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = 148)
           END
         ) as attendees,
         s.G_NAME as is_status_name, 
@@ -214,11 +231,11 @@ async function getAllBookings(searchDate) {
     LEFT JOIN employees e ON b.created_by = e.employee_id
     WHERE b.is_status NOT IN ('143') 
       AND b.booking_type = 'DF'
-      AND b.create_date = ? 
+      AND b.create_date BETWEEN ? AND ?
     ORDER BY b.created_at DESC
   `;
 
-  const [rows] = await db.query(sql, [searchDate]);
+  const [rows] = await db.query(sql, [startDate, endDate]);
   return rows;
 }
 
@@ -289,12 +306,14 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
         UPDATE tb_asset_lists 
         SET asset_status = 147, 
             is_status = '145', 
+            asset_origin = ?,
+            asset_destination = ?,
             current_address = ?,
             updated_by = ?, 
             updated_at = ?, 
             last_used = ? 
-        WHERE draft_id = ? AND asset_status = 148
-    `, [destination, user_id, now, now, draft_id]);
+        WHERE draft_id = ? 
+    `, [origin, destination, destination, user_id, now, now, draft_id]);
 
   // ✅ 3. อัปเดตตารางใบงาน (Header) ให้เป็น 145
   await db.query(`
@@ -391,14 +410,14 @@ async function scanCheckIn(uniqueKey, draft_id, refID, user_id) {
     }
   }
 
-  // ตรวจสอบสถานะต้องเป็น 101 (ระหว่างจัดส่ง) เท่านั้น
-  if (item.asset_status != 101) {
-    return { success: false, code: 'INVALID_STATUS', message: `กล่องนี้สถานะไม่พร้อมแจ้งชำรุด (ต้องเป็นสถานะ 101 เท่านั้น ปัจจุบัน: ${item.asset_status})`, data: item };
+  // ตรวจสอบสถานะต้องเป็น 100 หรือ 101 เท่านั้น
+  if (item.asset_status != 100 && item.asset_status != 101) {
+    return { success: false, code: 'INVALID_STATUS', message: `กล่องนี้สถานะไม่พร้อมแจ้งชำรุด (ต้องเป็นสถานะ 100 หรือ 101 เท่านั้น ปัจจุบัน: ${item.asset_status})`, data: item };
   }
 
-  // ตรวจสอบเส้นทาง: tb_asset_lists.asset_destination ต้องตรงกับ booking_asset_lists.origin
-  if (item.asset_destination !== origin) {
-    return { success: false, code: 'INVALID_ROUTING', message: `ปลายทางของทรัพย์สิน (${item.asset_destination || 'ไม่ระบุ'}) ไม่ตรงกับ "แจ้งชำรุดจาก" (${origin})`, data: item };
+  // ตรวจสอบเส้นทาง: tb_asset_lists.current_address ต้องตรงกับ booking_asset_lists.origin
+  if (item.current_address !== origin) {
+    return { success: false, code: 'INVALID_ROUTING', message: `ที่อยู่ปัจจุบันของทรัพย์สิน (${item.current_address || 'ไม่ระบุ'}) ไม่ตรงกับ "แจ้งชำรุดจาก" (${origin})`, data: item };
   }
 
   // ====================================================================
@@ -757,6 +776,145 @@ async function receiveToStock(assetCodes, userId) {
   return true;
 }
 
+async function getAssetsForPrint(assetCodes) {
+  if (!assetCodes || assetCodes.length === 0) return [];
+  const sql = `
+      SELECT a.asset_code, a.scan_at, a.label_register,
+             CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+      FROM tb_asset_lists a
+      LEFT JOIN employees e ON a.scan_by = e.employee_id
+      WHERE a.asset_code IN (?)
+      ORDER BY a.scan_at ASC
+  `;
+  const [rows] = await db.query(sql, [assetCodes]);
+  return rows;
+}
+
+async function getUserFullName(employee_id) {
+  if (!employee_id) return '-';
+  const sql = `
+      SELECT CONCAT(COALESCE(titlename_th,''), '', COALESCE(firstname_th,''), ' ', COALESCE(lastname_th,'')) as fullname 
+      FROM employees 
+      WHERE employee_id = ?
+  `;
+  const [rows] = await db.query(sql, [employee_id]);
+  return rows[0]?.fullname || employee_id;
+}
+
+// ดึงรายการที่รอทำคืนชำรุด (asset_status = 149) สำหรับหน้า TabDefective2
+async function getDefectiveCheckoutItems() {
+  const sql = `
+      SELECT a.asset_code, a.asset_detail, a.refID, a.updated_at,
+             s1.G_NAME as asset_status_name
+      FROM tb_asset_lists a
+      LEFT JOIN tb_erp_status s1 ON a.asset_status = s1.G_CODE AND s1.G_USE = 'A1'
+      WHERE a.asset_status = 149
+      ORDER BY a.updated_at DESC
+  `;
+  const [rows] = await db.query(sql);
+  return rows;
+}
+
+// แจ้งจ่ายออก (TabDefective) -> อัปเดตสถานะ 149, is_status 117
+async function checkoutDefective(assetCodes, userId) {
+  if (!assetCodes || assetCodes.length === 0) return false;
+  const now = getThaiNow();
+
+  // 1. อัปเดตตารางหลัก
+  await db.query(`
+      UPDATE tb_asset_lists 
+      SET asset_status = 149, 
+          is_status = '117', 
+          updated_by = ?, 
+          updated_at = ? 
+      WHERE asset_code IN (?)
+  `, [userId, now, assetCodes]);
+
+  // 2. บันทึก History
+  const sqlInsertDetail = `
+      INSERT INTO tb_asset_lists_detail (
+          draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+          doc_no, asset_lot, asset_holder, asset_location,
+          asset_width, asset_width_unit, asset_length, asset_length_unit,
+          asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+          asset_weight, asset_weight_unit, asset_img,
+          asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
+          asset_remark, asset_usedfor, asset_brand, asset_feature,
+          asset_supplier_name, label_register, partCode, print_status,
+          asset_status, asset_action, is_status,
+          create_date, created_by, created_at, updated_by, updated_at, scan_by, scan_at,
+          asset_origin, asset_destination, asset_model, asset_responsible_department, asset_source, current_address
+      )
+      SELECT
+          draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+          doc_no, asset_lot, asset_holder, asset_location,
+          asset_width, asset_width_unit, asset_length, asset_length_unit,
+          asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+          asset_weight, asset_weight_unit, asset_img,
+          asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
+          asset_remark, asset_usedfor, asset_brand, asset_feature,
+          asset_supplier_name, label_register, partCode, print_status,
+          149, 'แจ้งจ่ายออก (ชำรุด)', '117',
+          create_date, created_by, created_at, ?, ?, ?, ?,
+          asset_origin, asset_destination, asset_model, asset_responsible_department, asset_source, current_address
+      FROM tb_asset_lists
+      WHERE asset_code IN (?)
+  `;
+  await db.query(sqlInsertDetail, [userId, now, userId, now, assetCodes]);
+
+  return true;
+}
+
+// ทำคืนชำรุด (TabDefective2) -> อัปเดตสถานะ 147, is_status 103
+async function returnDefective(assetCodes, userId) {
+  if (!assetCodes || assetCodes.length === 0) return false;
+  const now = getThaiNow();
+
+  // 1. อัปเดตตารางหลัก
+  await db.query(`
+      UPDATE tb_asset_lists 
+      SET asset_status = 147, 
+          is_status = '103', 
+          updated_by = ?, 
+          updated_at = ? 
+      WHERE asset_code IN (?)
+  `, [userId, now, assetCodes]);
+
+  // 2. บันทึก History
+  const sqlInsertDetail = `
+      INSERT INTO tb_asset_lists_detail (
+          draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+          doc_no, asset_lot, asset_holder, asset_location,
+          asset_width, asset_width_unit, asset_length, asset_length_unit,
+          asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+          asset_weight, asset_weight_unit, asset_img,
+          asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
+          asset_remark, asset_usedfor, asset_brand, asset_feature,
+          asset_supplier_name, label_register, partCode, print_status,
+          asset_status, asset_action, is_status,
+          create_date, created_by, created_at, updated_by, updated_at, scan_by, scan_at,
+          asset_origin, asset_destination, asset_model, asset_responsible_department, asset_source, current_address
+      )
+      SELECT
+          draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
+          doc_no, asset_lot, asset_holder, asset_location,
+          asset_width, asset_width_unit, asset_length, asset_length_unit,
+          asset_height, asset_height_unit, asset_capacity, asset_capacity_unit,
+          asset_weight, asset_weight_unit, asset_img,
+          asset_dmg_001, asset_dmg_002, asset_dmg_003, asset_dmg_004, asset_dmg_005, asset_dmg_006,
+          asset_remark, asset_usedfor, asset_brand, asset_feature,
+          asset_supplier_name, label_register, partCode, print_status,
+          147, 'ทำคืนชำรุด', '103',
+          create_date, created_by, created_at, ?, ?, ?, ?,
+          asset_origin, asset_destination, asset_model, asset_responsible_department, asset_source, current_address
+      FROM tb_asset_lists
+      WHERE asset_code IN (?)
+  `;
+  await db.query(sqlInsertDetail, [userId, now, userId, now, assetCodes]);
+
+  return true;
+}
+
 module.exports = {
   createBooking,
   generateRefID,
@@ -777,5 +935,10 @@ module.exports = {
   getAssetsByMasterRefID,
   confirmOutput,
   getDefectiveItems,
-  receiveToStock
+  receiveToStock,
+  getAssetsForPrint,
+  getUserFullName,
+  getDefectiveCheckoutItems,
+  checkoutDefective,
+  returnDefective
 };

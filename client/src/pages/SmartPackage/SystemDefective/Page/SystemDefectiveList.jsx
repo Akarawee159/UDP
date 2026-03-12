@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     Form, Input, Button, Select, Row, Col, Card, Image, Typography,
-    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip
+    App, Space, Descriptions, Modal, Divider, Table, Tag, Tooltip, Grid
 } from 'antd';
 import {
     ReloadOutlined, SaveOutlined, ExclamationCircleOutlined,
     InfoCircleOutlined, PictureOutlined, FileAddOutlined,
     EditOutlined, CheckCircleOutlined, UnlockOutlined, EyeOutlined, SearchOutlined, QrcodeOutlined, CheckCircleFilled,
     ColumnWidthOutlined, ExpandAltOutlined, VerticalAlignTopOutlined, GoldOutlined, DatabaseOutlined, ApartmentOutlined,
-    CopyOutlined
+    CopyOutlined, UpOutlined, DownOutlined, LeftOutlined, RightOutlined, PrinterOutlined
 } from '@ant-design/icons';
 import api from "../../../../api";
 import { usePermission } from '../../../../hooks/usePermission';
@@ -23,7 +23,7 @@ const generateDraftId = () => {
 function SystemDefectiveList({ open, onCancel, targetDraftId }) {
     const { message, modal } = App.useApp();
     const [form] = Form.useForm();
-
+    const screens = Grid.useBreakpoint();
     // --- State ---
     const [draftId, setDraftId] = useState(null);
     const [refID, setRefID] = useState(null);
@@ -31,11 +31,17 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
     const [lastScanned, setLastScanned] = useState({});
     const [zones, setZones] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [hasActiveItems, setHasActiveItems] = useState(false);
 
     // Selection for Return (Using Asset Codes)
     const [selectedIds, setSelectedIds] = useState([]);
 
     const [expandedKeys, setExpandedKeys] = useState([]);
+
+    // --- UX States (สำหรับการยุบ/ขยาย UI) ---
+    // ให้ค่าเริ่มต้นเป็น true (ยุบหน้าต่าง)
+    const [isAssetCollapsed, setIsAssetCollapsed] = useState(true);
+    const [isUsageCollapsed, setIsUsageCollapsed] = useState(false);
 
     // Status Logic
     const [bookingStatus, setBookingStatus] = useState('140');
@@ -94,11 +100,11 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
 
             if (currentDraftId) {
                 const res = await api.get(`/smartpackage/systemdefective/detail?draft_id=${currentDraftId}`);
-                const { booking, assets } = res.data;
+                const { booking, assets, hasActiveItems } = res.data;
 
                 setDraftId(currentDraftId);
                 setScannedList(assets || []);
-
+                setHasActiveItems(hasActiveItems || false);
                 setLastScanned({});
 
                 if (booking) {
@@ -151,6 +157,10 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
             setScannedList([]);
             setLastScanned({});
             setSelectedIds([]); // Clear selection
+
+            // รีเซ็ตสถานะหน้าต่างเมื่อปิดออกไป ให้ asset เป็น true เสมอ
+            setIsAssetCollapsed(true);
+            setIsUsageCollapsed(false);
         }
     }, [open, targetDraftId]);
 
@@ -171,14 +181,14 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                     return;
                 }
 
-                // ✅ 2. [เพิ่มใหม่] กรณี "ยืนยันแจ้งชำรุด" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
+                // ✅ 2. กรณี "ยืนยันแจ้งชำรุด" (finalized) หรือ "Confirm Output" -> ปิดหน้าต่างทุกจอ
                 if (action === 'finalized' || action === 'output_confirmed') {
                     message.success('รายการนี้ถูกยืนยันการแจ้งชำรุดเรียบร้อยแล้ว');
                     onCancel(); // สั่งปิด Modal ทันที
                     return;     // จบการทำงาน ไม่ต้องไป Refresh Data ต่อ
                 }
 
-                // 3. รายการที่ต้อง Refresh ข้อมูล (เอา 'finalized' ออก เพราะไปดักข้างบนแล้ว)
+                // 3. รายการที่ต้อง Refresh ข้อมูล
                 const refreshActions = [
                     'header_update',
                     'unlocked',
@@ -187,14 +197,14 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
 
                 if (refreshActions.includes(action)) {
                     api.get(`/smartpackage/systemdefective/detail?draft_id=${draftId}`).then(res => {
-                        const { booking, assets } = res.data;
+                        const { booking, assets, hasActiveItems } = res.data;
 
                         if (booking) {
                             // อัปเดต State ต่างๆ
                             setBookingStatus(String(booking.is_status));
                             setRefID(booking.refID); // ✅ อัปเดต RefID ใน State
 
-                            // ✅ สำคัญ: อัปเดตค่าใน Form ให้เปลี่ยนตามทันที (Origin, Destination, Remark)
+                            // ✅ สำคัญ: อัปเดตค่าใน Form ให้เปลี่ยนตามทันที
                             form.setFieldsValue({
                                 refID: booking.refID,
                                 origin: booking.origin,
@@ -204,8 +214,9 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                             });
                         }
 
-                        // อัปเดตรายการสินค้าใหม่ทันที (กรณี Unlock รายการจะกลายเป็นว่าง หรือตามที่มีใน Master)
+                        // อัปเดตรายการสินค้าใหม่ทันที
                         setScannedList(assets || []);
+                        setHasActiveItems(hasActiveItems || false);
                     });
                 }
 
@@ -287,7 +298,7 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
             title: 'ยืนยันการแจ้งชำรุด',
             content: 'เมื่อยืนยันแล้วระบบจะบันทึกสถานะการแจ้งชำรุด',
             cancelText: 'ยืนยันแจ้งชำรุด',
-            cancelButtonProps: { type: 'primary', className: 'bg-green-600 hover:!bg-green-500 border-green-600' },
+            cancelButtonProps: { type: 'primary', className: '!bg-green-600 hover:!bg-green-500 border-green-600' },
             okText: 'ยกเลิก',
             onCancel: async () => {
                 try {
@@ -322,8 +333,7 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                 try {
                     await api.post('/smartpackage/systemdefective/unlock', { draft_id: draftId });
 
-                    // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที (Status + Assets)
-                    // จะทำให้หน้าจอดึงข้อมูลใหม่ที่ถูกต้องตาม Logic Backend (Status 144 -> Master RefID)
+                    // ✅ เรียก fetchData() เพื่อรีเฟรชข้อมูลทั้งหมดทันที
                     fetchData();
 
                     message.success('ปลดล็อคเรียบร้อย');
@@ -367,20 +377,58 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
 
     const handleReturnToStock = async () => {
         if (selectedIds.length === 0) return message.warning('กรุณาเลือกรายการ');
+
+        modal.confirm({
+            title: 'ยืนยันการยกเลิกแจ้งชำรุด',
+            content: `คุณต้องการยกเลิกแจ้งชำรุดรายการที่เลือกจำนวน ${selectedIds.length} รายการใช่หรือไม่?`,
+            cancelText: 'ยืนยัน',
+            cancelButtonProps: { type: 'primary', danger: true },
+            okText: 'ปิด',
+            okButtonProps: { type: 'default' },
+            onCancel: async () => {
+                try {
+                    await api.post('/smartpackage/systemdefective/return', {
+                        ids: selectedIds,
+                        draft_id: draftId
+                    });
+                    message.success('ยกเลิกแจ้งชำรุดเรียบร้อย');
+                    setSelectedIds([]);
+                } catch (err) {
+                    message.error('เกิดข้อผิดพลาดในการยกเลิกแจ้งชำรุด');
+                }
+            },
+            onOk: () => { }
+        });
+    };
+
+    const handlePrintPDF = async () => {
+        if (selectedIds.length === 0) return message.warning('กรุณาเลือกรายการที่ต้องการพิมพ์');
+
         try {
-            await api.post('/smartpackage/systemdefective/return', {
+            message.loading({ content: 'กำลังสร้างเอกสาร PDF...', key: 'print_pdf' });
+
+            // ใช้ endpoint ของ systemdefective
+            const response = await api.post('/smartpackage/systemdefective/print-pdf', {
                 ids: selectedIds,
                 draft_id: draftId
+            }, {
+                responseType: 'blob' // 📌 จำเป็นมากสำหรับการรับไฟล์ PDF
             });
-            message.success('ยกเลิกแจ้งชำรุดเรียบร้อย');
-            setSelectedIds([]);
-        } catch (err) { message.error('Error'); }
+
+            // สร้าง URL และเปิด PDF ในแท็บใหม่
+            const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+            window.open(url, '_blank');
+
+            message.success({ content: 'สร้างเอกสารสำเร็จ', key: 'print_pdf' });
+        } catch (err) {
+            console.error(err);
+            message.error({ content: 'เกิดข้อผิดพลาดในการสร้างเอกสาร', key: 'print_pdf' });
+        }
     };
 
     const handleModalClose = async () => {
-        // ✅ กรณี Status 144 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันแจ้งชำรุดทันทีเมื่อกดปิด
+        // ✅ กรณี Status 144 (กำลังแก้ไข/Unlocked) ให้บังคับเข้า Flow ยืนยันทันทีเมื่อกดปิด
         if (bookingStatus === '144') {
-            // 1. ดึงค่าและตรวจสอบความถูกต้องจาก Form ก่อน
             let values;
             try {
                 values = await form.validateFields(['origin', 'destination', 'booking_remark']);
@@ -389,7 +437,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                 return; // หยุดการทำงาน ไม่ให้ปิดหน้าต่างถ้าข้อมูลไม่ครบ
             }
 
-            // 2. เรียก API Finalize ทันทีโดยไม่ต้องแสดง Modal ยืนยันซ้ำ
             try {
                 await api.post('/smartpackage/systemdefective/finalize', {
                     draft_id: draftId,
@@ -401,15 +448,13 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                 setBookingStatus('142');
                 message.success('บันทึกและแจ้งชำรุดเรียบร้อย');
 
-                // ✅ เมื่อสำเร็จ ให้สั่งปิด Modal หลัก
                 onCancel();
             } catch (e) {
                 message.error('Failed: ' + (e.response?.data?.message || e.message));
             }
-            return; // จบการทำงานสำหรับสถานะ 144
+            return;
         }
 
-        // กรณีสถานะอื่นๆ (เช่น 142 หรือ 140) ให้ปิดหน้าต่างได้ตามปกติ
         onCancel();
     };
 
@@ -457,6 +502,7 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
             if (res.data.success) {
                 setLastScanned(res.data.data);
                 processingRef.current = false;
+                // if (isAssetCollapsed) setIsAssetCollapsed(false);
             } else {
                 const { code, data, message: msg } = res.data;
                 {
@@ -471,13 +517,10 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
     };
 
     const fixThaiInput = (str) => {
-        // ตรวจสอบว่ามีตัวอักษรภาษาไทยอยู่ในข้อความหรือไม่
-        // ถ้าไม่มี (แปลว่าเป็นภาษาอังกฤษอยู่แล้ว) ให้คืนค่ากลับไปเลยโดยไม่ต้องแปลง
         if (!/[ก-๛]/.test(str)) {
             return str;
         }
 
-        // แผนผังแปลงแป้นพิมพ์ภาษาไทย (Kedmanee) กลับเป็นภาษาอังกฤษ (QWERTY)
         const map = {
             'ๅ': '1', '/': '2', '-': '3', 'ภ': '4', 'ถ': '5', 'ุ': '6', 'ึ': '7', 'ค': '8', 'ต': '9', 'จ': '0', 'ข': '-', 'ช': '=',
             'ๆ': 'q', 'ไ': 'w', 'ำ': 'e', 'พ': 'r', 'ะ': 't', 'ั': 'y', 'ี': 'u', 'ร': 'i', 'น': 'o', 'ย': 'p', 'บ': '[', 'ล': ']', 'ฃ': '\\',
@@ -517,17 +560,19 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [open, draftId, refID, bookingStatus]);
+    }, [open, draftId, refID, bookingStatus, isAssetCollapsed]);
 
     // ปิด Form (Header) ถ้าสถานะเป็น 141 (บันทึกแล้วพร้อมสแกน) หรือ 145 (แจ้งชำรุดแล้ว)
     const isEditingDisabled = bookingStatus === '141' || bookingStatus === '145';
     // ปิดตาราง (Cart) ห้ามติ๊กคืนของ ถ้าเป็น 140, 146 หรือ 145
     const isCartDisabled = bookingStatus === '140' || bookingStatus === '146' || bookingStatus === '145';
     const hasScannedItems = scannedList.length > 0;
-    // ✅ เพิ่มเงื่อนไข: ล็อค 'origin' ถ้าเป็น 141, 145 หรือ (เป็น 146 และมีของในตะกร้า)
-    const isOriginDisabled = isEditingDisabled || (bookingStatus === '146' && hasScannedItems);
+
+    // ✅ เงื่อนไขใหม่: ล็อค 'origin' ถ้า 1) เป็นสถานะที่ห้ามแก้ไขอยู่แล้ว (141, 145) 2) มีของในตะกร้า หรือ 3) สถานะเป็น 144 (ปลดล็อค)
+    const isOriginDisabled = isEditingDisabled || hasScannedItems || bookingStatus === '144';
     // ✅ ส่วน 'destination' ล็อคแค่ 141, 145 (ถ้าเป็น 146 จะแก้ไขได้เสมอ)
     const isDestinationDisabled = isEditingDisabled;
+
     const showSaveCancel = refID && bookingStatus !== '142' && bookingStatus !== '144' && !hasScannedItems;
     const showConfirm = (bookingStatus === '141' || bookingStatus === '144') && hasScannedItems;
     const showCancelButton = bookingStatus !== '142' && !hasScannedItems;
@@ -592,15 +637,20 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                         icon={<EyeOutlined className="text-blue-500 text-lg" />}
                         onClick={(e) => {
                             e.stopPropagation();
-                            // Update the detail card with the representative item of this group
                             setLastScanned(record.firstItem);
+                            if (isAssetCollapsed) setIsAssetCollapsed(false);
                         }}
                     />
                 </Tooltip>
             )
         },
-        // { title: 'ลำดับ', key: 'index', width: 60, align: 'center', render: (_, __, index) => index + 1 },
-        { title: 'รหัสทรัพย์สิน', dataIndex: 'partCode', key: 'partCode', width: 150, ...getColumnSearchProps('partCode') },
+        {
+            title: 'รหัสทรัพย์สิน',
+            dataIndex: 'partCode',
+            key: 'partCode',
+            width: screens.lg ? 300 : 150,
+            ...getColumnSearchProps('partCode')
+        },
         {
             title: 'ชื่อทรัพย์สิน',
             dataIndex: 'asset_detail',
@@ -621,12 +671,11 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
 
     // Child Columns (Individual Scanned Items)
     const childColumns = [
-        // { title: 'ลำดับ', key: 'index', width: 60, align: 'center', render: (_, __, index) => index + 1 },
         {
             title: 'รหัสทรัพย์สิน',
             dataIndex: 'asset_code',
             key: 'asset_code',
-            width: 100,
+            width: screens.lg ? 300 : 100,
             ...getColumnSearchProps('asset_code'),
             render: (text) => (
                 <div className="whitespace-normal break-all min-w-[150px] sm:min-w-[auto] sm:break-words">
@@ -648,7 +697,7 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
             title: 'วันที่สแกน',
             dataIndex: 'scan_at',
             key: 'scan_at',
-            width: 140,
+            width: 110,
             render: (val) => val ? dayjs(val).format('DD/MM/YYYY') : '-'
         },
         {
@@ -683,7 +732,7 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
         );
     };
 
-    // ✅ 1. เพิ่มฟังก์ชันสำหรับสร้างปุ่ม Expand ที่ไม่มีการ Focus
+    // ✅ เพิ่มฟังก์ชันสำหรับสร้างปุ่ม Expand ที่ไม่มีการ Focus
     const customExpandIcon = ({ expanded, onExpand, record }) => {
         return (
             <span
@@ -693,7 +742,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                 onClick={(e) => {
                     onExpand(record, e);
                 }}
-                // 🔥 จุดสำคัญ: ป้องกันไม่ให้ปุ่มได้รับ Focus เมื่อคลิก
                 onMouseDown={(e) => e.preventDefault()}
             />
         );
@@ -701,21 +749,41 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
 
     return (
         <Modal
-            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการแจ้งชำรุด' : 'สร้างรายการแจ้งชำรุด (System Out)'}</Title>}
+            title={<Title level={4} className="m-0 text-base sm:text-lg lg:text-xl">{targetDraftId ? 'แก้ไขรายการแจ้งชำรุด' : 'สร้างรายการแจ้งชำรุด'}</Title>}
             open={open}
             onCancel={handleModalClose}
-            width={{ xs: '100%', sm: '95%' }} // ให้เต็มจอในมือถือ ย่อลงในจอใหญ่
-            style={{ top: 20, maxWidth: '1400px' }}
+            width="100%"
+            style={{ top: 0, padding: 0, margin: 0, maxWidth: '100vw' }}
+            styles={{
+                content: { borderRadius: 0, height: '100vh', display: 'flex', flexDirection: 'column' },
+                body: { flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '12px 16px', backgroundColor: '#f8fafc', gap: '16px' }
+            }}
             footer={null}
             destroyOnHidden
             maskClosable={false}
             keyboard={false}
         >
-            <div className="flex flex-col gap-4 bg-slate-50 p-2 sm:p-4 rounded-lg" style={{ minHeight: '80vh' }}>
-                <Card
-                    className="shadow-md border-0 bg-white overflow-hidden rounded-md"
-                    styles={{ body: { padding: 0 } }}
+            {/* --- TOP SECTION: ข้อมูลบรรจุภัณฑ์ (ยุบขึ้นบน) --- */}
+            <div className="flex-shrink-0 transition-all duration-300 w-full bg-white shadow-sm border border-gray-100 rounded-md overflow-hidden">
+                {/* Header Strip สำหรับเป็นตัว Toggle */}
+                <div
+                    className="flex justify-between items-center px-4 py-2 bg-white border-b border-gray-100 cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => setIsAssetCollapsed(!isAssetCollapsed)}
                 >
+                    <div className="flex items-center gap-2 text-slate-700">
+                        <InfoCircleOutlined className="text-blue-500" />
+                        <span className="font-semibold text-sm sm:text-base">ข้อมูลทรัพย์สินล่าสุด</span>
+                    </div>
+                    <Button
+                        type="text"
+                        size="small"
+                        className="text-gray-500 pointer-events-none"
+                        icon={isAssetCollapsed ? <DownOutlined /> : <UpOutlined />}
+                    />
+                </div>
+
+                {/* เนื้อหาของ Card ข้อมูลบรรจุภัณฑ์ (ซ่อน/แสดง ตาม State) */}
+                <div className={`${isAssetCollapsed ? 'hidden' : 'block'}`}>
                     {!lastScanned?.asset_code ? (
                         // --- UX: Empty State เมื่อยังไม่ได้สแกน ---
                         <div className="flex flex-col items-center justify-center py-8 sm:py-12 bg-slate-50/50">
@@ -726,36 +794,34 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                             <Text type="secondary" className="text-xs sm:text-sm text-center">กรุณาสแกน QR Code หรือเลือกรายการจากตาราง</Text>
                         </div>
                     ) : (
-                        // --- UX: ข้อมูลทรัพย์สิน ---
+                        // --- UX: ข้อมูลบรรจุภัณฑ์ ---
                         <div className="flex flex-col">
                             {/* Header Strip: Modern Gradient & Glass Effect */}
-                            <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 px-4 sm:px-6 py-3 sm:py-4 shadow-sm rounded-md">
-                                {/* Decorative Background Elements (ช่วยเพิ่มมิติ) */}
+                            <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 px-4 sm:px-6 py-3 sm:py-4 shadow-sm">
                                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl pointer-events-none"></div>
                                 <div className="absolute bottom-0 left-0 -mb-4 -ml-4 w-20 h-20 bg-blue-400 opacity-20 rounded-full blur-lg pointer-events-none"></div>
 
                                 <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center z-10 gap-3 sm:gap-0">
-                                    {/* Left Side: Title & Icon */}
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-inner">
-                                            <InfoCircleOutlined className="text-white text-lg sm:text-xl" />
+                                            <PictureOutlined className="text-white text-lg sm:text-xl" />
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="text-white font-bold text-base sm:text-lg leading-tight tracking-wide shadow-black drop-shadow-sm">
-                                                รายละเอียดทรัพย์สิน
+                                                {lastScanned.asset_detail || 'รายละเอียดทรัพย์สิน'}
                                             </span>
                                             <span className="text-blue-100 text-[10px] sm:text-xs font-light tracking-wider opacity-90">
-                                                Asset Information Details
+                                                {lastScanned.asset_type || 'Asset Information Details'}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Right Side: Asset Code Badge with Copy Action */}
                                     <div className="flex items-center gap-2 self-end sm:self-auto">
                                         <Tooltip title="คลิกเพื่อคัดลอกรหัส">
                                             <div
                                                 className="group flex items-center gap-2 bg-white text-blue-700 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-blue-200 shadow-md cursor-pointer hover:bg-blue-50 transition-all active:scale-95"
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     navigator.clipboard.writeText(lastScanned.partCode);
                                                     message.success('คัดลอกรหัสเรียบร้อย');
                                                 }}
@@ -771,20 +837,18 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                 </div>
                             </div>
 
-                            <div className="p-4 sm:p-6">
+                            <div className="p-4 sm:p-6 bg-white">
                                 <Row gutter={[16, 24]}>
                                     {/* 1. รูปภาพหลัก */}
                                     <Col xs={24} sm={10} md={8} lg={6} xl={5}>
                                         <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-100 shadow-inner flex items-center justify-center relative group">
                                             {lastScanned.asset_img ? (
-                                                <>
-                                                    <Image
-                                                        src={getFullImgUrl('material', lastScanned.asset_img)}
-                                                        className="object-cover w-full h-full"
-                                                        style={{ height: '100%', width: '100%' }}
-                                                        preview={{ mask: <div className="text-white text-xs sm:text-sm"><EyeOutlined /> ดูภาพขยาย</div> }}
-                                                    />
-                                                </>
+                                                <Image
+                                                    src={getFullImgUrl('material', lastScanned.asset_img)}
+                                                    className="object-cover w-full h-full"
+                                                    style={{ height: '100%', width: '100%' }}
+                                                    preview={{ mask: <div className="text-white text-xs sm:text-sm"><EyeOutlined /> ดูภาพขยาย</div> }}
+                                                />
                                             ) : (
                                                 <div className="flex flex-col items-center text-gray-300">
                                                     <PictureOutlined style={{ fontSize: 40 }} className="sm:text-5xl" />
@@ -843,7 +907,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                                             </div>
                                                         );
                                                     })}
-                                                    {/* Empty Placeholder for Drawing if none exists */}
                                                     {![1, 2, 3, 4, 5, 6].some(n => lastScanned?.[`asset_dmg_00${n}`]) && (
                                                         <div className="w-full text-center py-3 sm:py-4 bg-gray-50 rounded border border-dashed border-gray-300 text-gray-500 text-[10px] sm:text-xs">
                                                             ไม่พบข้อมูล Drawing
@@ -857,21 +920,18 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                     {/* 3. สเปค (Dimension Grid) */}
                                     <Col xs={24} md={24} lg={8} xl={8}>
                                         <div className="bg-white rounded-xl border border-gray-200 h-full shadow-sm overflow-hidden flex flex-col">
-                                            {/* Header */}
                                             <div className="bg-slate-50 px-3 sm:px-4 py-2 sm:py-3 border-b border-gray-100 flex items-center gap-2">
                                                 <ApartmentOutlined className="text-blue-500" />
                                                 <span className="font-semibold text-gray-700 text-xs sm:text-sm">ข้อมูลจำเพาะ (Spec)</span>
                                             </div>
 
                                             <div className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 h-full justify-center">
-
-                                                {/* Group 1: Dimensions (กว้าง x ยาว x สูง) */}
+                                                {/* Group 1: Dimensions */}
                                                 <div>
                                                     <Text type="secondary" className="text-xs sm:text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
                                                         ขนาด (Dimensions)
                                                     </Text>
                                                     <div className="grid grid-cols-3 gap-2">
-                                                        {/* Width */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <ColumnWidthOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">กว้าง</span>
@@ -879,7 +939,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                                                 {lastScanned.asset_width || '-'} <span className="text-[10px] sm:text-[14px] font-normal text-gray-700">{lastScanned.asset_width_unit}</span>
                                                             </div>
                                                         </div>
-                                                        {/* Length */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <ExpandAltOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">ยาว</span>
@@ -887,7 +946,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                                                 {lastScanned.asset_length || '-'} <span className="text-[10px] sm:text-[14px] font-normal text-gray-700">{lastScanned.asset_length_unit}</span>
                                                             </div>
                                                         </div>
-                                                        {/* Height */}
                                                         <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex flex-col items-center justify-center">
                                                             <VerticalAlignTopOutlined className="text-blue-400 text-xs mb-1" />
                                                             <span className="text-[10px] sm:text-[14px] text-gray-700">สูง</span>
@@ -898,16 +956,14 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                                     </div>
                                                 </div>
 
-                                                {/* Divider */}
                                                 <div className="h-px bg-gray-100 w-full"></div>
 
-                                                {/* Group 2: Properties (น้ำหนัก & ความจุ) */}
+                                                {/* Group 2: Properties */}
                                                 <div>
                                                     <Text type="secondary" className="text-xs sm:text-[14px] text-gray-700 uppercase tracking-wide mb-2 block pl-1">
                                                         คุณสมบัติ (Properties)
                                                     </Text>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 sm:gap-3">
-                                                        {/* Weight */}
                                                         <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
                                                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-500 flex-shrink-0">
                                                                 <GoldOutlined className="text-xs sm:text-base" />
@@ -919,8 +975,6 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                                                                 </span>
                                                             </div>
                                                         </div>
-
-                                                        {/* Capacity */}
                                                         <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-sm transition-all">
                                                             <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-500 flex-shrink-0">
                                                                 <DatabaseOutlined className="text-xs sm:text-base" />
@@ -942,243 +996,282 @@ function SystemDefectiveList({ open, onCancel, targetDraftId }) {
                             </div>
                         </div>
                     )}
-                </Card>
+                </div>
+            </div>
 
-                <Row gutter={[16, 16]} className="flex-1">
-                    <Col xs={24} lg={8} xl={7}>
-                        <Card title={<span className="text-sm sm:text-base">ข้อมูลแจ้งชำรุด</span>} className="h-full shadow-sm rounded-md" size="small">
-                            <Form layout="vertical" form={form}>
+            {/* --- BOTTOM SECTION: ข้อมูลแจ้งชำรุด (ซ้าย) & ตะกร้า (ขวา) --- */}
+            <div className="flex flex-col lg:flex-row gap-4 w-full">
 
-                                {/* แจ้งชำรุดจาก (ปลายทาง) */}
-                                {/* แจ้งชำรุดจาก (ปลายทาง) */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">แจ้งชำรุดจาก (ปลายทาง)</span>} name="origin" rules={[{ required: true }]}>
-                                    <Select
-                                        showSearch // เปิดให้พิมพ์ค้นหาได้
-                                        optionFilterProp="label"
-                                        filterOption={(input, option) =>
-                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                                        }
-                                        options={zones.map(s => ({
-                                            label: `${s.code} - ${s.name}`,
-                                            value: s.code
-                                        }))}
-                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
-                                        disabled={isOriginDisabled}
-                                    />
-                                </Form.Item>
+                {/* 1. LEFT PANEL: ข้อมูลแจ้งชำรุด (ย่อ/ขยายได้) */}
+                <div className={`transition-all duration-300 ease-in-out flex flex-col bg-white shadow-sm border border-gray-100 rounded-md flex-shrink-0
+                    ${isUsageCollapsed
+                        ? 'h-[40px] lg:w-[48px] overflow-hidden'
+                        : 'h-auto w-full lg:w-[320px] xl:w-[380px]'
+                    }`}
+                >
+                    {/* Header Strip เป็นปุ่ม Toggle */}
+                    <div
+                        className="flex justify-between items-center px-3 py-2 bg-white border-b border-gray-100 cursor-pointer hover:bg-slate-50 transition-colors flex-shrink-0 h-[40px]"
+                        onClick={() => setIsUsageCollapsed(!isUsageCollapsed)}
+                    >
+                        <div className={`flex items-center gap-2 text-slate-700 ${isUsageCollapsed ? 'lg:hidden' : ''}`}>
+                            <EditOutlined className="text-blue-500" />
+                            <span className="font-semibold text-sm sm:text-base whitespace-nowrap">ข้อมูลแจ้งชำรุด</span>
+                        </div>
+                        <Button
+                            type="text"
+                            size="small"
+                            className={`text-gray-500 pointer-events-none p-0 flex items-center justify-center ${isUsageCollapsed ? 'mx-auto' : ''}`}
+                            icon={isUsageCollapsed
+                                ? <RightOutlined className="rotate-90 lg:rotate-0" />
+                                : <LeftOutlined className="rotate-90 lg:rotate-0" />
+                            }
+                        />
+                    </div>
 
-                                {/* ต้นทางที่รับ */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">ต้นทางที่รับ</span>} name="destination" rules={[{ required: true }]}>
-                                    <Select
-                                        showSearch
-                                        optionFilterProp="label"
-                                        filterOption={(input, option) =>
-                                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-                                        }
-                                        options={zones.map(s => ({
-                                            label: `${s.code} - ${s.name}`,
-                                            value: s.code
-                                        }))}
-                                        placeholder="ค้นหารหัส หรือชื่อผู้จัดจำหน่าย"
-                                        disabled={isDestinationDisabled} // ⬅️ เปลี่ยนตรงนี้
-                                    />
-                                </Form.Item>
+                    {/* เนื้อหา Form ข้อมูลแจ้งชำรุด */}
+                    <div className={`${isUsageCollapsed ? 'hidden' : 'block'} p-3 sm:p-4`}>
+                        <Form layout="vertical" form={form}>
+                            {/* แจ้งชำรุดจาก (ปลายทาง) */}
+                            <Form.Item label={<span className="text-xs sm:text-sm">แจ้งชำรุดจาก (ปลายทาง)</span>} name="origin" rules={[{ required: true }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    filterOption={(input, option) =>
+                                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                    options={zones.map(s => ({
+                                        label: `${s.code} - ${s.name}`,
+                                        value: s.code
+                                    }))}
+                                    placeholder="ค้นหารหัส หรือชื่อสถานที่"
+                                    disabled={isOriginDisabled}
+                                />
+                            </Form.Item>
 
-                                {/* หมายเหตุ */}
-                                <Form.Item label={<span className="text-xs sm:text-sm">หมายเหตุ</span>} name="booking_remark">
-                                    <Input.TextArea rows={2} disabled={isDestinationDisabled} /> {/* ⬅️ ถ้าอยากให้แก้หมายเหตุได้ด้วยตอน 146 ใช้ isDestinationDisabled */}
-                                </Form.Item>
+                            {/* ต้นทางที่รับ */}
+                            <Form.Item label={<span className="text-xs sm:text-sm">ต้นทางที่รับ</span>} name="destination" rules={[{ required: true }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    filterOption={(input, option) =>
+                                        (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                                    }
+                                    options={zones.map(s => ({
+                                        label: `${s.code} - ${s.name}`,
+                                        value: s.code
+                                    }))}
+                                    placeholder="ค้นหารหัส หรือชื่อสถานที่"
+                                    disabled={isDestinationDisabled}
+                                />
+                            </Form.Item>
 
-                                <Row gutter={[8, 8]} style={{ marginTop: 16 }}>
-                                    {/* กรณีสถานะ 140 หรือ 146 (พร้อมบันทึก/แก้ไขเสร็จแล้ว) */}
-                                    {(bookingStatus === '140' || bookingStatus === '146') && (
-                                        <>
-                                            <Col xs={24} sm={14} lg={24} xl={14}>
-                                                <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large" className="rounded-md text-sm sm:text-base">
-                                                    บันทึกข้อมูล
-                                                </Button>
-                                            </Col>
-                                            <Col xs={24} sm={10} lg={24} xl={10}>
-                                                <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base">
-                                                    ยกเลิกแจ้งชำรุด
-                                                </Button>
-                                            </Col>
-                                        </>
-                                    )}
+                            <Form.Item label={<span className="text-xs sm:text-sm">หมายเหตุ</span>} name="booking_remark">
+                                <Input.TextArea rows={2} disabled={isDestinationDisabled} />
+                            </Form.Item>
 
-                                    {/* กรณีสถานะ 141 (บันทึกข้อมูลแล้ว) */}
-                                    {bookingStatus === '141' && (
-                                        <>
-                                            <Col xs={24} sm={12} lg={24} xl={12}>
-                                                <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="!bg-green-600 hover:!bg-green-500 rounded-md px-0 text-xs sm:text-sm" disabled={scannedList.length === 0}>
-                                                    ยืนยันการแจ้งชำรุด
-                                                </Button>
-                                            </Col>
-                                            <Col xs={24} sm={12} lg={24} xl={12}>
-                                                <Button type="default" block icon={<EditOutlined />} onClick={handleEditHeader} size="large" className="border-blue-500 text-blue-500 rounded-md px-0 text-xs sm:text-sm">
-                                                    แก้ไขข้อมูล
-                                                </Button>
-                                            </Col>
-                                            <Col span={24}>
-                                                <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base mt-1">
-                                                    ยกเลิกแจ้งชำรุด
-                                                </Button>
-                                            </Col>
-                                        </>
-                                    )}
+                            <Row gutter={[8, 8]} style={{ marginTop: 16 }}>
+                                {/* กรณีสถานะ 140 หรือ 146 (พร้อมบันทึก/แก้ไขเสร็จแล้ว) */}
+                                {(bookingStatus === '140' || bookingStatus === '146') && (
+                                    <>
+                                        <Col xs={24} sm={14} lg={24} xl={14}>
+                                            <Button type="primary" block icon={<SaveOutlined />} onClick={handleSaveHeader} size="large" className="rounded-md text-sm sm:text-base">
+                                                บันทึกข้อมูล
+                                            </Button>
+                                        </Col>
+                                        <Col xs={24} sm={10} lg={24} xl={10}>
+                                            <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base">
+                                                ยกเลิกแจ้งชำรุด
+                                            </Button>
+                                        </Col>
+                                    </>
+                                )}
 
-                                    {/* กรณีสถานะ 145 (ยืนยันสมบูรณ์) */}
-                                    {bookingStatus === '145' && canUse('system-out:unlock') && (
+                                {/* กรณีสถานะ 141 (บันทึกข้อมูลแล้ว) */}
+                                {bookingStatus === '141' && (
+                                    <>
+                                        <Col xs={24} sm={12} lg={24} xl={12}>
+                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="!bg-green-600 hover:!bg-green-500 rounded-md px-0 text-xs sm:text-sm" disabled={scannedList.length === 0}>
+                                                ยืนยันการแจ้งชำรุด
+                                            </Button>
+                                        </Col>
+                                        <Col xs={24} sm={12} lg={24} xl={12}>
+                                            <Button type="default" block icon={<EditOutlined />} onClick={handleEditHeader} size="large" className="border-blue-500 text-blue-500 rounded-md px-0 text-xs sm:text-sm">
+                                                แก้ไขข้อมูล
+                                            </Button>
+                                        </Col>
                                         <Col span={24}>
+                                            <Button danger block onClick={handleCancelBooking} size="large" className="rounded-md text-sm sm:text-base mt-1">
+                                                ยกเลิกแจ้งชำรุด
+                                            </Button>
+                                        </Col>
+                                    </>
+                                )}
+
+                                {/* กรณีสถานะ 145 (ยืนยันแจ้งชำรุดสมบูรณ์) */}
+                                {bookingStatus === '145' && canUse('system-out:unlock') && (
+                                    <Col span={24}>
+                                        {!hasActiveItems ? (    // ✅ ถ้าไม่มีข้อมูลสถานะ 147 ให้ขึ้นตัวหนังสือสีแดง
+                                            <div className="text-red-500 text-center font-medium mt-2 text-sm sm:text-base">
+                                                ไม่สามารถแก้ไขได้ เนื่องไม่พบรายการ
+                                            </div>
+                                        ) : (
                                             <Button type="default" block icon={<UnlockOutlined />} onClick={handleUnlock} size="large" className="border-orange-500 text-orange-500 hover:!text-orange-600 hover:!border-orange-600 rounded-md text-sm sm:text-base">
                                                 ปลดล็อคเพื่อแก้ไข
                                             </Button>
-                                        </Col>
-                                    )}
-
-                                    {/* กรณีสถานะ 144 (ปลดล็อคแก้ไขทั้งหมด) */}
-                                    {bookingStatus === '144' && (
-                                        <Col span={24}>
-                                            <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500 rounded-md text-sm sm:text-base">
-                                                แก้ไขแล้ว/ยืนยันแจ้งชำรุด
-                                            </Button>
-                                        </Col>
-                                    )}
-                                </Row>
-
-                                <Divider className="my-3 sm:my-4" />
-
-                                {/* ซ่อนฟิลด์เหล่านี้ไว้ แต่ยังคงให้ Form เก็บค่าและทำงานอยู่เบื้องหลัง */}
-                                <Form.Item name="draft_id" hidden><Input /></Form.Item>
-                                <Form.Item name="refID" hidden><Input /></Form.Item>
-                                <Form.Item name="objective" hidden><Input /></Form.Item>
-                                <Form.Item name="attendees" hidden><Input /></Form.Item>
-                            </Form>
-                        </Card>
-                    </Col>
-
-                    {/* ✅ New Table Implementation */}
-                    <Col xs={24} lg={16} xl={17}>
-                        <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm h-full flex flex-col">
-                            {/* ส่วนหัวตาราง */}
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-2 gap-2 sm:gap-0">
-                                <Title level={5} className="m-0 text-base sm:text-lg">รายการในตะกร้า ({scannedList.length})</Title>
-                                {/* ล็อคปุ่มยกเลิกแจ้งชำรุดถ้าเป็น 145 หรือ 142 */}
-                                {!isFinalized && (
-                                    <Button
-                                        danger
-                                        icon={<ReloadOutlined />}
-                                        onClick={handleReturnToStock}
-                                        disabled={selectedIds.length === 0}
-                                        className="w-full sm:w-auto text-xs sm:text-sm"
-                                    >
-                                        ยกเลิกแจ้งชำรุด ({selectedIds.length})
-                                    </Button>
+                                        )}
+                                    </Col>
                                 )}
+
+                                {/* กรณีสถานะ 144 (ปลดล็อคแก้ไขทั้งหมด) */}
+                                {bookingStatus === '144' && (
+                                    <Col span={24}>
+                                        <Button type="primary" block icon={<CheckCircleOutlined />} onClick={handleFinalize} size="large" className="bg-green-600 hover:bg-green-500 rounded-md text-sm sm:text-base">
+                                            แก้ไขแล้ว/ยืนยันแจ้งชำรุด
+                                        </Button>
+                                    </Col>
+                                )}
+                            </Row>
+
+                            <Divider className="my-3 sm:my-4" />
+
+                            {/* Hidden fields */}
+                            <Form.Item name="draft_id" hidden><Input /></Form.Item>
+                            <Form.Item name="refID" hidden><Input /></Form.Item>
+                            <Form.Item name="objective" hidden><Input /></Form.Item>
+                            <Form.Item name="attendees" hidden><Input /></Form.Item>
+                        </Form>
+                    </div>
+                </div>
+
+                {/* 2. RIGHT PANEL: รายการในตะกร้า (Table) */}
+                <div className="flex-1 bg-white p-3 sm:p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col min-w-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 sm:mb-2 gap-2 sm:gap-0 flex-shrink-0">
+                        <Title level={5} className="m-0 text-base sm:text-lg">รายการในตะกร้า ({scannedList.length})</Title>
+                        <Space>
+                            {/* ----- เริ่มส่วนที่เพิ่มใหม่ ----- */}
+                            {screens.lg && (
+                                <Button
+                                    type="primary"
+                                    className="bg-blue-600 hover:bg-blue-500"
+                                    icon={<PrinterOutlined />}
+                                    onClick={handlePrintPDF}
+                                    disabled={selectedIds.length === 0}
+                                >
+                                    พิมพ์ใบรับเข้า ({selectedIds.length})
+                                </Button>
+                            )}
+                            {/* ----- จบส่วนที่เพิ่มใหม่ ----- */}
+
+                            {!isFinalized && bookingStatus !== '144' && (
+                                <Button
+                                    danger
+                                    icon={<ReloadOutlined />}
+                                    onClick={handleReturnToStock}
+                                    disabled={selectedIds.length === 0}
+                                    className="w-full sm:w-auto text-xs sm:text-sm"
+                                >
+                                    ยกเลิกแจ้งชำรุด ({selectedIds.length})
+                                </Button>
+                            )}
+                        </Space>
+                    </div>
+
+                    <div className="flex-1 flex flex-col w-full">
+                        {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
+                        {bookingStatus === '144' && !hasScannedItems ? (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 text-center h-full">
+                                <div className="text-orange-500 mb-3 sm:mb-4">
+                                    <ExclamationCircleOutlined className="text-4xl sm:text-5xl" />
+                                </div>
+                                <Title level={5} className="text-gray-700 text-sm sm:text-base">
+                                    รายการแจ้งชำรุดปัจจุบัน
+                                </Title>
+                                <Text type="secondary" className="text-xs sm:text-sm">
+                                    ไม่พบรายการสินค้าในสถานะกำลังแก้ไข
+                                    <br />
+                                    (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
+                                </Text>
+                                <div className="mt-3 sm:mt-4">
+                                    <Tag color="orange" className="text-xs sm:text-sm">Status: Unlocked (144)</Tag>
+                                </div>
+                                <div className="mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400">
+                                    * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "แจ้งชำรุด" โดยอัตโนมัติ
+                                </div>
                             </div>
-                            <div className="flex-1 overflow-auto flex flex-col min-h-[400px]">
-                                {/* 🚩 ส่วนแสดงเงื่อนไข Lock/Unlock ก่อนเริ่มสแกน */}
-                                {bookingStatus === '144' && !hasScannedItems ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 text-center h-full">
-                                        <div className="text-orange-500 mb-3 sm:mb-4">
-                                            <ExclamationCircleOutlined className="text-4xl sm:text-5xl" />
+                        ) : !hasScannedItems ? (
+                            <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 h-full">
+                                <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-sm">
+                                    {/* เงื่อนไข: การระบุสถานที่และบันทึกข้อมูล */}
+                                    <div className={`flex flex-col sm:flex-row items-center p-3 sm:p-4 rounded-xl border-2 transition-all ${bookingStatus !== '140' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'} text-center sm:text-left`}>
+                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center sm:mr-4 mb-2 sm:mb-0 ${bookingStatus !== '140' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                            {bookingStatus !== '140' ? <CheckCircleOutlined className="text-lg sm:text-2xl" /> : <InfoCircleOutlined className="text-lg sm:text-2xl" />}
                                         </div>
-                                        <Title level={5} className="text-gray-700 text-sm sm:text-base">
-                                            รายการเบิกปัจจุบัน
-                                        </Title>
-                                        <Text type="secondary" className="text-xs sm:text-sm">
-                                            ไม่พบรายการสินค้าในสถานะกำลังแก้ไข
-                                            <br />
-                                            (ระบบกำลังตรวจสอบรายการจาก RefID: {refID})
-                                        </Text>
-                                        <div className="mt-3 sm:mt-4">
-                                            <Tag color="orange" className="text-xs sm:text-sm">Status: Unlocked (144)</Tag>
-                                        </div>
-                                        <div className="mt-4 sm:mt-6 text-[10px] sm:text-xs text-gray-400">
-                                            * หากปิดหน้าต่างนี้ ระบบจะปรับสถานะเป็น "แจ้งชำรุด" โดยอัตโนมัติ
+                                        <div>
+                                            <Text strong className={`text-sm sm:text-base ${bookingStatus !== '140' ? 'text-green-700' : 'text-gray-600'}`}>
+                                                {bookingStatus !== '140' ? 'บันทึกข้อมูลและสร้างเลขที่แจ้งชำรุดแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
+                                            </Text>
+                                            <br className="hidden sm:block" />
+                                            <Text type="secondary" className="text-xs sm:text-sm">
+                                                {bookingStatus !== '140' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่แจ้งชำรุดอัตโนมัติ'}
+                                            </Text>
                                         </div>
                                     </div>
-                                ) : !hasScannedItems ? (
-                                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 p-4 sm:p-8 h-full">
-                                        <div className="flex flex-col gap-4 sm:gap-6 w-full max-w-sm">
 
-                                            {/* เงื่อนไข: การระบุสถานที่และบันทึกข้อมูล */}
-                                            <div className={`flex flex-col sm:flex-row items-center p-3 sm:p-4 rounded-xl border-2 transition-all ${bookingStatus !== '140' ? 'bg-green-50 border-green-200' : 'bg-white border-gray-100 shadow-sm'} text-center sm:text-left`}>
-                                                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center sm:mr-4 mb-2 sm:mb-0 ${bookingStatus !== '140' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                    {bookingStatus !== '140' ? <CheckCircleOutlined className="text-lg sm:text-2xl" /> : <InfoCircleOutlined className="text-lg sm:text-2xl" />}
-                                                </div>
-                                                <div>
-                                                    <Text strong className={`text-sm sm:text-base ${bookingStatus !== '140' ? 'text-green-700' : 'text-gray-600'}`}>
-                                                        {bookingStatus !== '140' ? 'บันทึกข้อมูลและสร้างเลขที่แจ้งชำรุดแล้ว' : 'กรุณาระบุสถานที่และกดบันทึกข้อมูล'}
-                                                    </Text>
-                                                    <br className="hidden sm:block" />
-                                                    <Text type="secondary" className="text-xs sm:text-sm">
-                                                        {bookingStatus !== '140' ? `เลขที่: ${refID}` : 'ระบบจะสร้างเลขที่แจ้งชำรุดอัตโนมัติ'}
-                                                    </Text>
-                                                </div>
+                                    {/* ข้อความแนะนำด้านล่าง */}
+                                    {bookingStatus !== '140' && refID && (
+                                        <div className="mt-2 sm:mt-6 bg-white border border-green-100 shadow-sm rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 relative overflow-hidden text-center sm:text-left">
+                                            <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 rounded-full blur-xl hidden sm:block"></div>
+                                            <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
+                                                <QrcodeOutlined className="text-xl sm:text-2xl" />
                                             </div>
-
-                                            {/* ข้อความแนะนำด้านล่าง (จะแสดงเมื่อบันทึกข้อมูลแล้ว) */}
-                                            {bookingStatus !== '140' && refID && (
-                                                <div className="mt-2 sm:mt-6 bg-white border border-green-100 shadow-sm rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 relative overflow-hidden text-center sm:text-left">
-                                                    {/* Decorative Circle */}
-                                                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-green-50 rounded-full blur-xl hidden sm:block"></div>
-
-                                                    <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-green-50 rounded-full flex items-center justify-center text-green-600">
-                                                        <QrcodeOutlined className="text-xl sm:text-2xl" />
-                                                    </div>
-
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-center sm:justify-start gap-2">
-                                                            <h4 className="text-sm sm:text-base font-bold text-gray-700 m-0">ระบบพร้อมสแกน</h4>
-                                                            <span className="flex h-2 w-2 relative">
-                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-gray-400 text-xs sm:text-sm m-0">สามารถยิงบาร์โค้ดได้เลย</p>
-                                                    </div>
-
-                                                    <div className="hidden sm:block">
-                                                        <CheckCircleFilled className="text-green-500/20 text-3xl sm:text-4xl" />
-                                                    </div>
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-center sm:justify-start gap-2">
+                                                    <h4 className="text-sm sm:text-base font-bold text-gray-700 m-0">ระบบพร้อมสแกน</h4>
+                                                    <span className="flex h-2 w-2 relative">
+                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                    </span>
                                                 </div>
-                                            )}
+                                                <p className="text-gray-400 text-xs sm:text-sm m-0">สามารถยิงบาร์โค้ดได้เลย</p>
+                                            </div>
+                                            <div className="hidden sm:block">
+                                                <CheckCircleFilled className="text-green-500/20 text-3xl sm:text-4xl" />
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    /* ✅ เมื่อเริ่มสแกนแล้ว (มีข้อมูล) ให้แสดงตารางตามเดิม */
-                                    <Table
-                                        columns={parentColumns}
-                                        dataSource={groupedData}
-                                        expandable={{
-                                            expandedRowRender,
-                                            expandIcon: customExpandIcon,
-                                            // ✅ ปรับแก้ข้อ 2: ควบคุมการ Expand ด้วย State
-                                            expandedRowKeys: expandedKeys,
-                                            onExpand: (expanded, record) => {
-                                                // อนุญาตให้ User หุบเข้า-กางออกเองได้ด้วย
-                                                if (expanded) {
-                                                    setExpandedKeys(prev => [...prev, record.key]);
-                                                } else {
-                                                    setExpandedKeys(prev => prev.filter(k => k !== record.key));
-                                                }
-                                            }
-                                        }}
-                                        rowKey="key"
-                                        loading={loading}
-                                        pagination={false}
-                                        bordered
-                                        size="middle"
-                                        scroll={{ x: 'max-content', y: 600 }} // เพิ่ม max-content รองรับจอเล็ก
-                                    />
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </Col>
-                </Row>
+                        ) : (
+                            <Table
+                                columns={parentColumns}
+                                dataSource={groupedData}
+                                expandable={{
+                                    expandedRowRender,
+                                    expandIcon: customExpandIcon,
+                                    expandedRowKeys: expandedKeys,
+                                    onExpand: (expanded, record) => {
+                                        if (expanded) {
+                                            setExpandedKeys(prev => [...prev, record.key]);
+                                        } else {
+                                            setExpandedKeys(prev => prev.filter(k => k !== record.key));
+                                        }
+                                    }
+                                }}
+                                rowKey="key"
+                                loading={loading}
+                                pagination={false}
+                                bordered
+                                size="middle"
+                                scroll={{ x: 'max-content' }}
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
+
         </Modal >
     );
 }
+
 export default SystemDefectiveList;

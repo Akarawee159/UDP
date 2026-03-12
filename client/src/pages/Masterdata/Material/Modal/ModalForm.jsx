@@ -392,10 +392,10 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                             <div className="w-full md:w-[380px] lg:w-[450px] bg-slate-50 p-4 md:p-6 border-b md:border-b-0 md:border-r border-gray-100 flex-shrink-0 md:overflow-y-auto custom-scrollbar">
                                 <div className="space-y-4 md:space-y-6">
 
-                                    {/* 1. รูปภาพสินค้าหลัก */}
+                                    {/* 1. รูปภาพ */}
                                     <div className="bg-white p-4 rounded-md shadow-sm border border-gray-100 text-center">
                                         <div className="mb-3 font-semibold text-slate-700 flex items-center justify-center gap-2">
-                                            <FileImageOutlined /> รูปภาพสินค้าหลัก
+                                            <FileImageOutlined /> รูปภาพ
                                         </div>
                                         <div className="flex justify-center">
                                             <Upload
@@ -519,20 +519,25 @@ function ModalForm({ open, record, onClose, onSuccess, onDelete }) {
                                     </Row>
                                 </div>
 
-                                {/* Section 2: ขนาดและบรรจุภัณฑ์ */}
+                                {/* Section 2: หน่วยนับและขนาด */}
                                 <div className="mb-6 md:mb-8">
                                     <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
                                         <div className="flex items-center gap-2">
                                             <ExpandAltOutlined className="text-purple-600" />
-                                            <h3 className="text-base font-bold text-slate-800 m-0">ขนาดและบรรจุภัณฑ์</h3>
+                                            <h3 className="text-base font-bold text-slate-800 m-0">หน่วยนับและขนาด</h3>
                                         </div>
                                     </div>
                                     <div className="bg-slate-50 p-4 md:p-5 rounded-md border border-gray-100">
                                         <Row gutter={[16, 16]}>
                                             {/* เปลี่ยน md={8} เป็น md={12} เพื่อให้กว้างขึ้น แบ่งเป็น 2 คอลัมน์ต่อแถว */}
+                                            <Col xs={24} sm={12} md={12}>
+                                                <Form.Item label="หน่วยนับ" name="material_unitname" className="mb-0">
+                                                    <Select options={unitOptions} placeholder="เลือกหน่วย" style={{ width: '100%' }} allowClear className="bg-gray-50" />
+                                                </Form.Item>
+                                            </Col>
                                             <Col xs={24} sm={12} md={12}><DimensionInput label="ความกว้าง" name="material_width" unitName="material_width_unit" icon={<ColumnWidthOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
                                             <Col xs={24} sm={12} md={12}><DimensionInput label="ความยาว" name="material_length" unitName="material_length_unit" icon={<ColumnHeightOutlined className="rotate-90 text-slate-400" />} placeholder="0.00" /></Col>
-                                            <Col xs={24} sm={24} md={24}><DimensionInput label="ความสูง" name="material_height" unitName="material_height_unit" icon={<ColumnHeightOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
+                                            <Col xs={24} sm={12} md={12}><DimensionInput label="ความสูง" name="material_height" unitName="material_height_unit" icon={<ColumnHeightOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
                                             <Col xs={24} sm={12} md={12}><DimensionInput label="ความจุ (Capacity)" name="material_capacity" unitName="material_capacity_unit" icon={<GatewayOutlined className="text-slate-400" />} placeholder="0.00" /></Col>
                                             <Col xs={24} sm={12} md={12}><DimensionInput label="น้ำหนัก (Weight)" name="material_weight" unitName="material_weight_unit" icon={<span className="text-slate-400 text-xs font-bold">W</span>} placeholder="0.00" /></Col>
                                         </Row>

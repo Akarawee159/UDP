@@ -18,7 +18,7 @@ function getBangkokNow() {
 }
 
 const COLUMNS_LIST = `
-  asset_code, asset_detail, asset_type, asset_date, doc_no, 
+  asset_code, asset_detail, asset_color, asset_type, asset_unitname, asset_date, doc_no, 
   asset_lot, asset_responsible_department, asset_model, asset_holder, asset_location, 
   asset_origin, asset_width, asset_width_unit, asset_length, asset_length_unit, 
   asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
@@ -122,7 +122,7 @@ async function createBulk(dataArray) {
 
   // มีทั้งหมด 42 ข้อมูล (ต้องเท่ากับจำนวนคอลัมน์ใน sqlMain)
   const valuesForMain = dataArray.map(item => [
-    item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
+    item.asset_code, item.asset_detail, item.asset_color, item.asset_type, item.asset_unitname, item.asset_date, item.doc_no,
     item.asset_lot, item.asset_responsible_department, item.asset_model, item.asset_holder, item.asset_location,
     item.asset_origin, item.asset_width, item.asset_width_unit, item.asset_length, item.asset_length_unit,
     item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,
@@ -136,7 +136,7 @@ async function createBulk(dataArray) {
   // มีทั้งหมด 42 คอลัมน์
   const sqlMain = `
     INSERT INTO tb_asset_lists (
-      asset_code, asset_detail, asset_type, asset_date, doc_no, 
+      asset_code, asset_detail, asset_color, asset_type, asset_unitname, asset_date, doc_no, 
       asset_lot, asset_responsible_department, asset_model, asset_holder, asset_location, 
       asset_origin, asset_width, asset_width_unit, asset_length, asset_length_unit, 
       asset_height, asset_height_unit, asset_capacity, asset_capacity_unit, asset_weight, 
@@ -169,7 +169,7 @@ async function insertDetailLog(dataObjArray) {
 
   // มีทั้งหมด 44 ข้อมูล (ต้องเท่ากับ COLUMNS_LIST ด้านบนเป๊ะๆ)
   const values = dataObjArray.map(item => [
-    item.asset_code, item.asset_detail, item.asset_type, item.asset_date, item.doc_no,
+    item.asset_code, item.asset_detail, item.asset_color, item.asset_type, item.asset_unitname, item.asset_date, item.doc_no,
     item.asset_lot, item.asset_responsible_department, item.asset_model, item.asset_holder, item.asset_location,
     item.asset_origin, item.asset_width, item.asset_width_unit, item.asset_length, item.asset_length_unit,
     item.asset_height, item.asset_height_unit, item.asset_capacity, item.asset_capacity_unit, item.asset_weight,

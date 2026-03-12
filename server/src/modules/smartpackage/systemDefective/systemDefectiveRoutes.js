@@ -22,5 +22,9 @@ router.post('/confirm-output', auth, controller.confirmOutput); // ยืนย�
 router.get('/dropdowns', auth, controller.getDropdowns);      // Dropdowns
 router.get('/defective-items', auth, controller.getDefectiveItems);
 router.post('/receive-stock', auth, controller.receiveToStock);
+router.post('/print-pdf', auth, controller.printUsagePDF); // พิมพ์ใบใช้งาน
+router.get('/defective-checkout-items', auth, controller.getDefectiveCheckoutItems);
+router.post('/checkout-defective', auth, controller.checkoutDefective);
+router.post('/return-defective', auth, controller.returnDefective);
 
 module.exports = router;

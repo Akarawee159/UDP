@@ -126,6 +126,8 @@ async function editHeaderBooking(draft_id, user_id) {
 // 3. ปรับฟังก์ชัน Finalize (ใช้งานสมบูรณ์ - รวบ 111->115 และ 114->115 ไว้ด้วยกัน)
 async function finalizeBooking(draft_id, user_id, headerData = {}) {
   const now = getThaiNow();
+
+  // ✅ 1. อัปเดตตารางที่ 1: booking_asset_lists (Header)
   if (headerData.origin && headerData.destination) {
     await db.query(`
             UPDATE booking_asset_lists SET booking_remark = ?, origin = ?, destination = ?, updated_by = ?, updated_at = ?
@@ -139,27 +141,36 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
 
   const { refID, origin, destination } = booking;
 
-  // ✅ 1. เพิ่มการอัปเดต current_address โดยใช้ค่าปลายทาง (destination) ลงใน tb_asset_lists
+  // ✅ 2. อัปเดตตารางที่ 2: tb_asset_lists (Master)
   await db.query(`
-        UPDATE tb_asset_lists SET asset_origin = ?, asset_destination = ?, current_address = ? WHERE draft_id = ?
-    `, [origin, destination, destination, draft_id]);
+        UPDATE tb_asset_lists 
+        SET asset_origin = ?, 
+            asset_destination = ?, 
+            current_address = ?, 
+            is_status = '115', 
+            updated_by = ?, 
+            updated_at = ?, 
+            last_used = ? 
+        WHERE draft_id = ?
+    `, [origin, destination, destination, user_id, now, now, draft_id]);
 
-  // ✅ 2. เพิ่ม current_address ลงใน tb_asset_lists_detail กรณีแก้ไขข้อมูลเดิม
-  await db.query(`
-        UPDATE tb_asset_lists_detail 
-        SET asset_origin = ?, asset_destination = ?, current_address = ? 
-        WHERE refID = ? AND asset_status = '101' AND is_status = '115'
-    `, [origin, destination, destination, refID]);
+  // ✅ 3. อัปเดตตารางที่ 3: tb_asset_lists_detail (Detail - สำหรับรายการที่เคย Insert ไปแล้ว)
+  if (refID) {
+    await db.query(`
+          UPDATE tb_asset_lists_detail 
+          SET asset_origin = ?, 
+              asset_destination = ?, 
+              current_address = ? 
+          WHERE refID = ? AND is_status = '115'
+      `, [origin, destination, destination, refID]);
+  }
 
+  // อัปเดต Status ของใบเบิกเป็น 115
   await db.query(`
         UPDATE booking_asset_lists SET is_status = '115', updated_by = ?, updated_at = ? WHERE draft_id = ?
     `, [user_id, now, draft_id]);
 
-  await db.query(`
-        UPDATE tb_asset_lists SET is_status = '115', updated_by = ?, updated_at = ?, last_used = ? WHERE draft_id = ?
-    `, [user_id, now, now, draft_id]);
-
-  // ✅ 3. เพิ่มฟิลด์ current_address เข้าไปตอน Insert ลงตาราง Detail
+  // ✅ 4. Insert ข้อมูลลง Detail (กรณีเป็นของที่เพิ่งสแกนเข้ามาใหม่ ยังไม่มีในประวัติ 115)
   const sqlInsertDetail = `
         INSERT INTO tb_asset_lists_detail (
             draft_id, refID, asset_code, asset_detail, asset_type, asset_date,
@@ -195,7 +206,6 @@ async function finalizeBooking(draft_id, user_id, headerData = {}) {
             SELECT asset_code 
             FROM tb_asset_lists_detail 
             WHERE refID = ? 
-              AND asset_status = '101' 
               AND is_status = '115'
         )
     `;
@@ -375,16 +385,12 @@ async function getZones() {
   return rows;
 }
 
-// ค้นหาฟังก์ชันนี้และแทนที่ด้วย Code ด้านล่าง
-async function getAllBookings(searchDate) {
+// เปลี่ยนพารามิเตอร์รับค่า startDate, endDate
+async function getAllBookings(startDate, endDate) {
   const sql = `
     SELECT 
         b.*, 
-        -- 1. จำนวนจากตารางหลัก (Master)
         (SELECT COUNT(*) FROM tb_asset_lists a WHERE a.draft_id = b.draft_id AND a.asset_status = '101') as master_count,
-        
-        -- 2. จำนวนจากตารางประวัติ (Detail)
-        -- เปลี่ยนมาใช้เงื่อนไขเดียวกับตอนที่กดดูรายละเอียด
         (
             SELECT COUNT(DISTINCT d.asset_code) 
             FROM tb_asset_lists_detail d 
@@ -392,7 +398,6 @@ async function getAllBookings(searchDate) {
             AND d.is_status = '115' 
             AND d.asset_status = '101'
         ) as detail_count,
-        
         s.G_NAME as is_status_name, 
         s.G_DESCRIPT as is_status_color,
         CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as created_by_name
@@ -401,11 +406,12 @@ async function getAllBookings(searchDate) {
     LEFT JOIN employees e ON b.created_by = e.employee_id
     WHERE b.is_status NOT IN ('113') 
       AND b.booking_type = 'RF'
-      AND b.create_date = ? 
+      AND b.create_date BETWEEN ? AND ?
     ORDER BY b.created_at DESC
   `;
 
-  const [rows] = await db.query(sql, [searchDate]);
+  // ส่ง parameter เข้า query 2 ตัว
+  const [rows] = await db.query(sql, [startDate, endDate]);
   return rows;
 }
 
@@ -533,7 +539,6 @@ async function getAssetsByMasterRefID(refID) {
   return rows;
 }
 
-// src/modules/Smartpackage/systemOut/systemOutModel.js
 async function confirmOutput(draft_id, user_id) {
   const now = getThaiNow();
 
@@ -609,6 +614,31 @@ async function confirmOutput(draft_id, user_id) {
   return true;
 }
 
+async function getAssetsForPrint(assetCodes) {
+  if (!assetCodes || assetCodes.length === 0) return [];
+  const sql = `
+      SELECT a.asset_code, a.scan_at, a.label_register,
+             CONCAT(COALESCE(e.titlename_th,''), '', COALESCE(e.firstname_th,''), ' ', COALESCE(e.lastname_th,'')) as scan_by_name
+      FROM tb_asset_lists a
+      LEFT JOIN employees e ON a.scan_by = e.employee_id
+      WHERE a.asset_code IN (?)
+      ORDER BY a.scan_at ASC
+  `;
+  const [rows] = await db.query(sql, [assetCodes]);
+  return rows;
+}
+
+async function getUserFullName(employee_id) {
+  if (!employee_id) return '-';
+  const sql = `
+      SELECT CONCAT(COALESCE(titlename_th,''), '', COALESCE(firstname_th,''), ' ', COALESCE(lastname_th,'')) as fullname 
+      FROM employees 
+      WHERE employee_id = ?
+  `;
+  const [rows] = await db.query(sql, [employee_id]);
+  return rows[0]?.fullname || employee_id;
+}
+
 module.exports = {
   createBooking,
   generateRefID,
@@ -627,5 +657,7 @@ module.exports = {
   cancelBooking,
   getAssetsDetailByRefID,
   getAssetsByMasterRefID,
-  confirmOutput
+  confirmOutput,
+  getAssetsForPrint,
+  getUserFullName
 };

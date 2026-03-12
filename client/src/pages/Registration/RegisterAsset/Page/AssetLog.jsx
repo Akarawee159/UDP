@@ -38,7 +38,7 @@ function AssetLog() {
 
     useEffect(() => {
         if (!asset_code) {
-            message.error("ไม่พบรหัสทรัพย์สิน");
+            message.error("ไม่พบรหัสบรรจุภัณฑ์");
             navigate(-1);
             return;
         }
@@ -117,7 +117,7 @@ function AssetLog() {
             }
         },
         {
-            headerName: 'สถานะทรัพย์สิน', field: 'is_status', width: 180,
+            headerName: 'สถานะบรรจุภัณฑ์', field: 'is_status', width: 180,
             sortable: true,
             filter: true,
             filterValueGetter: (params) => params.data.is_status_name,
@@ -272,10 +272,10 @@ function AssetLog() {
                     <div>
                         <Title level={4} style={{ margin: 0 }} className="text-slate-800 flex items-center gap-2">
                             <span className="bg-orange-500 w-2 h-6 rounded-r-md block"></span>
-                            ประวัติทรัพย์สิน: {asset_code}
+                            ประวัติบรรจุภัณฑ์: {asset_code}
                         </Title>
                         <Text className="text-slate-500 text-xs ml-4">
-                            แสดงประวัติการเปลี่ยนแปลง (Log) ทั้งหมดของทรัพย์สินนี้
+                            แสดงประวัติการเปลี่ยนแปลง (Log) ทั้งหมดของบรรจุภัณฑ์นี้
                         </Text>
                     </div>
                 </div>

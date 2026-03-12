@@ -77,7 +77,9 @@ async function create(req, res, next) {
       const row = {
         asset_code: fullAssetCode,
         asset_detail: body.asset_detail || '',
+        asset_color: body.asset_color || '',
         asset_type: body.asset_type || '',
+        asset_unitname: body.asset_unitname || '',
         asset_date: body.asset_date || null,
         create_date: createdTimestamp,
         doc_no: body.doc_no || '',

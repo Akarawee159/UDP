@@ -2,6 +2,7 @@
 'use strict';
 const model = require('./systemOutModel');
 const dayjs = require('dayjs');
+const { generateUsagePDF } = require('./outPDF');
 
 async function initBooking(req, res, next) {
   try {
@@ -13,7 +14,7 @@ async function initBooking(req, res, next) {
 
     // ✅ 1.2 กำหนด Logic booking_type ตามเงื่อนไข
     let booking_type = null;
-    if (objective === 'ทำรายการใช้งาน') {
+    if (objective === 'ทำรายการเบิกใช้งาน') {
       booking_type = 'RF';
     }
 
@@ -96,6 +97,17 @@ async function unlockBooking(req, res, next) {
     const user_id = req.user?.employee_id;
     if (!draft_id) throw new Error("Draft ID missing");
 
+    // ✅ 1. ดึงข้อมูลใบเบิกเพื่อเอา refID ปัจจุบัน
+    const booking = await model.getBookingDetail(draft_id);
+    if (!booking) throw new Error("ไม่พบข้อมูลใบเบิก");
+
+    // ✅ 2. ตรวจสอบว่าใน tb_asset_lists มีรายการที่ผูกกับ refID และสถานะเป็น 101 หรือไม่
+    const assetsInMaster = await model.getAssetsByMasterRefID(booking.refID);
+    if (!assetsInMaster || assetsInMaster.length === 0) {
+      throw new Error("ไม่อนุญาติให้แก้ไข เนื่องไม่พบรายการ");
+    }
+
+    // ✅ 3. ถ้ามีข้อมูล ค่อยสั่งอัปเดตสถานะเป็น 114
     await model.unlockBooking(draft_id, user_id);
 
     const io = req.app.get('io');
@@ -172,11 +184,13 @@ async function getDropdowns(req, res, next) {
 
 async function getBookingList(req, res, next) {
   try {
-    // ✅ รับค่า date จาก query parameter ถ้าไม่ส่งมาให้ใช้ "วันนี้"
-    const { date } = req.query;
-    const searchDate = date || dayjs().format('YYYY-MM-DD');
+    const { startDate, endDate } = req.query;
 
-    const rows = await model.getAllBookings(searchDate);
+    // ตั้งค่าเริ่มต้น: วันแรกของเดือนปัจจุบัน ถึง วันสุดท้ายของเดือนปัจจุบัน
+    const sDate = startDate || dayjs().startOf('month').format('YYYY-MM-DD');
+    const eDate = endDate || dayjs().endOf('month').format('YYYY-MM-DD');
+
+    const rows = await model.getAllBookings(sDate, eDate);
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 }
@@ -188,26 +202,32 @@ async function getBookingDetail(req, res, next) {
 
     const booking = await model.getBookingDetail(draft_id);
     let assets = [];
+    let hasActiveItems = false; // ✅ 1. เพิ่ม Flag สำหรับบอกว่ามีของในตาราง Master ไหม
 
     if (booking) {
       const status = String(booking.is_status);
 
       if (status === '115') {
-        // 1. ลองดึงข้อมูลจากตารางหลัก (Master: tb_asset_lists) ก่อน
-        assets = await model.getAssetsByMasterRefID(booking.refID);
+        const masterAssets = await model.getAssetsByMasterRefID(booking.refID);
 
-        // 2. ถ้าในตารางหลักไม่มีข้อมูลที่ผูกกับ refID นี้แล้ว (assets.length === 0) 
-        // ค่อยดึงจากประวัติ (Detail: tb_asset_lists_detail)
-        if (!assets || assets.length === 0) {
+        // ✅ 2. เช็คว่ามีข้อมูลใน Master ไหม
+        if (masterAssets && masterAssets.length > 0) {
+          assets = masterAssets;
+          hasActiveItems = true; // มีของจริง
+        } else {
           assets = await model.getAssetsDetailByRefID(booking.refID);
+          hasActiveItems = false; // ไม่มีของจริง (ดึงประวัติมาเฉยๆ)
         }
       } else if (status === '114' || status === '111' || status === '116') {
         assets = await model.getAssetsByMasterRefID(booking.refID);
+        hasActiveItems = assets.length > 0;
       } else {
         assets = await model.getAssetsByDraft(draft_id);
+        hasActiveItems = assets.length > 0;
       }
     }
-    res.json({ success: true, booking, assets });
+    // ✅ 3. ส่ง hasActiveItems กลับไปให้ Frontend
+    res.json({ success: true, booking, assets, hasActiveItems });
   } catch (err) { next(err); }
 }
 
@@ -245,6 +265,35 @@ async function confirmOutput(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function printUsagePDF(req, res, next) {
+  try {
+    const { ids, draft_id } = req.body;
+    const user_id = req.user?.employee_id;
+    if (!ids || ids.length === 0) throw new Error("ไม่พบรายการที่เลือก");
+
+    const booking = await model.getBookingDetail(draft_id);
+
+    const origin = booking ? booking.origin : '-';
+    const destination = booking ? booking.destination : '-';
+
+    // 📌 ดึงวันที่และเวลาเบิกใช้งานมาจัดฟอร์แมต
+    const createDate = booking?.create_date ? dayjs(booking.create_date).format('DD/MM/YYYY') : '-';
+    const createTime = booking?.create_time ? booking.create_time : '-';
+
+    const items = await model.getAssetsForPrint(ids);
+    const printByName = await model.getUserFullName(user_id);
+
+    // 📌 ส่ง createDate และ createTime เข้าไปในฟังก์ชัน
+    const pdfBuffer = await generateUsagePDF(items, origin, destination, printByName, createDate, createTime);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   initBooking,
   getScannedList,
@@ -259,5 +308,6 @@ module.exports = {
   cancelBooking,
   finalizeBooking,
   unlockBooking,
-  confirmOutput
+  confirmOutput,
+  printUsagePDF
 };
